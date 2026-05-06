@@ -80,6 +80,7 @@ describe("codex args", () => {
 			]),
 		);
 		expect(args).not.toContain("--sandbox");
+		expect(args).not.toContain("--cd");
 	});
 
 	it("extracts session id from jsonl", () => {

@@ -44,8 +44,6 @@ export function buildCodexResumeArgs(
 		"resume",
 		"--json",
 		"--skip-git-repo-check",
-		"--cd",
-		config.executionPath,
 		"--output-last-message",
 		outputFile,
 	];
