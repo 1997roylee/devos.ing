@@ -100,6 +100,10 @@ export interface LinearIssue {
 	identifier: string;
 	title: string;
 	url: string;
+	priority: {
+		value: number;
+		name: string;
+	};
 	state: {
 		id: string;
 		name: string;

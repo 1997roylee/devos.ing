@@ -58,18 +58,20 @@ export class LinearClient {
 			),
 		);
 
-		return issues
-			.filter((issue) => issue.state.id === this.requiredStatusMap().assigned)
-			.filter((issue) => {
-				if (!this.config.linear.requiredLabel) {
-					return true;
-				}
-				return issue.labels.some(
-					(label) =>
-						label.name.toLowerCase() ===
-						this.config.linear.requiredLabel?.toLowerCase(),
-				);
-			});
+		return sortIssuesByPriority(
+			issues
+				.filter((issue) => issue.state.id === this.requiredStatusMap().assigned)
+				.filter((issue) => {
+					if (!this.config.linear.requiredLabel) {
+						return true;
+					}
+					return issue.labels.some(
+						(label) =>
+							label.name.toLowerCase() ===
+							this.config.linear.requiredLabel?.toLowerCase(),
+					);
+				}),
+		);
 	}
 
 	async markStage(
@@ -324,6 +326,10 @@ export class LinearClient {
 			identifier: issue.identifier,
 			title: issue.title,
 			url: issue.url,
+			priority: {
+				value: issue.priority ?? 0,
+				name: issue.priorityLabel ?? "No priority",
+			},
 			state: {
 				id: state.id,
 				name: state.name,
@@ -351,4 +357,31 @@ function isWorkflowLabelStage(
 	stage: WorkflowStage,
 ): stage is WorkflowLabelStage {
 	return stage === "pr_created" || stage === "reviewing" || stage === "testing";
+}
+
+const PRIORITY_SORT_ORDER: Record<number, number> = {
+	1: 0,
+	2: 1,
+	3: 2,
+	4: 3,
+	0: 4,
+};
+
+function getPriorityRank(priority: number): number {
+	return PRIORITY_SORT_ORDER[priority] ?? PRIORITY_SORT_ORDER[0];
+}
+
+export function sortIssuesByPriority(issues: LinearIssue[]): LinearIssue[] {
+	return issues
+		.map((issue, index) => ({ issue, index }))
+		.sort((left, right) => {
+			const rankDiff =
+				getPriorityRank(left.issue.priority.value) -
+				getPriorityRank(right.issue.priority.value);
+			if (rankDiff !== 0) {
+				return rankDiff;
+			}
+			return left.index - right.index;
+		})
+		.map((entry) => entry.issue);
 }
