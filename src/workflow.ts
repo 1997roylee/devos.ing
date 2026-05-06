@@ -293,7 +293,7 @@ async function executeIssue(
 		await linear.markStage(state.issue.id, "implementing");
 		await linear.comment(
 			state.issue.id,
-			buildPlanComment(state.issue.key, state.planSummary),
+			buildPlanComment(state.issue.key, state.planSummary, result.usage),
 		);
 		logger.info(buildIssueJobLogFields(state, "planning"), "Plan completed");
 	}
@@ -335,7 +335,10 @@ async function executeIssue(
 		await linear.applyStageLabel(state.issue.id, "pr_created");
 		await linear.comment(
 			state.issue.id,
-			`Implementation completed. Draft PR: ${state.pullRequest.url ?? "(created)"}`,
+			[
+				`Implementation completed. Draft PR: ${state.pullRequest.url ?? "(created)"}`,
+				formatCodexUsageLine(result.usage),
+			].join("\n"),
 		);
 		logger.info(
 			buildIssueJobLogFields(state, "implementing"),
@@ -375,6 +378,8 @@ async function executeIssue(
 			`PIV loop review for ${state.issue.key}`,
 			"",
 			`Result: ${outcome.passed ? "PASS" : "FAIL"}`,
+			"",
+			formatCodexUsageLine(review.usage),
 			"",
 			outcome.summary,
 			"",
@@ -457,6 +462,11 @@ export interface ReviewOutcome {
 export function buildPlanComment(
 	issueKey: string,
 	planSummary: string,
+	usage?: {
+		inputTokens?: number;
+		outputTokens?: number;
+		totalTokens?: number;
+	},
 ): string {
 	const maxSummaryLength = 6000;
 	const normalized = planSummary.trim();
@@ -470,9 +480,30 @@ export function buildPlanComment(
 		"",
 		"Planning completed; implementation started.",
 		"",
+		formatCodexUsageLine(usage),
+		"",
 		"Plan:",
 		truncated || "(No plan summary returned by planning agent.)",
 	].join("\n");
+}
+
+export function formatCodexUsageLine(usage?: {
+	inputTokens?: number;
+	outputTokens?: number;
+	totalTokens?: number;
+}): string {
+	if (!usage) {
+		return "Token usage: unknown";
+	}
+	const input = usage.inputTokens ?? "unknown";
+	const output = usage.outputTokens ?? "unknown";
+	const total =
+		usage.totalTokens ??
+		(typeof usage.inputTokens === "number" &&
+		typeof usage.outputTokens === "number"
+			? usage.inputTokens + usage.outputTokens
+			: "unknown");
+	return `Token usage: input ${input}, output ${output}, total ${total}`;
 }
 
 export function parseReviewOutcome(text: string): ReviewOutcome {
