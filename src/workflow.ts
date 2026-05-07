@@ -234,22 +234,17 @@ async function runProjectCycle(
 	polling: PollingSettings,
 ): Promise<number> {
 	const projectLogger = logger.child({ projectId: config.id });
-	const issues = await linear.fetchWork(options.issueArg);
-	const staleIssues =
-		options.issueArg === undefined
-			? await fetchStaleIssuesForRetry(
-					config,
-					linear,
-					polling.staleRunTimeoutMs,
-					issues,
-				)
-			: [];
-	const issueQueue = dedupeIssuesByKey([...issues, ...staleIssues]);
+	const { issueQueue, staleRetryCount } = await buildIssueQueueForProjectCycle(
+		config,
+		options,
+		linear,
+		polling,
+	);
 	projectLogger.info(
 		{
 			cycle,
 			issueCount: issueQueue.length,
-			staleRetryCount: staleIssues.length,
+			staleRetryCount,
 			pollingEnabled: polling.enabled,
 		},
 		"Fetched eligible Linear issues",
@@ -264,6 +259,28 @@ async function runProjectCycle(
 	}
 
 	return issueQueue.length;
+}
+
+async function buildIssueQueueForProjectCycle(
+	config: ResolvedProjectConfig,
+	options: RunOptions,
+	linear: LinearClient,
+	polling: PollingSettings,
+): Promise<{ issueQueue: WorkflowIssue[]; staleRetryCount: number }> {
+	const assignedIssues = await linear.fetchWork(options.issueArg);
+	if (options.issueArg !== undefined) {
+		return { issueQueue: assignedIssues, staleRetryCount: 0 };
+	}
+	const staleRetryIssues = await fetchStaleIssuesForRetry(
+		config,
+		linear,
+		polling.staleRunTimeoutMs,
+		assignedIssues,
+	);
+	return {
+		issueQueue: dedupeIssuesByKey([...assignedIssues, ...staleRetryIssues]),
+		staleRetryCount: staleRetryIssues.length,
+	};
 }
 
 export function shouldRetryRunStage(stage: WorkflowStage): boolean {
@@ -320,20 +337,22 @@ async function fetchStaleIssuesForRetry(
 	config: ResolvedProjectConfig,
 	linear: LinearClient,
 	timeoutMs: number,
-	existingIssues: WorkflowIssue[],
+	assignedIssues: WorkflowIssue[],
 ): Promise<WorkflowIssue[]> {
 	const runStates = await listRunStates(config.workspacePath, config.id);
-	const nowMs = Date.now();
-	const existingKeys = new Set(
-		existingIssues.map((issue) => normalizeIssueKey(issue.identifier)),
-	);
 	const staleRunKeys = selectStaleRunIssueKeys(
 		runStates,
-		nowMs,
+		Date.now(),
 		timeoutMs,
-	).filter((key) => !existingKeys.has(key));
+	);
+	const assignedIssueKeys = new Set(
+		assignedIssues.map((issue) => normalizeIssueKey(issue.identifier)),
+	);
+	const staleUnassignedKeys = staleRunKeys.filter(
+		(key) => !assignedIssueKeys.has(key),
+	);
 	const staleIssues: WorkflowIssue[] = [];
-	for (const key of staleRunKeys) {
+	for (const key of staleUnassignedKeys) {
 		const issue = await linear.fetchIssueByIdentifier(key);
 		if (!issue) {
 			continue;
@@ -474,182 +493,213 @@ async function executeIssue(
 ): Promise<void> {
 	while (state.stage !== "done" && state.stage !== "blocked") {
 		if (state.stage === "received") {
-			await linear.markStage(state.issue.id, "planning");
-			await linear.comment(state.issue.id, "ADHD.ai started planning.");
-			Object.assign(state, transitionStage(state, "planning"));
-			await saveRunState(config.workspacePath, state);
+			await handleReceivedStage(config, linear, state);
 			continue;
 		}
 
 		if (state.stage === "planning") {
-			logger.info(buildIssueJobLogFields(state, "planning"), "Planning issue");
-			const prompt = await buildPlanPrompt(config.skills.plan, state.issue);
-			const result = await runPlanSession(config, prompt);
-			state.codexSessionId = result.sessionId ?? state.codexSessionId;
-			state.planSummary = result.finalMessage || result.stdout;
-			appendCodexUsage(state, "planning", result.usage);
-			Object.assign(state, transitionStage(state, "implementing"));
-			await saveRunState(config.workspacePath, state);
-			await linear.markStage(state.issue.id, "implementing");
-			await linear.comment(
-				state.issue.id,
-				buildPlanComment(state.issue.key, state.planSummary, result.usage),
-			);
-			logger.info(buildIssueJobLogFields(state, "planning"), "Plan completed");
+			await handlePlanningStage(config, linear, state);
 			continue;
 		}
 
 		if (state.stage === "implementing") {
-			if (!state.codexSessionId) {
-				throw new Error("Missing codex session id for implement step");
-			}
-			logger.info(
-				buildIssueJobLogFields(state, "implementing"),
-				"Implementing issue",
-			);
-
-			const hasExistingPr = Boolean(state.pullRequest);
-			const fixRound = hasExistingPr && state.bugs.length > 0;
-			const prompt = fixRound
-				? await buildFixPrompt(
-						config.skills.implement,
-						state.issue,
-						state.planSummary ?? "",
-						state.testingSummary ?? state.reviewSummary ?? "",
-						state.bugs,
-						state.pullRequest,
-					)
-				: await buildImplementPrompt(
-						config.skills.implement,
-						state.issue,
-						state.planSummary ?? "",
-					);
-			const result = await runResumeSession(
-				config,
-				state.codexSessionId,
-				prompt,
-			);
-			state.implementationSummary = result.finalMessage || result.stdout;
-			appendCodexUsage(state, "implementing", result.usage);
-
-			if (!hasExistingPr) {
-				if (config.dryRun) {
-					state.pullRequest = {
-						branch: `codex/${state.issue.key.toLowerCase()}`,
-						title: `[codex] ${state.issue.key}: ${state.issue.title}`,
-						url: "https://example.invalid/dry-run",
-					};
-				} else {
-					state.pullRequest = await createDraftPrFromWorktree(
-						config,
-						state.issue.key,
-						state.issue.title,
-					);
-				}
-			} else if (!config.dryRun) {
-				if (!state.pullRequest?.branch) {
-					throw new Error("Missing pull request branch for feedback pass");
-				}
-				await updateDraftPrFromWorktree(
-					config,
-					state.pullRequest.branch,
-					state.issue.key,
-				);
-			}
-
-			state.bugs = [];
-			const nextStage: WorkflowStage = hasExistingPr
-				? "reviewing"
-				: "pr_created";
-			Object.assign(state, transitionStage(state, nextStage));
-			await saveRunState(config.workspacePath, state);
-			await linear.markStage(state.issue.id, nextStage);
-			await linear.applyStageLabel(state.issue.id, nextStage);
-			await linear.comment(
-				state.issue.id,
-				buildImplementationComment(state.pullRequest?.url, result.usage, {
-					updated: hasExistingPr,
-				}),
-			);
-			logger.info(
-				buildIssueJobLogFields(state, "implementing"),
-				hasExistingPr
-					? "Implementation feedback pass completed"
-					: "Implementation completed",
-			);
+			await handleImplementingStage(config, linear, state);
 			continue;
 		}
 
 		if (state.stage === "pr_created") {
-			Object.assign(state, transitionStage(state, "reviewing"));
-			await saveRunState(config.workspacePath, state);
-			await linear.markStage(state.issue.id, "reviewing");
-			await linear.applyStageLabel(state.issue.id, "reviewing");
+			await handlePrCreatedStage(config, linear, state);
 			continue;
 		}
 
 		if (state.stage === "reviewing" || state.stage === "testing") {
-			logger.info(buildIssueJobLogFields(state, "testing"), "Testing issue");
-			await linear.markStage(state.issue.id, "testing");
-			await linear.applyStageLabel(state.issue.id, "testing");
-			Object.assign(state, transitionStage(state, "testing"));
-			await saveRunState(config.workspacePath, state);
-
-			const prompt = await buildReviewPrompt(
-				config.skills.reviewTest,
-				state.issue,
-				state.pullRequest,
-			);
-			const review = await runReviewSession(config, prompt);
-			const outcome = parseReviewOutcome(review.finalMessage || review.stdout);
-			const retryBugs = normalizeFailedReviewBugs(outcome);
-			appendCodexUsage(state, "testing", review.usage);
-
-			state.reviewSummary = outcome.summary;
-			state.testingSummary = outcome.summary;
-			state.bugs = retryBugs;
-			await saveRunState(config.workspacePath, state);
-
-			const reviewComment = buildReviewComment({
-				issueKey: state.issue.key,
-				passed: outcome.passed,
-				summary: outcome.summary,
-				usage: review.usage,
-				bugs: retryBugs,
-			});
-
-			if (!config.dryRun && state.pullRequest) {
-				await commentOnPr(config, state.pullRequest, reviewComment);
-			}
-			await linear.comment(state.issue.id, reviewComment);
-
-			if (!outcome.passed) {
-				Object.assign(state, transitionStage(state, "implementing"));
-				await saveRunState(config.workspacePath, state);
-				await linear.markStage(state.issue.id, "implementing");
-				await linear.comment(
-					state.issue.id,
-					"Review/testing failed. Feedback was sent back to implementation for another pass.",
-				);
-				continue;
-			}
-
-			Object.assign(state, transitionStage(state, "done"));
-			await saveRunState(config.workspacePath, state);
-			await linear.markStage(state.issue.id, "done");
-			await linear.comment(
-				state.issue.id,
-				"Review/testing passed. Marked done.",
-			);
-			logger.info(
-				buildIssueJobLogFields(state, "testing"),
-				"Review/testing completed",
-			);
+			await handleReviewTestingStage(config, linear, state);
 			continue;
 		}
 
 		throw new Error(`Unsupported workflow stage: ${state.stage}`);
 	}
+}
+
+async function handleReceivedStage(
+	config: ResolvedProjectConfig,
+	linear: LinearClient,
+	state: RunState,
+): Promise<void> {
+	await linear.markStage(state.issue.id, "planning");
+	await linear.comment(state.issue.id, "ADHD.ai started planning.");
+	Object.assign(state, transitionStage(state, "planning"));
+	await saveRunState(config.workspacePath, state);
+}
+
+async function handlePlanningStage(
+	config: ResolvedProjectConfig,
+	linear: LinearClient,
+	state: RunState,
+): Promise<void> {
+	logger.info(buildIssueJobLogFields(state, "planning"), "Planning issue");
+	const prompt = await buildPlanPrompt(config.skills.plan, state.issue);
+	const result = await runPlanSession(config, prompt);
+	state.codexSessionId = result.sessionId ?? state.codexSessionId;
+	state.planSummary = result.finalMessage || result.stdout;
+	appendCodexUsage(state, "planning", result.usage);
+	Object.assign(state, transitionStage(state, "implementing"));
+	await saveRunState(config.workspacePath, state);
+	await linear.markStage(state.issue.id, "implementing");
+	await linear.comment(
+		state.issue.id,
+		buildPlanComment(state.issue.key, state.planSummary, result.usage),
+	);
+	logger.info(buildIssueJobLogFields(state, "planning"), "Plan completed");
+}
+
+async function handleImplementingStage(
+	config: ResolvedProjectConfig,
+	linear: LinearClient,
+	state: RunState,
+): Promise<void> {
+	if (!state.codexSessionId) {
+		throw new Error("Missing codex session id for implement step");
+	}
+	logger.info(
+		buildIssueJobLogFields(state, "implementing"),
+		"Implementing issue",
+	);
+
+	const hasExistingPr = Boolean(state.pullRequest);
+	const fixRound = hasExistingPr && state.bugs.length > 0;
+	const prompt = fixRound
+		? await buildFixPrompt(
+				config.skills.implement,
+				state.issue,
+				state.planSummary ?? "",
+				state.testingSummary ?? state.reviewSummary ?? "",
+				state.bugs,
+				state.pullRequest,
+			)
+		: await buildImplementPrompt(
+				config.skills.implement,
+				state.issue,
+				state.planSummary ?? "",
+			);
+	const result = await runResumeSession(config, state.codexSessionId, prompt);
+	state.implementationSummary = result.finalMessage || result.stdout;
+	appendCodexUsage(state, "implementing", result.usage);
+
+	if (!hasExistingPr) {
+		if (config.dryRun) {
+			state.pullRequest = {
+				branch: `codex/${state.issue.key.toLowerCase()}`,
+				title: `[codex] ${state.issue.key}: ${state.issue.title}`,
+				url: "https://example.invalid/dry-run",
+			};
+		} else {
+			state.pullRequest = await createDraftPrFromWorktree(
+				config,
+				state.issue.key,
+				state.issue.title,
+			);
+		}
+	} else if (!config.dryRun) {
+		if (!state.pullRequest?.branch) {
+			throw new Error("Missing pull request branch for feedback pass");
+		}
+		await updateDraftPrFromWorktree(
+			config,
+			state.pullRequest.branch,
+			state.issue.key,
+		);
+	}
+
+	state.bugs = [];
+	const nextStage: WorkflowStage = hasExistingPr ? "reviewing" : "pr_created";
+	Object.assign(state, transitionStage(state, nextStage));
+	await saveRunState(config.workspacePath, state);
+	await linear.markStage(state.issue.id, nextStage);
+	await linear.applyStageLabel(state.issue.id, nextStage);
+	await linear.comment(
+		state.issue.id,
+		buildImplementationComment(state.pullRequest?.url, result.usage, {
+			updated: hasExistingPr,
+		}),
+	);
+	logger.info(
+		buildIssueJobLogFields(state, "implementing"),
+		hasExistingPr
+			? "Implementation feedback pass completed"
+			: "Implementation completed",
+	);
+}
+
+async function handlePrCreatedStage(
+	config: ResolvedProjectConfig,
+	linear: LinearClient,
+	state: RunState,
+): Promise<void> {
+	Object.assign(state, transitionStage(state, "reviewing"));
+	await saveRunState(config.workspacePath, state);
+	await linear.markStage(state.issue.id, "reviewing");
+	await linear.applyStageLabel(state.issue.id, "reviewing");
+}
+
+async function handleReviewTestingStage(
+	config: ResolvedProjectConfig,
+	linear: LinearClient,
+	state: RunState,
+): Promise<void> {
+	logger.info(buildIssueJobLogFields(state, "testing"), "Testing issue");
+	await linear.markStage(state.issue.id, "testing");
+	await linear.applyStageLabel(state.issue.id, "testing");
+	Object.assign(state, transitionStage(state, "testing"));
+	await saveRunState(config.workspacePath, state);
+
+	const prompt = await buildReviewPrompt(
+		config.skills.reviewTest,
+		state.issue,
+		state.pullRequest,
+	);
+	const review = await runReviewSession(config, prompt);
+	const outcome = parseReviewOutcome(review.finalMessage || review.stdout);
+	const retryBugs = normalizeFailedReviewBugs(outcome);
+	appendCodexUsage(state, "testing", review.usage);
+
+	state.reviewSummary = outcome.summary;
+	state.testingSummary = outcome.summary;
+	state.bugs = retryBugs;
+	await saveRunState(config.workspacePath, state);
+
+	const reviewComment = buildReviewComment({
+		issueKey: state.issue.key,
+		passed: outcome.passed,
+		summary: outcome.summary,
+		usage: review.usage,
+		bugs: retryBugs,
+	});
+
+	if (!config.dryRun && state.pullRequest) {
+		await commentOnPr(config, state.pullRequest, reviewComment);
+	}
+	await linear.comment(state.issue.id, reviewComment);
+
+	if (!outcome.passed) {
+		Object.assign(state, transitionStage(state, "implementing"));
+		await saveRunState(config.workspacePath, state);
+		await linear.markStage(state.issue.id, "implementing");
+		await linear.comment(
+			state.issue.id,
+			"Review/testing failed. Feedback was sent back to implementation for another pass.",
+		);
+		return;
+	}
+
+	Object.assign(state, transitionStage(state, "done"));
+	await saveRunState(config.workspacePath, state);
+	await linear.markStage(state.issue.id, "done");
+	await linear.comment(state.issue.id, "Review/testing passed. Marked done.");
+	logger.info(
+		buildIssueJobLogFields(state, "testing"),
+		"Review/testing completed",
+	);
 }
 
 export function normalizeFailedReviewBugs(
