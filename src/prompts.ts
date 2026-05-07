@@ -15,7 +15,7 @@ export async function buildPlanPrompt(
 ): Promise<string> {
 	const skill = await loadSkillText(skillPath);
 	return [
-		"You are the planning agent in a PIV loop workflow.",
+		"You are the planning agent in the Agent-Driven Development Hub (ADHD.ai) workflow.",
 		"",
 		"Use this skill:",
 		skill,
@@ -35,7 +35,7 @@ export async function buildImplementPrompt(
 ): Promise<string> {
 	const skill = await loadSkillText(skillPath);
 	return [
-		"You are the implementation agent in a PIV loop workflow.",
+		"You are the implementation agent in the Agent-Driven Development Hub (ADHD.ai) workflow.",
 		"",
 		"Use this skill:",
 		skill,
@@ -60,7 +60,7 @@ export async function buildReviewPrompt(
 		? `PR: ${pr.url}`
 		: `Branch: ${pr?.branch ?? "unknown"}`;
 	return [
-		"You are the review and testing agent in a PIV loop workflow.",
+		"You are the review and testing agent in the Agent-Driven Development Hub (ADHD.ai) workflow.",
 		"",
 		"Use this skill:",
 		skill,
@@ -91,7 +91,7 @@ export async function buildFixPrompt(
 		? `PR: ${pr.url}`
 		: `Branch: ${pr?.branch ?? "unknown"}`;
 	return [
-		"You are the implementation agent in a PIV loop workflow.",
+		"You are the implementation agent in the Agent-Driven Development Hub (ADHD.ai) workflow.",
 		"",
 		"Use this skill:",
 		skill,

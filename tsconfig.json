@@ -10,5 +10,5 @@
 		"skipLibCheck": true,
 		"types": ["bun-types"]
 	},
-	"include": ["src", "tests", "piv-loop.config.ts"]
+	"include": ["src", "tests", "adhd-ai.config.ts"]
 }

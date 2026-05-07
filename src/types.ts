@@ -36,7 +36,7 @@ export type DeepPartial<T> = {
 
 export interface ProjectRuntimeConfig {
 	/**
-	 * Root path used by piv-loop to persist run state and transient workflow files.
+	 * Root path used by ADHD.ai to persist run state and transient workflow files.
 	 */
 	workspacePath: string;
 	/**
@@ -107,10 +107,12 @@ export interface PollingConfig {
 	staleRunTimeoutMs: number;
 }
 
-export type PivLoopRootConfig = DeepPartial<ProjectRuntimeConfig> & {
+export type AdhdAiRootConfig = DeepPartial<ProjectRuntimeConfig> & {
 	polling?: DeepPartial<PollingConfig>;
 	projects: ProjectConfig[];
 };
+
+export type PivLoopRootConfig = AdhdAiRootConfig;
 
 export interface LinearIssue {
 	id: string;

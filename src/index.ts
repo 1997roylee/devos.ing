@@ -56,14 +56,14 @@ async function main(): Promise<void> {
 function printHelp(): void {
 	process.stdout.write(
 		`${[
-			"piv-loop - Codex CLI orchestration workflow",
+			"adhd-ai - Agent-Driven Development Hub (ADHD.ai) CLI orchestration workflow",
 			"",
 			"Commands:",
-			"  piv-loop run [--project <PROJECT_ID>] [--issue <LINEAR_KEY_OR_URL>] [--poll] [--no-exit-when-idle] [--poll-interval-ms <MS>] [--max-poll-cycles <N>]",
-			"  piv-loop run --all-projects [--issue <LINEAR_KEY_OR_URL>] [--poll] [--no-exit-when-idle]",
-			"  piv-loop status --project <PROJECT_ID> --issue <LINEAR_KEY>",
-			"  piv-loop projects",
-			"  piv-loop help",
+			"  adhd-ai run [--project <PROJECT_ID>] [--issue <LINEAR_KEY_OR_URL>] [--poll] [--no-exit-when-idle] [--poll-interval-ms <MS>] [--max-poll-cycles <N>]",
+			"  adhd-ai run --all-projects [--issue <LINEAR_KEY_OR_URL>] [--poll] [--no-exit-when-idle]",
+			"  adhd-ai status --project <PROJECT_ID> --issue <LINEAR_KEY>",
+			"  adhd-ai projects",
+			"  adhd-ai help",
 			"",
 			"Environment:",
 			"  LINEAR_API_KEY, LINEAR_STATUS_* state IDs, GITHUB_* repo settings",

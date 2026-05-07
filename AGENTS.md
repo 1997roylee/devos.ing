@@ -1,4 +1,4 @@
-# PIV Loop Agent Alignment
+# ADHD.ai Agent Alignment
 
 This repository supports multi-project orchestration. Keep behavior consistent across projects and avoid coupling workflow logic to one workspace.
 

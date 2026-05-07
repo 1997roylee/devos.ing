@@ -29,7 +29,7 @@ export async function createDraftPrFromWorktree(
 		);
 	}
 
-	const commitTitle = `[piv-loop] ${issueKey}: ${issueTitle}`;
+	const commitTitle = `[adhd.ai] ${issueKey}: ${issueTitle}`;
 	await commitChanges(config, commitTitle);
 	await pushBranch(config, branch);
 
@@ -38,7 +38,7 @@ export async function createDraftPrFromWorktree(
 	const prBody = [
 		`Linear issue: ${issueKey}`,
 		"",
-		"This PR was created by the PIV Loop workflow.",
+		"This PR was created by the Agent-Driven Development Hub (ADHD.ai) workflow.",
 		"",
 		"Includes:",
 		"- plan + implement session output",
@@ -90,7 +90,7 @@ export async function updateDraftPrFromWorktree(
 		);
 	}
 
-	const commitTitle = `[piv-loop] ${issueKey}: address review feedback`;
+	const commitTitle = `[adhd.ai] ${issueKey}: address review feedback`;
 	await commitChanges(config, commitTitle);
 	await pushBranch(config, prBranch);
 }

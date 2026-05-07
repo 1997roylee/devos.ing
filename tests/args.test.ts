@@ -3,7 +3,7 @@ import { parseArgs } from "../src/args";
 
 describe("parseArgs", () => {
 	it("parses run command with issue", () => {
-		const parsed = parseArgs(["bun", "piv-loop", "run", "--issue", "ABC-1"]);
+		const parsed = parseArgs(["bun", "adhd-ai", "run", "--issue", "ABC-1"]);
 		expect(parsed).toEqual({
 			kind: "run",
 			options: {
@@ -19,7 +19,7 @@ describe("parseArgs", () => {
 	});
 
 	it("parses run with project", () => {
-		const parsed = parseArgs(["bun", "piv-loop", "run", "--project", "api"]);
+		const parsed = parseArgs(["bun", "adhd-ai", "run", "--project", "api"]);
 		expect(parsed).toEqual({
 			kind: "run",
 			options: {
@@ -36,7 +36,7 @@ describe("parseArgs", () => {
 	it("parses run polling flags", () => {
 		const parsed = parseArgs([
 			"bun",
-			"piv-loop",
+			"adhd-ai",
 			"run",
 			"--poll",
 			"--poll-interval-ms",
@@ -61,7 +61,7 @@ describe("parseArgs", () => {
 	it("parses no-exit-when-idle flag", () => {
 		const parsed = parseArgs([
 			"bun",
-			"piv-loop",
+			"adhd-ai",
 			"run",
 			"--poll",
 			"--no-exit-when-idle",
@@ -82,20 +82,20 @@ describe("parseArgs", () => {
 
 	it("rejects invalid poll-interval-ms", () => {
 		expect(() =>
-			parseArgs(["bun", "piv-loop", "run", "--poll-interval-ms", "0"]),
+			parseArgs(["bun", "adhd-ai", "run", "--poll-interval-ms", "0"]),
 		).toThrow("--poll-interval-ms must be a positive integer");
 	});
 
 	it("rejects invalid max-poll-cycles", () => {
 		expect(() =>
-			parseArgs(["bun", "piv-loop", "run", "--max-poll-cycles", "-1"]),
+			parseArgs(["bun", "adhd-ai", "run", "--max-poll-cycles", "-1"]),
 		).toThrow("--max-poll-cycles must be a positive integer");
 	});
 
 	it("parses status command", () => {
 		const parsed = parseArgs([
 			"bun",
-			"piv-loop",
+			"adhd-ai",
 			"status",
 			"--project",
 			"api",
@@ -113,7 +113,7 @@ describe("parseArgs", () => {
 		expect(() =>
 			parseArgs([
 				"bun",
-				"piv-loop",
+				"adhd-ai",
 				"run",
 				"--project",
 				"api",

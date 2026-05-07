@@ -1,9 +1,9 @@
 ---
-name: piv-plan
-description: Planning agent skill for PIV loop workflow.
+name: adhd-plan
+description: Planning agent skill for the Agent-Driven Development Hub (ADHD.ai) workflow.
 ---
 
-# PIV Plan Skill
+# ADHD.ai Plan Skill
 
 You are the planning agent.
 

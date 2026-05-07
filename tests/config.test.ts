@@ -98,7 +98,7 @@ describe("loadConfig", () => {
 			path.join(process.cwd(), ".tmp-config-test-"),
 		);
 		await writeFile(
-			path.join(tempDir, "piv-loop.config.ts"),
+			path.join(tempDir, "adhd-ai.config.ts"),
 			[
 				"export default {",
 				"  projects: [",
@@ -116,6 +116,34 @@ describe("loadConfig", () => {
 			await expect(loadConfig(tempDir)).rejects.toThrow(
 				"Project-level polling config is not supported",
 			);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("supports legacy piv-loop config file fallback", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "piv-loop.config.ts"),
+			[
+				"export default {",
+				"  projects: [",
+				"    {",
+				"      id: 'legacy',",
+				"      name: 'Legacy Config'",
+				"    }",
+				"  ]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.projects[0]?.id).toBe("legacy");
+			expect(config.projects[0]?.name).toBe("Legacy Config");
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });
 		}
@@ -178,7 +206,7 @@ describe("loadConfig", () => {
 			path.join(process.cwd(), ".tmp-config-test-"),
 		);
 		await writeFile(
-			path.join(tempDir, "piv-loop.config.ts"),
+			path.join(tempDir, "adhd-ai.config.ts"),
 			[
 				"export default {",
 				"  codex: {",

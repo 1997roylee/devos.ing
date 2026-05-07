@@ -2,17 +2,18 @@ import { access } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type {
+	AdhdAiRootConfig,
 	DeepPartial,
-	PivLoopRootConfig,
 	PollingConfig,
 	ProjectConfig,
 	ProjectRuntimeConfig,
 	ResolvedProjectConfig,
 } from "./types";
 
-const DEFAULT_CONFIG_FILE = "piv-loop.config.ts";
+const DEFAULT_CONFIG_FILE = "adhd-ai.config.ts";
+const LEGACY_CONFIG_FILE = "piv-loop.config.ts";
 
-type RootOverride = DeepPartial<PivLoopRootConfig>;
+type RootOverride = DeepPartial<AdhdAiRootConfig>;
 type LegacyOverride = DeepPartial<ProjectRuntimeConfig>;
 type AnyOverride = RootOverride | LegacyOverride;
 
@@ -114,21 +115,25 @@ function buildEnvPolling(): PollingConfig {
 }
 
 async function loadConfigOverride(cwd: string): Promise<AnyOverride> {
-	const configPath = path.join(cwd, DEFAULT_CONFIG_FILE);
-	try {
-		await access(configPath);
-	} catch {
-		return {};
+	for (const configFile of [DEFAULT_CONFIG_FILE, LEGACY_CONFIG_FILE]) {
+		const configPath = path.join(cwd, configFile);
+		try {
+			await access(configPath);
+		} catch {
+			continue;
+		}
+
+		const imported = await import(pathToFileURL(configPath).href);
+		const override = imported.default ?? imported.config ?? {};
+		return override as AnyOverride;
 	}
 
-	const imported = await import(pathToFileURL(configPath).href);
-	const override = imported.default ?? imported.config ?? {};
-	return override as AnyOverride;
+	return {};
 }
 
-function normalizeOverrideToRoot(override: AnyOverride): PivLoopRootConfig {
+function normalizeOverrideToRoot(override: AnyOverride): AdhdAiRootConfig {
 	if ("projects" in override && Array.isArray(override.projects)) {
-		return override as PivLoopRootConfig;
+		return override as AdhdAiRootConfig;
 	}
 
 	const legacy = override as DeepPartial<ProjectRuntimeConfig>;
@@ -144,7 +149,7 @@ function normalizeOverrideToRoot(override: AnyOverride): PivLoopRootConfig {
 
 function resolveProjects(
 	base: ProjectRuntimeConfig,
-	root: PivLoopRootConfig,
+	root: AdhdAiRootConfig,
 ): ResolvedProjectConfig[] {
 	const projectSpecs =
 		root.projects.length > 0 ? root.projects : [{ id: "default" }];
@@ -156,7 +161,7 @@ function resolveProjects(
 }
 
 function stripProjects(
-	root: PivLoopRootConfig,
+	root: AdhdAiRootConfig,
 ): DeepPartial<ProjectRuntimeConfig> {
 	const { projects: _, polling: __, ...rest } = root;
 	return rest;

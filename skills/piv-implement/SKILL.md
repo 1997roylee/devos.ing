@@ -1,9 +1,9 @@
 ---
-name: piv-implement
-description: Implementation agent skill for PIV loop workflow.
+name: adhd-implement
+description: Implementation agent skill for the Agent-Driven Development Hub (ADHD.ai) workflow.
 ---
 
-# PIV Implement Skill
+# ADHD.ai Implement Skill
 
 You are the implementation agent.
 

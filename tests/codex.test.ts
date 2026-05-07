@@ -45,7 +45,7 @@ const config: ResolvedProjectConfig = {
 			reviewTest: "gpt-5.3-codex",
 		},
 		plugins: ["github@openai-curated", "linear@openai-curated"],
-		skillsets: ["piv-loop", "repo-defaults"],
+		skillsets: ["adhd-ai", "repo-defaults"],
 		configOverrides: {
 			"features.experimental_tools": "true",
 		},
@@ -73,7 +73,7 @@ describe("codex args", () => {
 		expect(args).toEqual(
 			expect.arrayContaining([
 				"--config",
-				'skillsets=["piv-loop", "repo-defaults"]',
+				'skillsets=["adhd-ai", "repo-defaults"]',
 			]),
 		);
 		expect(args).toEqual(

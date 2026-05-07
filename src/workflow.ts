@@ -406,7 +406,7 @@ async function processIssue(
 		await safeLinearComment(
 			linear,
 			runState.issue.id,
-			`PIV loop failed and moved issue to Canceled.\n\nError:\n${message}`,
+			`ADHD.ai failed and moved issue to Canceled.\n\nError:\n${message}`,
 		);
 		issueLogger.error(
 			{
@@ -475,7 +475,7 @@ async function executeIssue(
 	while (state.stage !== "done" && state.stage !== "blocked") {
 		if (state.stage === "received") {
 			await linear.markStage(state.issue.id, "planning");
-			await linear.comment(state.issue.id, "PIV loop started planning.");
+			await linear.comment(state.issue.id, "ADHD.ai started planning.");
 			Object.assign(state, transitionStage(state, "planning"));
 			await saveRunState(config.workspacePath, state);
 			continue;

@@ -1,9 +1,9 @@
 ---
-name: piv-review-test
-description: Review and testing agent skill for PIV loop workflow.
+name: adhd-review-test
+description: Review and testing agent skill for the Agent-Driven Development Hub (ADHD.ai) workflow.
 ---
 
-# PIV Review and Test Skill
+# ADHD.ai Review and Test Skill
 
 You are the review/testing agent in a separate Codex session.
 

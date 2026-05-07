@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "piv-loop",
+      "name": "adhd.ai",
       "dependencies": {
         "@linear/sdk": "^83.0.0",
         "pino": "^10.3.1",

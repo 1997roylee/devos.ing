@@ -34,7 +34,7 @@ export function buildPlanComment(
 			: normalized;
 
 	return [
-		`PIV loop plan for ${issueKey}`,
+		`ADHD.ai plan for ${issueKey}`,
 		"",
 		"Planning completed; implementation started.",
 		"",
@@ -64,7 +64,7 @@ export function buildReviewComment(input: {
 	bugs: BugRecord[];
 }): string {
 	return [
-		`PIV loop review for ${input.issueKey}`,
+		`ADHD.ai review for ${input.issueKey}`,
 		"",
 		`Result: ${input.passed ? "PASS" : "FAIL"}`,
 		"",

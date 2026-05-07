@@ -1,10 +1,10 @@
 {
-	"name": "piv-loop",
+	"name": "adhd.ai",
 	"version": "0.1.0",
 	"private": true,
 	"type": "module",
 	"bin": {
-		"piv-loop": "./src/index.ts"
+		"adhd-ai": "./src/index.ts"
 	},
 	"scripts": {
 		"build": "bun build ./src/index.ts --target bun --outdir dist",
