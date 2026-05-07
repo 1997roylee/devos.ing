@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import type { BugRecord, IssueRef, PullRequestRef } from "./types";
+import type { BugRecord, IssueRef, PullRequestRef } from "../core/types";
 
 async function loadSkillText(filePath: string): Promise<string> {
 	try {

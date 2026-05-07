@@ -1,5 +1,9 @@
-import { assertCommandOk, runCommand } from "./shell";
-import type { BugRecord, PullRequestRef, ResolvedProjectConfig } from "./types";
+import type {
+	BugRecord,
+	PullRequestRef,
+	ResolvedProjectConfig,
+} from "../core/types";
+import { assertCommandOk, runCommand } from "../utils/shell";
 
 export async function ensureGhAuth(
 	config: ResolvedProjectConfig,

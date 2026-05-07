@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
+import type { LinearIssue } from "../src/core/types";
 import {
 	isIssueInConfiguredProject,
 	sortIssuesByPriority,
-} from "../src/linear";
-import type { LinearIssue } from "../src/types";
+} from "../src/services/linear";
 
 function createIssue(
 	identifier: string,

@@ -1,4 +1,4 @@
-import type { RunOptions } from "./types";
+import type { RunOptions } from "./core/types";
 
 export type CliCommand =
 	| { kind: "run"; options: RunOptions }

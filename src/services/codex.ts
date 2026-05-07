@@ -1,7 +1,7 @@
 import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import { assertCommandOk, runCommand } from "./shell";
-import type { ResolvedProjectConfig } from "./types";
+import type { ResolvedProjectConfig } from "../core/types";
+import { assertCommandOk, runCommand } from "../utils/shell";
 
 export interface CodexResult {
 	sessionId?: string;

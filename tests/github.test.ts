@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { buildBugIssueBody } from "../src/github";
+import { buildBugIssueBody } from "../src/services/github";
 
 describe("buildBugIssueBody", () => {
 	it("includes linear and optional pr links", () => {

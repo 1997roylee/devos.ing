@@ -148,9 +148,32 @@ export interface CronConfig {
 	jobs: CronJobConfig[];
 }
 
+export interface NotificationEmailConfig {
+	enabled?: boolean;
+	resendApiKey?: string;
+	from?: string;
+	to?: string[];
+}
+
+export interface NotificationConfig {
+	email?: NotificationEmailConfig;
+}
+
+export interface ResolvedNotificationEmailConfig {
+	enabled: boolean;
+	resendApiKey?: string;
+	from?: string;
+	to: string[];
+}
+
+export interface ResolvedNotificationConfig {
+	email: ResolvedNotificationEmailConfig;
+}
+
 export type AdhdAiRootConfig = DeepPartial<ProjectRuntimeConfig> & {
 	polling?: DeepPartial<PollingConfig>;
 	cron?: DeepPartial<CronConfig>;
+	notifications?: DeepPartial<NotificationConfig>;
 	projects: ProjectConfig[];
 };
 

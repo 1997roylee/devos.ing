@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { loadConfig } from "../src/config";
+import { loadConfig } from "../src/core/config";
 
 const envKeys = [
 	"LINEAR_API_KEY",
@@ -27,6 +27,9 @@ const envKeys = [
 	"PIV_MAX_POLL_CYCLES",
 	"PIV_EXIT_WHEN_IDLE",
 	"PIV_STALE_RUN_TIMEOUT_MS",
+	"RESEND_API_KEY",
+	"RESEND_FROM",
+	"RESEND_TO",
 ] as const;
 
 const previousEnv: Record<string, string | undefined> = {};
@@ -36,21 +39,23 @@ describe("loadConfig", () => {
 		for (const key of envKeys) {
 			previousEnv[key] = process.env[key];
 			process.env[key] =
-				key === "CODEX_SANDBOX"
-					? "workspace-write"
-					: key === "CODEX_HOME"
-						? ""
-						: key === "PIV_POLL_INTERVAL_MS"
-							? "30000"
-							: key === "PIV_MAX_POLL_CYCLES"
-								? ""
-								: key === "PIV_DEV_MODE" || key === "PIV_PRINT_CODEX_LOGS"
-									? "0"
-									: key === "PIV_EXIT_WHEN_IDLE"
-										? "1"
-										: key === "PIV_STALE_RUN_TIMEOUT_MS"
-											? "3600000"
-											: key.toLowerCase();
+				key === "RESEND_API_KEY" || key === "RESEND_FROM" || key === "RESEND_TO"
+					? ""
+					: key === "CODEX_SANDBOX"
+						? "workspace-write"
+						: key === "CODEX_HOME"
+							? ""
+							: key === "PIV_POLL_INTERVAL_MS"
+								? "30000"
+								: key === "PIV_MAX_POLL_CYCLES"
+									? ""
+									: key === "PIV_DEV_MODE" || key === "PIV_PRINT_CODEX_LOGS"
+										? "0"
+										: key === "PIV_EXIT_WHEN_IDLE"
+											? "1"
+											: key === "PIV_STALE_RUN_TIMEOUT_MS"
+												? "3600000"
+												: key.toLowerCase();
 		}
 	});
 
@@ -72,6 +77,86 @@ describe("loadConfig", () => {
 		expect(config.polling.maxCycles).toBeUndefined();
 		expect(config.polling.exitWhenIdle).toBe(true);
 		expect(config.polling.staleRunTimeoutMs).toBe(3600000);
+		expect(config.notifications.email.enabled).toBe(false);
+	});
+
+	it("loads notification settings from RESEND env vars", async () => {
+		process.env.RESEND_API_KEY = "re_test_key";
+		process.env.RESEND_FROM = "ADHD.ai <ops@example.com>";
+		process.env.RESEND_TO = "a@example.com,b@example.com";
+		const config = await loadConfig(process.cwd());
+		expect(config.notifications.email.enabled).toBe(true);
+		expect(config.notifications.email.resendApiKey).toBe("re_test_key");
+		expect(config.notifications.email.from).toBe("ADHD.ai <ops@example.com>");
+		expect(config.notifications.email.to).toEqual([
+			"a@example.com",
+			"b@example.com",
+		]);
+	});
+
+	it("supports disabling notifications even with RESEND_API_KEY", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		process.env.RESEND_API_KEY = "re_test_key";
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			[
+				"export default {",
+				"  notifications: {",
+				"    email: { enabled: false }",
+				"  },",
+				"  projects: [",
+				"    { id: 'default' }",
+				"  ]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.notifications.email.enabled).toBe(false);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("rejects missing sender when notifications are enabled", async () => {
+		process.env.RESEND_API_KEY = "re_test_key";
+		process.env.RESEND_FROM = "";
+		process.env.RESEND_TO = "a@example.com";
+		await expect(loadConfig(process.cwd())).rejects.toThrow(
+			"notifications.email.from (or RESEND_FROM) is required when email notifications are enabled",
+		);
+	});
+
+	it("rejects project-level notification overrides", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			[
+				"export default {",
+				"  projects: [",
+				"    {",
+				"      id: 'default',",
+				"      notifications: { email: { enabled: true } }",
+				"    }",
+				"  ]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			await expect(loadConfig(tempDir)).rejects.toThrow(
+				"Project-level notifications config is not supported",
+			);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
 	});
 
 	it("loads polling values from env", async () => {

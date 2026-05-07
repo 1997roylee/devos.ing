@@ -6,14 +6,16 @@ ADHD.ai is a multi-project orchestration hub that pulls eligible Linear issues a
 
 ## Ownership Boundaries
 
-1. `src/config.ts` is the only runtime config resolver for env vars and config files.
-2. `src/workflow.ts` owns stage transitions, retries, and orchestration order.
-3. Integration modules stay isolated:
-   - `src/linear.ts`
-   - `src/github.ts`
-   - `src/codex.ts`
-4. `src/state.ts` owns run-state paths and legacy fallback behavior.
-5. `src/args.ts` and `src/index.ts` own CLI parsing and command dispatch.
+1. `src/core/config.ts` is the only runtime config resolver for env vars and config files.
+2. `src/core/workflow.ts` owns stage transitions, retries, and orchestration order.
+3. Integration modules stay isolated under `src/services/`:
+   - `src/services/linear.ts`
+   - `src/services/github.ts`
+   - `src/services/codex.ts`
+   - `src/services/cron.ts`
+   - `src/services/notifications.ts`
+4. `src/core/state.ts` owns run-state paths and legacy fallback behavior.
+5. `src/args.ts` and `src/index.ts` own CLI parsing and command dispatch with command handlers in `src/commands/`.
 
 ## Stage Model
 

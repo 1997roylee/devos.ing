@@ -1,4 +1,4 @@
-import type { BugRecord } from "./types";
+import type { BugRecord } from "../core/types";
 
 export interface TokenUsage {
 	inputTokens?: number;

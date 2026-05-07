@@ -5,7 +5,7 @@ import {
 	buildPlanComment,
 	buildReviewComment,
 	formatCodexUsageLine,
-} from "../src/comments";
+} from "../src/utils/comments";
 
 describe("buildPlanComment", () => {
 	it("includes header and plan summary", () => {

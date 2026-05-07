@@ -1,0 +1,70 @@
+import type { CliCommand } from "../args";
+import type { LoadedConfig } from "../core/config";
+import { getProjectById } from "../core/config";
+import { loadRunState, normalizeIssueKey } from "../core/state";
+import { runWorkflow } from "../core/workflow";
+import { runCronScheduler } from "../services/cron";
+
+type RunnableCommand = Exclude<CliCommand, { kind: "help" }>;
+
+export async function handleCommand(
+	command: RunnableCommand,
+	config: LoadedConfig,
+): Promise<void> {
+	if (command.kind === "run") {
+		await runWorkflow(config, command.options);
+		return;
+	}
+
+	if (command.kind === "cron") {
+		await runCronScheduler(config, { jobId: command.jobId });
+		return;
+	}
+
+	if (command.kind === "projects") {
+		for (const project of config.projects) {
+			process.stdout.write(
+				`${[
+					project.id,
+					project.name,
+					`exec=${project.executionPath}`,
+					`state=${project.workspacePath}`,
+				].join("\t")}\n`,
+			);
+		}
+		return;
+	}
+
+	const project = getProjectById(config, command.projectId);
+	if (!project) {
+		throw new Error(`Project '${command.projectId}' not found`);
+	}
+	const key = normalizeIssueKey(command.issueKey);
+	const state = await loadRunState(project.workspacePath, project.id, key);
+	if (!state) {
+		process.stdout.write(
+			`No run state found for ${key} in project ${project.id}\n`,
+		);
+		return;
+	}
+	process.stdout.write(`${JSON.stringify(state, null, 2)}\n`);
+}
+
+export function printHelp(): void {
+	process.stdout.write(
+		`${[
+			"adhd-ai - Agent-Driven Development Hub (ADHD.ai) CLI orchestration workflow",
+			"",
+			"Commands:",
+			"  adhd-ai run [--project <PROJECT_ID>] [--issue <LINEAR_KEY_OR_URL>] [--poll] [--no-exit-when-idle] [--poll-interval-ms <MS>] [--max-poll-cycles <N>]",
+			"  adhd-ai run --all-projects [--issue <LINEAR_KEY_OR_URL>] [--poll] [--no-exit-when-idle]",
+			"  adhd-ai cron [--job <JOB_ID>]",
+			"  adhd-ai status --project <PROJECT_ID> --issue <LINEAR_KEY>",
+			"  adhd-ai projects",
+			"  adhd-ai help",
+			"",
+			"Environment:",
+			"  LINEAR_API_KEY, LINEAR_STATUS_* state IDs, GITHUB_* repo settings",
+		].join("\n")}\n`,
+	);
+}

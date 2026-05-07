@@ -1,12 +1,12 @@
-import type { LoadedConfig } from "./config";
-import { logger, normalizeError } from "./logger";
+import type { LoadedConfig } from "../core/config";
 import type {
 	CronJobConfig,
 	CronJobSchedule,
 	CronScheduleDayOfWeek,
 	RunOptions,
-} from "./types";
-import { runWorkflow, sleep } from "./workflow";
+} from "../core/types";
+import { runWorkflow, sleep } from "../core/workflow";
+import { logger, normalizeError } from "../utils/logger";
 
 const SCHEDULER_MIN_SLEEP_MS = 250;
 const SCHEDULER_MAX_SLEEP_MS = 60000;

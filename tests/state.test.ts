@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { normalizeIssueKey, transitionStage } from "../src/state";
-import type { RunState } from "../src/types";
+import { normalizeIssueKey, transitionStage } from "../src/core/state";
+import type { RunState } from "../src/core/types";
 
 describe("state helpers", () => {
 	it("normalizes issue key from URL", () => {

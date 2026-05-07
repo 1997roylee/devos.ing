@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { buildFixPrompt } from "../src/prompts";
-import type { IssueRef, PullRequestRef } from "../src/types";
+import type { IssueRef, PullRequestRef } from "../src/core/types";
+import { buildFixPrompt } from "../src/skills/prompts";
 
 const issue: IssueRef = {
 	id: "lin_123",

@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { AdhdAiRootConfig, DeepPartial } from "./src/types";
+import type { AdhdAiRootConfig, DeepPartial } from "./src/core/types";
 
 const cwd = process.cwd();
 

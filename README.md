@@ -53,6 +53,7 @@ flowchart LR
 Configuration is loaded from `adhd-ai.config.ts` and resolved into project-specific runtime settings. Existing `piv-loop.config.ts` files are still accepted as a legacy fallback.
 
 - Root defaults can define shared repo, linear, codex, skills, and dry-run behavior.
+- Optional root `notifications.email` settings can enable terminal outcome emails through Resend.
 - Polling is a single global config at the root `polling` key (`intervalMs`, `maxCycles`, `exitWhenIdle`, `staleRunTimeoutMs`) and applies to all selected projects in a run.
 - Optional `linear.projectId` can scope each ADHD.ai project to a specific Linear project when selecting assigned work.
 - For targeted runs with `--all-projects --issue <KEY>`, ADHD.ai routes the issue to exactly one project by matching `linear.projectId` to the Linear issue's `projectId`.
@@ -132,6 +133,23 @@ Supported schedules:
 - `daily`: `{ frequency: "daily", time: "HH:mm" }`
 - `weekly`: `{ frequency: "weekly", dayOfWeek: "sun"|"mon"|...|"sat", time: "HH:mm" }`
 
+## Email Notifications
+
+Email notifications are optional and global. ADHD.ai sends a notification when an issue reaches a terminal outcome (`done` or `blocked`).
+
+Configuration options:
+
+- `notifications.email.enabled` (optional boolean; defaults to auto-enabled when a Resend API key exists)
+- `notifications.email.resendApiKey`
+- `notifications.email.from`
+- `notifications.email.to` (array of recipients)
+
+Environment fallbacks:
+
+- `RESEND_API_KEY`
+- `RESEND_FROM`
+- `RESEND_TO` (comma-separated recipients)
+
 ## Required Environment
 
 Set these variables before running:
@@ -174,6 +192,9 @@ The `PIV_*` environment variable namespace remains supported for compatibility w
 - `CODEX_HOME` to override Codex runtime state directory
 - `PIV_LOG_LEVEL` (optional; default `info`)
 - `PIV_LOG_PRETTY` (optional; default `1` in TTY, `0` otherwise)
+- `RESEND_API_KEY` (optional; enables email notifications when configured with sender/recipients)
+- `RESEND_FROM` (optional; required when email notifications are enabled)
+- `RESEND_TO` (optional; comma-separated recipients, required when email notifications are enabled)
 
 `LINEAR_STATUS_*` values may be either Linear workflow state IDs or exact state names (for example `Todo`, `In Progress`, `Done`). Names are resolved to IDs at runtime.
 

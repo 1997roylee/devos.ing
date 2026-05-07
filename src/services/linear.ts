@@ -4,12 +4,12 @@ import {
 	type IssueLabel as LinearSdkIssueLabel,
 	type WorkflowState as LinearSdkWorkflowState,
 } from "@linear/sdk";
-import { normalizeIssueKey } from "./state";
+import { normalizeIssueKey } from "../core/state";
 import type {
 	LinearIssue,
 	ResolvedProjectConfig,
 	WorkflowStage,
-} from "./types";
+} from "../core/types";
 
 type WorkflowLabelStage = keyof ResolvedProjectConfig["linear"]["labelMap"];
 

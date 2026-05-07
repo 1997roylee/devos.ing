@@ -1,11 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import type { LoadedConfig } from "../src/config";
+import type { LoadedConfig } from "../src/core/config";
+import type { CronJobConfig } from "../src/core/types";
 import {
 	computeNextCronRunAt,
 	runCronSchedulerCycle,
 	selectCronJobs,
-} from "../src/cron";
-import type { CronJobConfig } from "../src/types";
+} from "../src/services/cron";
 
 describe("computeNextCronRunAt", () => {
 	it("computes minute schedules", () => {
@@ -158,5 +158,11 @@ function createLoadedConfig(jobs: CronJobConfig[]): LoadedConfig {
 			staleRunTimeoutMs: 3600000,
 		},
 		cron: { jobs },
+		notifications: {
+			email: {
+				enabled: false,
+				to: [],
+			},
+		},
 	};
 }

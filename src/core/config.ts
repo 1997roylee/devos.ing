@@ -8,9 +8,11 @@ import type {
 	CronJobSchedule,
 	CronScheduleDayOfWeek,
 	DeepPartial,
+	NotificationConfig,
 	PollingConfig,
 	ProjectConfig,
 	ProjectRuntimeConfig,
+	ResolvedNotificationConfig,
 	ResolvedProjectConfig,
 	RunOptions,
 } from "./types";
@@ -26,21 +28,29 @@ export interface LoadedConfig {
 	projects: ResolvedProjectConfig[];
 	polling: PollingConfig;
 	cron: CronConfig;
+	notifications: ResolvedNotificationConfig;
 }
 
 export async function loadConfig(cwd: string): Promise<LoadedConfig> {
 	const envBase = buildEnvBase(cwd);
 	const envPolling = buildEnvPolling();
+	const envNotifications = buildEnvNotifications();
 	const loadedOverride = await loadConfigOverride(cwd);
 	const root = normalizeOverrideToRoot(loadedOverride);
 	assertNoProjectPolling(root.projects);
+	assertNoProjectNotifications(root.projects);
 	const projects = resolveProjects(envBase, root);
 	const polling = resolvePolling(envPolling, root.polling);
 	const cron = resolveCron(root.cron);
+	const notifications = resolveNotifications(
+		envNotifications,
+		root.notifications,
+	);
 	validateProjects(projects);
 	validatePolling(polling);
 	validateCron(cron);
-	return { projects, polling, cron };
+	validateNotifications(notifications);
+	return { projects, polling, cron, notifications };
 }
 
 export function getProjectById(
@@ -122,6 +132,18 @@ function buildEnvPolling(): PollingConfig {
 	};
 }
 
+function buildEnvNotifications(): ResolvedNotificationConfig {
+	const env = process.env;
+	return {
+		email: {
+			enabled: false,
+			resendApiKey: normalizeOptionalValue(env.RESEND_API_KEY),
+			from: normalizeOptionalValue(env.RESEND_FROM),
+			to: parseRecipientsFromEnv(env.RESEND_TO),
+		},
+	};
+}
+
 async function loadConfigOverride(cwd: string): Promise<AnyOverride> {
 	for (const configFile of [DEFAULT_CONFIG_FILE, LEGACY_CONFIG_FILE]) {
 		const configPath = path.join(cwd, configFile);
@@ -171,7 +193,13 @@ function resolveProjects(
 function stripProjects(
 	root: AdhdAiRootConfig,
 ): DeepPartial<ProjectRuntimeConfig> {
-	const { projects: _, polling: __, cron: ___, ...rest } = root;
+	const {
+		projects: _,
+		polling: __,
+		cron: ___,
+		notifications: ____,
+		...rest
+	} = root;
 	return rest;
 }
 
@@ -192,6 +220,77 @@ function resolveCron(
 	return {
 		jobs: jobs.map((job, index) => resolveCronJob(job, index)),
 	};
+}
+
+function resolveNotifications(
+	base: ResolvedNotificationConfig,
+	override: DeepPartial<NotificationConfig> | undefined,
+): ResolvedNotificationConfig {
+	const email = override?.email;
+	const resendApiKey =
+		typeof email?.resendApiKey === "string"
+			? normalizeOptionalValue(email.resendApiKey)
+			: base.email.resendApiKey;
+	const from =
+		typeof email?.from === "string"
+			? normalizeOptionalValue(email.from)
+			: base.email.from;
+	const to = normalizeRecipientsOverride(email?.to) ?? base.email.to;
+	const enabled = resolveNotificationEnabled(email?.enabled, resendApiKey);
+
+	return {
+		email: {
+			enabled,
+			resendApiKey,
+			from,
+			to,
+		},
+	};
+}
+
+function resolveNotificationEnabled(
+	input: unknown,
+	resendApiKey: string | undefined,
+): boolean {
+	if (input === undefined) {
+		return Boolean(resendApiKey);
+	}
+	if (input === true) {
+		return true;
+	}
+	if (input === false) {
+		return false;
+	}
+	throw new Error("notifications.email.enabled must be a boolean");
+}
+
+function normalizeRecipientsOverride(input: unknown): string[] | undefined {
+	if (input === undefined) {
+		return undefined;
+	}
+	if (!Array.isArray(input)) {
+		throw new Error("notifications.email.to must be an array of email strings");
+	}
+
+	const recipients = input.map((value, index) => {
+		if (typeof value !== "string") {
+			throw new Error(
+				`notifications.email.to[${index}] must be an email string`,
+			);
+		}
+		return value.trim();
+	});
+	return recipients.filter((recipient) => recipient.length > 0);
+}
+
+function parseRecipientsFromEnv(input: string | undefined): string[] {
+	if (!input) {
+		return [];
+	}
+	return input
+		.split(",")
+		.map((value) => value.trim())
+		.filter((value) => value.length > 0);
 }
 
 function resolveCronJob(
@@ -555,6 +654,30 @@ function validateCron(cron: CronConfig): void {
 	}
 }
 
+function validateNotifications(
+	notifications: ResolvedNotificationConfig,
+): void {
+	const { email } = notifications;
+	if (!email.enabled) {
+		return;
+	}
+	if (!email.resendApiKey) {
+		throw new Error(
+			"notifications.email.resendApiKey (or RESEND_API_KEY) is required when email notifications are enabled",
+		);
+	}
+	if (!email.from) {
+		throw new Error(
+			"notifications.email.from (or RESEND_FROM) is required when email notifications are enabled",
+		);
+	}
+	if (email.to.length === 0) {
+		throw new Error(
+			"notifications.email.to (or RESEND_TO) must include at least one recipient when email notifications are enabled",
+		);
+	}
+}
+
 function validateCronSchedule(jobId: string, schedule: CronJobSchedule): void {
 	if (schedule.frequency === "minute") {
 		const every = schedule.every ?? 1;
@@ -632,6 +755,16 @@ function assertNoProjectPolling(projects: ProjectConfig[]): void {
 		if ("polling" in (project as unknown as Record<string, unknown>)) {
 			throw new Error(
 				`Project-level polling config is not supported for project '${project.id}'. Configure polling once at root level.`,
+			);
+		}
+	}
+}
+
+function assertNoProjectNotifications(projects: ProjectConfig[]): void {
+	for (const project of projects) {
+		if ("notifications" in (project as unknown as Record<string, unknown>)) {
+			throw new Error(
+				`Project-level notifications config is not supported for project '${project.id}'. Configure notifications once at root level.`,
 			);
 		}
 	}

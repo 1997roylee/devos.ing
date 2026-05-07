@@ -3,7 +3,7 @@ import type {
 	PollingConfig,
 	ResolvedProjectConfig,
 	RunState,
-} from "../src/types";
+} from "../src/core/types";
 import {
 	appendCodexUsage,
 	buildIssueJobLogFields,
@@ -14,7 +14,7 @@ import {
 	selectStaleRunIssueKeys,
 	shouldRetryRunStage,
 	shouldStopPolling,
-} from "../src/workflow";
+} from "../src/core/workflow";
 
 describe("resolvePollingSettings", () => {
 	const polling: PollingConfig = {

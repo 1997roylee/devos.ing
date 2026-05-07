@@ -1,23 +1,28 @@
-import { runPlanSession, runResumeSession, runReviewSession } from "./codex";
 import {
-	buildImplementationComment,
-	buildPlanComment,
-	buildReviewComment,
-} from "./comments";
-import { type LoadedConfig, getProjectById } from "./config";
+	runPlanSession,
+	runResumeSession,
+	runReviewSession,
+} from "../services/codex";
 import {
 	commentOnPr,
 	createDraftPrFromWorktree,
 	updateDraftPrFromWorktree,
-} from "./github";
-import { LinearClient } from "./linear";
-import { logger, normalizeError } from "./logger";
+} from "../services/github";
+import { LinearClient } from "../services/linear";
+import { sendTaskOutcomeEmail } from "../services/notifications";
 import {
 	buildFixPrompt,
 	buildImplementPrompt,
 	buildPlanPrompt,
 	buildReviewPrompt,
-} from "./prompts";
+} from "../skills/prompts";
+import {
+	buildImplementationComment,
+	buildPlanComment,
+	buildReviewComment,
+} from "../utils/comments";
+import { logger, normalizeError } from "../utils/logger";
+import { type LoadedConfig, getProjectById } from "./config";
 import { type ReviewOutcome, parseReviewOutcome } from "./review";
 import {
 	listRunStates,
@@ -29,6 +34,7 @@ import {
 import type {
 	CodexUsageRecord,
 	PollingConfig,
+	ResolvedNotificationConfig,
 	ResolvedProjectConfig,
 	RunOptions,
 	RunState,
@@ -80,6 +86,7 @@ export async function runWorkflow(
 		for (const context of projectContexts) {
 			totalIssues += await runProjectCycle(
 				context.config,
+				config.notifications,
 				options,
 				context.linear,
 				cycle,
@@ -228,6 +235,7 @@ export function shouldStopPolling(
 
 async function runProjectCycle(
 	config: ResolvedProjectConfig,
+	notifications: ResolvedNotificationConfig,
 	options: RunOptions,
 	linear: LinearClient,
 	cycle: number,
@@ -255,7 +263,7 @@ async function runProjectCycle(
 	}
 
 	for (const issue of issueQueue) {
-		await processIssue(config, linear, issue);
+		await processIssue(config, notifications, linear, issue);
 	}
 
 	return issueQueue.length;
@@ -370,6 +378,7 @@ async function fetchStaleIssuesForRetry(
 
 async function processIssue(
 	config: ResolvedProjectConfig,
+	notifications: ResolvedNotificationConfig,
 	linear: LinearClient,
 	issue: WorkflowIssue,
 ): Promise<void> {
@@ -414,7 +423,7 @@ async function processIssue(
 	);
 
 	try {
-		await executeIssue(config, linear, runState);
+		await executeIssue(config, notifications, linear, runState);
 		issueLogger.info({ stage: runState.stage }, "Issue workflow finished");
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -434,6 +443,7 @@ async function processIssue(
 			},
 			"Issue workflow failed",
 		);
+		await safeNotifyTaskOutcome(notifications, runState, "blocked", message);
 	}
 }
 
@@ -488,6 +498,7 @@ export function buildIssueJobLogFields(
 
 async function executeIssue(
 	config: ResolvedProjectConfig,
+	notifications: ResolvedNotificationConfig,
 	linear: LinearClient,
 	state: RunState,
 ): Promise<void> {
@@ -513,7 +524,7 @@ async function executeIssue(
 		}
 
 		if (state.stage === "reviewing" || state.stage === "testing") {
-			await handleReviewTestingStage(config, linear, state);
+			await handleReviewTestingStage(config, notifications, linear, state);
 			continue;
 		}
 
@@ -644,6 +655,7 @@ async function handlePrCreatedStage(
 
 async function handleReviewTestingStage(
 	config: ResolvedProjectConfig,
+	notifications: ResolvedNotificationConfig,
 	linear: LinearClient,
 	state: RunState,
 ): Promise<void> {
@@ -696,6 +708,7 @@ async function handleReviewTestingStage(
 	await saveRunState(config.workspacePath, state);
 	await linear.markStage(state.issue.id, "done");
 	await linear.comment(state.issue.id, "Review/testing passed. Marked done.");
+	await safeNotifyTaskOutcome(notifications, state, "done");
 	logger.info(
 		buildIssueJobLogFields(state, "testing"),
 		"Review/testing completed",
@@ -756,6 +769,32 @@ async function safeLinearComment(
 		runLogger.error(
 			{ err: normalizeError(error) },
 			"Failed to add Linear comment",
+		);
+	}
+}
+
+async function safeNotifyTaskOutcome(
+	notifications: ResolvedNotificationConfig,
+	state: RunState,
+	outcome: "done" | "blocked",
+	errorMessage?: string,
+): Promise<void> {
+	const runLogger = logger.child({
+		projectId: state.projectId,
+		issueKey: state.issue.key,
+		outcome,
+	});
+	try {
+		await sendTaskOutcomeEmail(
+			notifications.email,
+			state,
+			outcome,
+			errorMessage,
+		);
+	} catch (error) {
+		runLogger.error(
+			{ err: normalizeError(error) },
+			"Failed to send task outcome email notification",
 		);
 	}
 }
