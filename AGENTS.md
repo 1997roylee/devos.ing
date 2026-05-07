@@ -1,41 +1,32 @@
-# ADHD.ai Agent Alignment
+# ADHD.ai Agent Entry
 
-This repository supports multi-project orchestration. Keep behavior consistent across projects and avoid coupling workflow logic to one workspace.
+This repository orchestrates multi-project agent workflows. Keep behavior project-agnostic and avoid coupling logic to a single workspace.
 
-## Architecture Guardrails
+## Must-Follow Rules
 
-1. `src/config.ts` is the only place that resolves env vars and config files into project runtime config.
-2. `src/workflow.ts` owns stage transitions and orchestration sequencing.
-3. Integration modules stay isolated:
-   - `src/linear.ts`
-   - `src/github.ts`
-   - `src/codex.ts`
-4. `src/state.ts` owns run-state paths and compatibility fallback.
-5. CLI parsing and command dispatch live in:
-   - `src/args.ts`
-   - `src/index.ts`
-
-## Multi-Project Rules
-
-1. Every run must resolve to one or more `project.id` values.
-2. Persist run state under `.piv-loop/projects/<project-id>/runs`.
-3. Status reads require an explicit project id.
-4. Default invocation without project flags runs the first configured project.
-
-## Coding Rules
-
-1. Do not read env vars outside `src/config.ts`.
-2. Do not construct raw shell command strings in workflow logic; use helper modules.
-3. Keep parsing contracts stable for review output:
+1. Resolve env vars and config only in `src/config.ts`.
+2. Keep stage transitions and sequencing in `src/workflow.ts`.
+3. Keep integrations isolated in `src/linear.ts`, `src/github.ts`, and `src/codex.ts`.
+4. Keep run-state path logic in `src/state.ts`.
+5. Keep CLI parsing and dispatch in `src/args.ts` and `src/index.ts`.
+6. Do not construct raw shell command strings in workflow logic; use helper modules.
+7. Keep review parsing contract stable:
    - `RESULT: PASS|FAIL`
    - `SUMMARY: ...`
    - `BUGS_JSON: [...]`
-4. Add tests for any new CLI flag, config shape, state path, or stage transition.
+8. Add tests for any new CLI flag, config shape, state path, or stage transition.
 
 ## Quality Gates
 
-Run all of these before finalizing changes:
+Run all checks before finalizing changes:
 
 1. `bun run check`
 2. `bun run typecheck`
 3. `bun test`
+
+## Documentation Map
+
+- Architecture details: [ARCHITECTURE.md](/Users/roy/Desktop/SourceCode/agentic/show-me-ur-agents/ARCHITECTURE.md)
+- Execution and operating plans: [docs/PLANS.md](/Users/roy/Desktop/SourceCode/agentic/show-me-ur-agents/docs/PLANS.md)
+- Reliability and run behavior: [docs/RELIABILITY.md](/Users/roy/Desktop/SourceCode/agentic/show-me-ur-agents/docs/RELIABILITY.md)
+- Security and secrets handling: [docs/SECURITY.md](/Users/roy/Desktop/SourceCode/agentic/show-me-ur-agents/docs/SECURITY.md)

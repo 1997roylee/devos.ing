@@ -1,0 +1,2 @@
+Placeholder reference file.
+Add Nixpacks guidance for LLM workflows when available.

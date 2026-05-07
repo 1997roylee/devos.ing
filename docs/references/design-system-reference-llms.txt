@@ -1,0 +1,2 @@
+Placeholder reference file.
+Add design-system guidance for LLM workflows when available.

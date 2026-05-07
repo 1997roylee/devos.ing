@@ -1,0 +1,2 @@
+Placeholder reference file.
+Add uv guidance for LLM workflows when available.
