@@ -67,6 +67,21 @@ describe("sortIssuesByPriority", () => {
 			"ROY-12",
 		]);
 	});
+
+	it("treats unknown priority values like no-priority and keeps stable order", () => {
+		const issues = [
+			createIssue("ROY-20", 99, "Custom"),
+			createIssue("ROY-21", 0, "No priority"),
+			createIssue("ROY-22", 2, "High"),
+		];
+
+		const sorted = sortIssuesByPriority(issues);
+		expect(sorted.map((issue) => issue.identifier)).toEqual([
+			"ROY-22",
+			"ROY-20",
+			"ROY-21",
+		]);
+	});
 });
 
 describe("isIssueInConfiguredProject", () => {

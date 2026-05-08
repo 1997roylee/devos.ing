@@ -11,6 +11,7 @@ import type {
 import {
 	appendCodexUsage,
 	buildIssueJobLogFields,
+	buildPrioritizedIssueQueue,
 	buildRunLeaseOwnerId,
 	fixedBugsForImplementationComment,
 	isRunStateStaleForRetry,
@@ -19,7 +20,7 @@ import {
 	readyPullRequestAfterPassingReview,
 	resolvePollingSettings,
 	routeProjectsForIssueProjectId,
-	runAgentWithChatLog,
+	selectIssueQueueForCycle,
 	selectStaleRunIssueKeys,
 	shouldRetryRunStage,
 	shouldStopPolling,
@@ -153,6 +154,48 @@ describe("shouldStopPolling", () => {
 			true,
 		);
 		expect(stop).toBe(false);
+	});
+});
+
+describe("buildPrioritizedIssueQueue", () => {
+	it("sorts merged assigned and stale-retry issues by priority", () => {
+		const assignedIssues = [
+			createWorkflowIssue("ROY-2", 2, "High"),
+			createWorkflowIssue("ROY-4", 4, "Low"),
+		];
+		const staleRetryIssues = [
+			createWorkflowIssue("ROY-1", 1, "Urgent"),
+			createWorkflowIssue("ROY-3", 3, "Medium"),
+		];
+
+		const queue = buildPrioritizedIssueQueue(assignedIssues, staleRetryIssues);
+		expect(queue.map((issue) => issue.identifier)).toEqual([
+			"ROY-1",
+			"ROY-2",
+			"ROY-3",
+			"ROY-4",
+		]);
+	});
+
+	it("keeps first occurrence when assigned and stale queues overlap", () => {
+		const assignedIssues = [createWorkflowIssue("ROY-20", 4, "Low")];
+		const staleRetryIssues = [createWorkflowIssue("ROY-20", 1, "Urgent")];
+
+		const queue = buildPrioritizedIssueQueue(assignedIssues, staleRetryIssues);
+		expect(queue).toHaveLength(1);
+		expect(queue[0]?.priority.value).toBe(4);
+	});
+
+	it("bypasses merged sorting when a specific issue is targeted", () => {
+		const assignedIssues = [createWorkflowIssue("ROY-9", 4, "Low")];
+		const staleRetryIssues = [createWorkflowIssue("ROY-8", 1, "Urgent")];
+
+		const queue = selectIssueQueueForCycle(
+			"ROY-9",
+			assignedIssues,
+			staleRetryIssues,
+		);
+		expect(queue.map((issue) => issue.identifier)).toEqual(["ROY-9"]);
 	});
 });
 
@@ -749,6 +792,28 @@ function createRunState(
 		bugs: [],
 		startedAt: updatedAt,
 		updatedAt,
+	};
+}
+
+function createWorkflowIssue(
+	identifier: string,
+	priorityValue: number,
+	priorityName: string,
+) {
+	return {
+		id: identifier,
+		identifier,
+		title: identifier,
+		url: `https://linear.app/acme/issue/${identifier}/sample`,
+		priority: {
+			value: priorityValue,
+			name: priorityName,
+		},
+		labels: [],
+		state: {
+			id: "state_assigned",
+			name: "Todo",
+		},
 	};
 }
 
