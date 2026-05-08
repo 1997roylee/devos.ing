@@ -646,7 +646,7 @@ async function handleImplementingStage(
 		}
 	}
 
-	const hasExistingPr = Boolean(state.pullRequest);
+	const hasExistingPr = Boolean(state.pullRequest?.url);
 	const fixRound = hasExistingPr && state.bugs.length > 0;
 	const prompt = fixRound
 		? await buildFixPrompt(
