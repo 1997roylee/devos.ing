@@ -30,6 +30,10 @@ const envKeys = [
 	"RESEND_API_KEY",
 	"RESEND_FROM",
 	"RESEND_TO",
+	"AGENT_BACKEND",
+	"CLAUDE_CODE_MODEL",
+	"CLAUDE_CODE_MAX_TURNS",
+	"CLAUDE_CODE_ALLOWED_TOOLS",
 ] as const;
 
 const previousEnv: Record<string, string | undefined> = {};
@@ -43,11 +47,14 @@ describe("loadConfig", () => {
 					? ""
 					: key === "CODEX_SANDBOX"
 						? "workspace-write"
-						: key === "CODEX_HOME"
+						: key === "CODEX_HOME" ||
+								key === "CLAUDE_CODE_MODEL" ||
+								key === "CLAUDE_CODE_ALLOWED_TOOLS"
 							? ""
 							: key === "PIV_POLL_INTERVAL_MS"
 								? "30000"
-								: key === "PIV_MAX_POLL_CYCLES"
+								: key === "PIV_MAX_POLL_CYCLES" ||
+										key === "CLAUDE_CODE_MAX_TURNS"
 									? ""
 									: key === "PIV_DEV_MODE" || key === "PIV_PRINT_CODEX_LOGS"
 										? "0"
@@ -55,7 +62,9 @@ describe("loadConfig", () => {
 											? "1"
 											: key === "PIV_STALE_RUN_TIMEOUT_MS"
 												? "3600000"
-												: key.toLowerCase();
+												: key === "AGENT_BACKEND"
+													? ""
+													: key.toLowerCase();
 		}
 	});
 
@@ -658,6 +667,95 @@ describe("loadConfig", () => {
 			await expect(loadConfig(tempDir)).rejects.toThrow(
 				"Cron job 'invalid-run' run cannot use projectId with allProjects",
 			);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("loads agent backend from AGENT_BACKEND env", async () => {
+		process.env.AGENT_BACKEND = "claude-code";
+		const config = await loadConfig(process.cwd());
+		expect(config.projects[0]?.agent?.backend).toBe("claude-code");
+	});
+
+	it("defaults agent backend to undefined when not set", async () => {
+		process.env.AGENT_BACKEND = "";
+		const config = await loadConfig(process.cwd());
+		expect(config.projects[0]?.agent?.backend).toBeUndefined();
+	});
+
+	it("rejects invalid AGENT_BACKEND value", async () => {
+		process.env.AGENT_BACKEND = "invalid-backend";
+		await expect(loadConfig(process.cwd())).rejects.toThrow(
+			"Invalid AGENT_BACKEND value: 'invalid-backend'",
+		);
+	});
+
+	it("loads Claude Code model from CLAUDE_CODE_MODEL env", async () => {
+		process.env.CLAUDE_CODE_MODEL = "claude-sonnet-4-20250514";
+		const config = await loadConfig(process.cwd());
+		expect(config.projects[0]?.agent?.model).toBe("claude-sonnet-4-20250514");
+	});
+
+	it("loads Claude Code max turns from CLAUDE_CODE_MAX_TURNS env", async () => {
+		process.env.CLAUDE_CODE_MAX_TURNS = "50";
+		const config = await loadConfig(process.cwd());
+		expect(config.projects[0]?.agent?.maxTurns).toBe(50);
+	});
+
+	it("ignores non-positive CLAUDE_CODE_MAX_TURNS", async () => {
+		process.env.CLAUDE_CODE_MAX_TURNS = "0";
+		const config = await loadConfig(process.cwd());
+		expect(config.projects[0]?.agent?.maxTurns).toBeUndefined();
+	});
+
+	it("loads Claude Code allowed tools from CLAUDE_CODE_ALLOWED_TOOLS env", async () => {
+		process.env.CLAUDE_CODE_ALLOWED_TOOLS = "Read,Write,Bash";
+		const config = await loadConfig(process.cwd());
+		expect(config.projects[0]?.agent?.allowedTools).toEqual([
+			"Read",
+			"Write",
+			"Bash",
+		]);
+	});
+
+	it("returns undefined allowed tools when env is empty", async () => {
+		process.env.CLAUDE_CODE_ALLOWED_TOOLS = "";
+		const config = await loadConfig(process.cwd());
+		expect(config.projects[0]?.agent?.allowedTools).toBeUndefined();
+	});
+
+	it("allows config file to override agent settings", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			[
+				"export default {",
+				"  agent: {",
+				"    backend: 'claude-code',",
+				"    model: 'claude-opus-4-20250514',",
+				"    maxTurns: 100,",
+				"    allowedTools: ['Read', 'Write'],",
+				"  },",
+				"  projects: [",
+				"    { id: 'default' }",
+				"  ]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.projects[0]?.agent?.backend).toBe("claude-code");
+			expect(config.projects[0]?.agent?.model).toBe("claude-opus-4-20250514");
+			expect(config.projects[0]?.agent?.maxTurns).toBe(100);
+			expect(config.projects[0]?.agent?.allowedTools).toEqual([
+				"Read",
+				"Write",
+			]);
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });
 		}

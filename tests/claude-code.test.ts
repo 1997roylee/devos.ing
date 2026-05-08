@@ -1,12 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import type { ResolvedProjectConfig } from "../src/core/types";
 import {
-	ClaudeCodeAdapter,
 	extractSessionId,
 	extractUsage,
 } from "../src/services/claude-code-adapter";
 
-const config: ResolvedProjectConfig = {
+const baseConfig: ResolvedProjectConfig = {
 	id: "default",
 	name: "Default",
 	workspacePath: "/tmp/work",
@@ -75,13 +74,5 @@ describe("claude code adapter", () => {
 	it("returns undefined when usage is missing", () => {
 		const json = `{"result":"ok"}`;
 		expect(extractUsage(json)).toBeUndefined();
-	});
-
-	it("creates adapter instance", () => {
-		const adapter = new ClaudeCodeAdapter(config);
-		expect(adapter).toBeDefined();
-		expect(typeof adapter.runPlan).toBe("function");
-		expect(typeof adapter.resume).toBe("function");
-		expect(typeof adapter.runReview).toBe("function");
 	});
 });

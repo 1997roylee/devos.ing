@@ -122,6 +122,9 @@ function buildEnvBase(cwd: string): ProjectRuntimeConfig {
 		},
 		agent: {
 			backend: normalizeAgentBackend(env.AGENT_BACKEND),
+			model: normalizeOptionalValue(env.CLAUDE_CODE_MODEL),
+			maxTurns: parseOptionalPositiveInt(env.CLAUDE_CODE_MAX_TURNS),
+			allowedTools: parseCommaList(env.CLAUDE_CODE_ALLOWED_TOOLS),
 		},
 		dryRun: env.PIV_DRY_RUN === "1",
 	};
@@ -603,6 +606,17 @@ function validateProjects(projects: ResolvedProjectConfig[]): void {
 		seen.add(project.id);
 		validateProject(project);
 	}
+}
+
+function parseCommaList(input: string | undefined): string[] | undefined {
+	if (!input || !input.trim()) {
+		return undefined;
+	}
+	const items = input
+		.split(",")
+		.map((v) => v.trim())
+		.filter(Boolean);
+	return items.length > 0 ? items : undefined;
 }
 
 function normalizeOptionalValue(input: string | undefined): string | undefined {

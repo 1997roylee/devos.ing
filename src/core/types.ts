@@ -84,6 +84,9 @@ export interface ProjectRuntimeConfig {
 	};
 	agent?: {
 		backend?: "codex" | "claude-code";
+		model?: string;
+		maxTurns?: number;
+		allowedTools?: string[];
 	};
 	skills: {
 		root: string;
