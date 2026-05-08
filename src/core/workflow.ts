@@ -60,6 +60,8 @@ interface WorkflowIssue {
 	};
 }
 
+const LINEAR_TERMINAL_REASSERT_DELAY_MS = 2000;
+
 export async function runWorkflow(
 	config: LoadedConfig,
 	options: RunOptions,
@@ -897,6 +899,7 @@ async function handleReviewTestingStage(
 	await linear.markStage(state.issue.id, "done");
 	await linear.comment(state.issue.id, "Review/testing passed. Marked done.");
 	await safeNotifyTaskOutcome(notifications, state, "done");
+	await reassertLinearStageAfterDelay(linear, state.issue.id, "done");
 	logger.info(
 		buildIssueJobLogFields(state, "testing"),
 		"Review/testing completed",
@@ -958,6 +961,35 @@ export async function readyPullRequestAfterPassingReview(
 	}
 	const markReady = deps?.markPrReadyForReview ?? markPrReadyForReview;
 	return markReady(config, pullRequest);
+}
+
+export async function reassertLinearStageAfterDelay(
+	linear: Pick<LinearClient, "markStage">,
+	issueId: string,
+	stage: keyof ResolvedProjectConfig["linear"]["statusMap"],
+	deps?: {
+		delayMs?: number;
+		onError?: (error: unknown) => void;
+		sleep?: typeof sleep;
+	},
+): Promise<void> {
+	const delayMs = deps?.delayMs ?? LINEAR_TERMINAL_REASSERT_DELAY_MS;
+	if (delayMs > 0) {
+		await (deps?.sleep ?? sleep)(delayMs);
+	}
+	try {
+		// GitHub-to-Linear automations can lag behind `gh pr ready`; make terminal completion the final status write.
+		await linear.markStage(issueId, stage);
+	} catch (error) {
+		if (deps?.onError) {
+			deps.onError(error);
+		} else {
+			logger.error(
+				{ issueId, stage, err: normalizeError(error) },
+				"Failed to reassert Linear terminal stage",
+			);
+		}
+	}
 }
 
 export interface PlannerDecision {

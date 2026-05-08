@@ -13,6 +13,7 @@ import {
 	normalizeFailedReviewBugs,
 	parsePlannerDecision,
 	readyPullRequestAfterPassingReview,
+	reassertLinearStageAfterDelay,
 	resolvePollingSettings,
 	routeProjectsForIssueProjectId,
 	selectStaleRunIssueKeys,
@@ -421,6 +422,60 @@ describe("readyPullRequestAfterPassingReview", () => {
 
 		expect(updated).toBe(false);
 		expect(markPrReady).not.toHaveBeenCalled();
+	});
+});
+
+describe("reassertLinearStageAfterDelay", () => {
+	it("waits before writing the final Linear stage", async () => {
+		const events: string[] = [];
+		const linear = {
+			markStage: mock(async () => {
+				events.push("mark");
+			}),
+		};
+		const sleeper = mock(async (delayMs: number) => {
+			events.push(`sleep:${delayMs}`);
+		});
+
+		await reassertLinearStageAfterDelay(linear, "lin_123", "done", {
+			delayMs: 25,
+			sleep: sleeper,
+		});
+
+		expect(events).toEqual(["sleep:25", "mark"]);
+		expect(linear.markStage).toHaveBeenCalledWith("lin_123", "done");
+	});
+
+	it("can reassert immediately when delay is disabled", async () => {
+		const linear = {
+			markStage: mock(async () => {}),
+		};
+		const sleeper = mock(async () => {});
+
+		await reassertLinearStageAfterDelay(linear, "lin_123", "done", {
+			delayMs: 0,
+			sleep: sleeper,
+		});
+
+		expect(sleeper).not.toHaveBeenCalled();
+		expect(linear.markStage).toHaveBeenCalledWith("lin_123", "done");
+	});
+
+	it("does not fail the workflow when the best-effort reassertion fails", async () => {
+		const linear = {
+			markStage: mock(async () => {
+				throw new Error("Linear unavailable");
+			}),
+		};
+		const onError = mock(() => {});
+
+		await reassertLinearStageAfterDelay(linear, "lin_123", "done", {
+			delayMs: 0,
+			onError,
+		});
+
+		expect(linear.markStage).toHaveBeenCalledWith("lin_123", "done");
+		expect(onError).toHaveBeenCalledTimes(1);
 	});
 });
 
