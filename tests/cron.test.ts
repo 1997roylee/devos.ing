@@ -76,6 +76,24 @@ describe("selectCronJobs", () => {
 		]);
 		expect(selectCronJobs(config, "b").map((job) => job.id)).toEqual(["b"]);
 	});
+
+	it("filters disabled default maintenance job", () => {
+		const config = createLoadedConfig([
+			{
+				id: "daily-codebase-maintenance",
+				name: "Daily Codebase Maintenance",
+				schedule: { frequency: "daily", time: "09:00" },
+				enabled: false,
+				run: {
+					allProjects: true,
+					poll: true,
+					maxPollCycles: 1,
+					exitWhenIdle: true,
+				},
+			},
+		]);
+		expect(selectCronJobs(config, undefined)).toEqual([]);
+	});
 });
 
 describe("runCronSchedulerCycle", () => {

@@ -229,9 +229,32 @@ function resolvePolling(
 function resolveCron(
 	override: DeepPartial<CronConfig> | undefined,
 ): CronConfig {
-	const jobs = override?.jobs ?? [];
+	const jobs = override?.jobs;
+	if (jobs === undefined) {
+		return {
+			jobs: [buildDefaultCronJob()],
+		};
+	}
 	return {
 		jobs: jobs.map((job, index) => resolveCronJob(job, index)),
+	};
+}
+
+function buildDefaultCronJob(): CronJobConfig {
+	return {
+		id: "daily-codebase-maintenance",
+		name: "Daily Codebase Maintenance",
+		enabled: true,
+		schedule: {
+			frequency: "daily",
+			time: "09:00",
+		},
+		run: {
+			allProjects: true,
+			poll: true,
+			maxPollCycles: 1,
+			exitWhenIdle: true,
+		},
 	};
 }
 

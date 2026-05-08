@@ -133,7 +133,13 @@ Run `adhd-ai setup --check` to validate that config loads, the execution path ex
 
 ## Cron Jobs
 
-Define scheduled pipeline jobs in `adhd-ai.config.ts`:
+ADHD.ai now includes a default daily maintenance cron job when `cron.jobs` is not set:
+
+- `id`: `daily-codebase-maintenance`
+- `schedule`: `{ frequency: "daily", time: "09:00" }`
+- `run`: `{ allProjects: true, poll: true, maxPollCycles: 1, exitWhenIdle: true }`
+
+To override the default, define explicit jobs in `adhd-ai.config.ts`:
 
 ```ts
 export default {
@@ -145,6 +151,17 @@ export default {
         run: { allProjects: true, poll: true, maxPollCycles: 3 },
       },
     ],
+  },
+  projects: [{ id: "default" }],
+};
+```
+
+To disable all cron jobs explicitly:
+
+```ts
+export default {
+  cron: {
+    jobs: [],
   },
   projects: [{ id: "default" }],
 };

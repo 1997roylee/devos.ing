@@ -103,6 +103,30 @@ describe("loadConfig", () => {
 		);
 	});
 
+	it("loads default daily codebase maintenance cron job", async () => {
+		const config = await loadConfig(process.cwd());
+		expect(config.cron.jobs).toEqual([
+			{
+				id: "daily-codebase-maintenance",
+				name: "Daily Codebase Maintenance",
+				enabled: true,
+				schedule: {
+					frequency: "daily",
+					time: "09:00",
+				},
+				run: {
+					projectId: undefined,
+					issueArg: undefined,
+					allProjects: true,
+					poll: true,
+					pollIntervalMs: undefined,
+					maxPollCycles: 1,
+					exitWhenIdle: true,
+				},
+			},
+		]);
+	});
+
 	it("loads notification settings from RESEND env vars", async () => {
 		process.env.RESEND_API_KEY = "re_test_key";
 		process.env.RESEND_FROM = "ADHD.ai <ops@example.com>";
@@ -544,6 +568,66 @@ describe("loadConfig", () => {
 					exitWhenIdle: undefined,
 				},
 			});
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("uses explicit cron job list instead of default cron job", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			[
+				"export default {",
+				"  cron: {",
+				"    jobs: [",
+				"      {",
+				"        id: 'custom-hourly',",
+				"        schedule: { frequency: 'hourly', every: 6 },",
+				"      }",
+				"    ]",
+				"  },",
+				"  projects: [",
+				"    { id: 'default' }",
+				"  ]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.cron.jobs).toHaveLength(1);
+			expect(config.cron.jobs[0]?.id).toBe("custom-hourly");
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("supports opting out of default cron job with explicit empty list", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			[
+				"export default {",
+				"  cron: {",
+				"    jobs: []",
+				"  },",
+				"  projects: [",
+				"    { id: 'default' }",
+				"  ]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.cron.jobs).toEqual([]);
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });
 		}
