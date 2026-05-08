@@ -1,10 +1,11 @@
 import { describe, expect, it } from "bun:test";
 import type { ResolvedProjectConfig } from "../src/core/types";
+import { ClaudeCodeAdapter } from "../src/services/claude-code-adapter";
 import {
-	ClaudeCodeAdapter,
+	extractFinalMessage,
 	extractSessionId,
 	extractUsage,
-} from "../src/services/claude-code-adapter";
+} from "../src/utils/parsing";
 
 const config: ResolvedProjectConfig = {
 	id: "default",
