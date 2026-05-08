@@ -669,23 +669,23 @@ async function processIssue(
 		"Taking issue job",
 	);
 
-	const leaseAcquired = await tryAcquireRunLease(
-		config.workspacePath,
-		runState,
-		leaseOwnerId,
-		leaseTimeoutMs,
-	);
-	if (!leaseAcquired) {
-		issueLogger.info(
-			{ leaseOwnerId, currentLeaseOwnerId: runState.lease?.ownerId },
-			"Skipping issue because it is already leased by another worker",
-		);
-		return;
-	}
-
+	let leaseAcquired = false;
 	try {
-		await withExecutionPathLock(config.executionPath, async () =>
-			executeIssue(
+		await withExecutionPathLock(config.executionPath, async () => {
+			leaseAcquired = await tryAcquireRunLease(
+				config.workspacePath,
+				runState,
+				leaseOwnerId,
+				leaseTimeoutMs,
+			);
+			if (!leaseAcquired) {
+				issueLogger.info(
+					{ leaseOwnerId, currentLeaseOwnerId: runState.lease?.ownerId },
+					"Skipping issue because it is already leased by another worker",
+				);
+				return;
+			}
+			await executeIssue(
 				config,
 				notifications,
 				linear,
@@ -693,8 +693,11 @@ async function processIssue(
 				options,
 				leaseOwnerId,
 				leaseTimeoutMs,
-			),
-		);
+			);
+		});
+		if (!leaseAcquired) {
+			return;
+		}
 		issueLogger.info({ stage: runState.stage }, "Issue workflow finished");
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -716,7 +719,9 @@ async function processIssue(
 		);
 		await safeNotifyTaskOutcome(notifications, runState, "blocked", message);
 	} finally {
-		await releaseRunLease(config.workspacePath, runState, leaseOwnerId);
+		if (leaseAcquired) {
+			await releaseRunLease(config.workspacePath, runState, leaseOwnerId);
+		}
 	}
 }
 

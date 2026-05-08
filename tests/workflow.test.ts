@@ -2,7 +2,11 @@ import { describe, expect, it, mock } from "bun:test";
 import { mkdtemp, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { agentChatLogPath } from "../src/core/state";
+import {
+	agentChatLogPath,
+	applyRunLease,
+	isRunLeaseExpired,
+} from "../src/core/state";
 import type {
 	PollingConfig,
 	ResolvedProjectConfig,
@@ -276,6 +280,31 @@ describe("withExecutionPathLock", () => {
 		]);
 
 		expect(events).toEqual(["a:start", "a:end", "b:start", "b:end"]);
+	});
+
+	it("allows acquiring a fresh lease after queue wait exceeds timeout", async () => {
+		const leaseTimeoutMs = 5;
+		const waitMs = 20;
+		const startedAtMs = Date.now();
+		const state = createRunState("ROY-6", "reviewing", startedAtMs);
+
+		await Promise.all([
+			withExecutionPathLock("/tmp/shared-timeout", async () => {
+				await new Promise((resolve) => setTimeout(resolve, waitMs));
+			}),
+			withExecutionPathLock("/tmp/shared-timeout", async () => {
+				const acquiredAtMs = Date.now();
+				expect(acquiredAtMs - startedAtMs).toBeGreaterThanOrEqual(waitMs);
+
+				const leased = applyRunLease(
+					state,
+					"worker-queued",
+					leaseTimeoutMs,
+					acquiredAtMs,
+				);
+				expect(isRunLeaseExpired(leased, acquiredAtMs)).toBe(false);
+			}),
+		]);
 	});
 });
 
