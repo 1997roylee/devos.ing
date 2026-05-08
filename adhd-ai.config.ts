@@ -14,7 +14,7 @@ const config: DeepPartial<AdhdAiRootConfig> = {
 		models: {
 			plan: "gpt-5.5",
 			implement: "gpt-5.3-codex",
-			reviewTest: "gpt-5.3-codex",
+			reviewTest: "gpt-5.5",
 		},
 		plugins: ["github@openai-curated", "linear@openai-curated"],
 		skillsets: ["adhd-ai"],

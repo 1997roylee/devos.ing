@@ -74,6 +74,8 @@ Path behavior:
 
 - `workspacePath`: where ADHD.ai stores state and temp artifacts.
 - `executionPath`: local repo path where `codex`, `git`, and `gh` commands run.
+- `skills.root`: base directory used to resolve stage skill files.
+- `skills.plan` / `skills.implement` / `skills.reviewTest`: skill files for each stage; relative values resolve from `skills.root`, absolute values are used directly.
 
 Run state is namespaced per project at:
 

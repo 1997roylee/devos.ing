@@ -425,6 +425,7 @@ function createProject(
 			streamLogs: false,
 		},
 		skills: {
+			root: "/tmp/skills",
 			plan: "/tmp/plan.md",
 			implement: "/tmp/implement.md",
 			reviewTest: "/tmp/review.md",

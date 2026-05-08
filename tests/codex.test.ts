@@ -51,7 +51,7 @@ const config: ResolvedProjectConfig = {
 		sandbox: "workspace-write",
 		codexHome: "/tmp/codex",
 	},
-	skills: { plan: "p", implement: "i", reviewTest: "r" },
+	skills: { root: "/tmp/skills", plan: "p", implement: "i", reviewTest: "r" },
 	dryRun: false,
 };
 

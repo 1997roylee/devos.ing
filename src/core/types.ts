@@ -86,6 +86,7 @@ export interface ProjectRuntimeConfig {
 		backend?: "codex" | "claude-code";
 	};
 	skills: {
+		root: string;
 		plan: string;
 		implement: string;
 		reviewTest: string;

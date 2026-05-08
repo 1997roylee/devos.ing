@@ -115,9 +115,10 @@ function buildEnvBase(cwd: string): ProjectRuntimeConfig {
 			codexHome,
 		},
 		skills: {
-			plan: path.join(cwd, "skills", "piv-plan", "SKILL.md"),
-			implement: path.join(cwd, "skills", "piv-implement", "SKILL.md"),
-			reviewTest: path.join(cwd, "skills", "piv-review-test", "SKILL.md"),
+			root: path.join(cwd, "skills"),
+			plan: path.join("piv-plan", "SKILL.md"),
+			implement: path.join("piv-implement", "SKILL.md"),
+			reviewTest: path.join("piv-review-test", "SKILL.md"),
 		},
 		agent: {
 			backend: normalizeAgentBackend(env.AGENT_BACKEND),
@@ -504,6 +505,20 @@ function mergeRuntime(
 		rootDefaults.workspacePath ??
 		base.executionPath;
 
+	const skillRoot =
+		project.skills?.root ?? rootDefaults.skills?.root ?? base.skills.root;
+	const mergedSkills = {
+		plan: project.skills?.plan ?? rootDefaults.skills?.plan ?? base.skills.plan,
+		implement:
+			project.skills?.implement ??
+			rootDefaults.skills?.implement ??
+			base.skills.implement,
+		reviewTest:
+			project.skills?.reviewTest ??
+			rootDefaults.skills?.reviewTest ??
+			base.skills.reviewTest,
+	};
+
 	return {
 		workspacePath,
 		executionPath,
@@ -538,12 +553,20 @@ function mergeRuntime(
 			...(project.codex ?? {}),
 		},
 		skills: {
-			...base.skills,
-			...(rootDefaults.skills ?? {}),
-			...(project.skills ?? {}),
+			root: skillRoot,
+			plan: resolveSkillPath(skillRoot, mergedSkills.plan),
+			implement: resolveSkillPath(skillRoot, mergedSkills.implement),
+			reviewTest: resolveSkillPath(skillRoot, mergedSkills.reviewTest),
 		},
 		dryRun: project.dryRun ?? rootDefaults.dryRun ?? base.dryRun,
 	};
+}
+
+function resolveSkillPath(root: string, input: string): string {
+	if (path.isAbsolute(input)) {
+		return input;
+	}
+	return path.resolve(root, input);
 }
 
 function parseOptionalPositiveInt(

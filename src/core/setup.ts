@@ -166,9 +166,10 @@ export function renderLocalConfig(draft: SetupDraft): string {
 		],
 		codex: draft.codex,
 		skills: {
-			plan: "${cwd}/skills/piv-plan/SKILL.md",
-			implement: "${cwd}/skills/piv-implement/SKILL.md",
-			reviewTest: "${cwd}/skills/piv-review-test/SKILL.md",
+			root: "${cwd}/skills",
+			plan: "piv-plan/SKILL.md",
+			implement: "piv-implement/SKILL.md",
+			reviewTest: "piv-review-test/SKILL.md",
 		},
 	};
 
@@ -250,6 +251,29 @@ export async function collectSetupChecks(
 				status: "fail",
 				message: `${project.executionPath} does not exist or is not accessible`,
 			});
+		}
+	}
+	for (const project of config.projects) {
+		const skillChecks: Array<[string, string]> = [
+			["plan", project.skills.plan],
+			["implement", project.skills.implement],
+			["reviewTest", project.skills.reviewTest],
+		];
+		for (const [stage, skillPath] of skillChecks) {
+			try {
+				await accessPath(skillPath);
+				checks.push({
+					name: `Skill file (${project.id}:${stage})`,
+					status: "pass",
+					message: skillPath,
+				});
+			} catch {
+				checks.push({
+					name: `Skill file (${project.id}:${stage})`,
+					status: "fail",
+					message: `${skillPath} does not exist or is not accessible`,
+				});
+			}
 		}
 	}
 
@@ -579,19 +603,10 @@ function quoteEnvValue(value: string): string {
 }
 
 function stringifyConfig(value: unknown): string {
-	return JSON.stringify(value, null, "\t")
-		.replaceAll(
-			'"${cwd}/skills/piv-plan/SKILL.md"',
-			"`${cwd}/skills/piv-plan/SKILL.md`",
-		)
-		.replaceAll(
-			'"${cwd}/skills/piv-implement/SKILL.md"',
-			"`${cwd}/skills/piv-implement/SKILL.md`",
-		)
-		.replaceAll(
-			'"${cwd}/skills/piv-review-test/SKILL.md"',
-			"`${cwd}/skills/piv-review-test/SKILL.md`",
-		);
+	return JSON.stringify(value, null, "\t").replaceAll(
+		'"${cwd}/skills"',
+		"`${cwd}/skills`",
+	);
 }
 
 function resolveUserPath(input: string): string {

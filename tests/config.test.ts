@@ -78,6 +78,18 @@ describe("loadConfig", () => {
 		expect(config.polling.exitWhenIdle).toBe(true);
 		expect(config.polling.staleRunTimeoutMs).toBe(3600000);
 		expect(config.notifications.email.enabled).toBe(false);
+		expect(config.projects[0]?.skills.root).toBe(
+			path.join(process.cwd(), "skills"),
+		);
+		expect(config.projects[0]?.skills.plan).toBe(
+			path.join(process.cwd(), "skills", "piv-plan", "SKILL.md"),
+		);
+		expect(config.projects[0]?.skills.implement).toBe(
+			path.join(process.cwd(), "skills", "piv-implement", "SKILL.md"),
+		);
+		expect(config.projects[0]?.skills.reviewTest).toBe(
+			path.join(process.cwd(), "skills", "piv-review-test", "SKILL.md"),
+		);
 	});
 
 	it("loads notification settings from RESEND env vars", async () => {
@@ -294,10 +306,24 @@ describe("loadConfig", () => {
 		process.env.CODEX_MODEL_PLAN = "gpt-5.5";
 		process.env.CODEX_MODEL_IMPLEMENT = "gpt-5.3-codex";
 		process.env.CODEX_MODEL_REVIEW_TEST = "gpt-5.3-codex";
-		const config = await loadConfig(process.cwd());
-		expect(config.projects[0]?.codex.models?.plan).toBe("gpt-5.5");
-		expect(config.projects[0]?.codex.models?.implement).toBe("gpt-5.3-codex");
-		expect(config.projects[0]?.codex.models?.reviewTest).toBe("gpt-5.3-codex");
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			["export default { projects: [{ id: 'default' }] };", ""].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.projects[0]?.codex.models?.plan).toBe("gpt-5.5");
+			expect(config.projects[0]?.codex.models?.implement).toBe("gpt-5.3-codex");
+			expect(config.projects[0]?.codex.models?.reviewTest).toBe(
+				"gpt-5.3-codex",
+			);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
 	});
 
 	it("does not stream codex logs by default", async () => {
@@ -358,6 +384,103 @@ describe("loadConfig", () => {
 			expect(config.projects[0]?.codex.configOverrides).toEqual({
 				"features.project": "false",
 			});
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("resolves relative skill paths under configured skills.root", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			[
+				"export default {",
+				"  skills: {",
+				"    root: './shared-skills',",
+				"    plan: 'planning/SKILL.md'",
+				"  },",
+				"  projects: [",
+				"    { id: 'default' }",
+				"  ]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.projects[0]?.skills.root).toBe("./shared-skills");
+			expect(config.projects[0]?.skills.plan).toBe(
+				path.resolve("./shared-skills", "planning/SKILL.md"),
+			);
+			expect(config.projects[0]?.skills.implement).toBe(
+				path.resolve("./shared-skills", "piv-implement/SKILL.md"),
+			);
+			expect(config.projects[0]?.skills.reviewTest).toBe(
+				path.resolve("./shared-skills", "piv-review-test/SKILL.md"),
+			);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("keeps absolute skill paths when skills.root is overridden", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			[
+				"export default {",
+				"  skills: { root: './shared-skills' },",
+				"  projects: [",
+				"    {",
+				"      id: 'default',",
+				"      skills: {",
+				"        implement: '/opt/custom/implement/SKILL.md'",
+				"      }",
+				"    }",
+				"  ]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.projects[0]?.skills.implement).toBe(
+				"/opt/custom/implement/SKILL.md",
+			);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("allows project skills.root to override root defaults", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			[
+				"export default {",
+				"  skills: { root: './root-skills' },",
+				"  projects: [",
+				"    { id: 'default', skills: { root: './project-skills' } }",
+				"  ]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.projects[0]?.skills.root).toBe("./project-skills");
+			expect(config.projects[0]?.skills.plan).toBe(
+				path.resolve("./project-skills", "piv-plan/SKILL.md"),
+			);
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });
 		}

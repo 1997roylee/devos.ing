@@ -51,6 +51,8 @@ describe("setup helpers", () => {
 		expect(env).toContain("LINEAR_API_KEY=lin_secret_123");
 		expect(localConfig).not.toContain("lin_secret_123");
 		expect(localConfig).toContain("demo-project");
+		expect(localConfig).toContain('"root": `${cwd}/skills`');
+		expect(localConfig).toContain('"plan": "piv-plan/SKILL.md"');
 	});
 
 	it("merges env updates without dropping unrelated values", () => {
@@ -114,6 +116,26 @@ describe("setup helpers", () => {
 		});
 	});
 
+	it("reports missing skill files", async () => {
+		const checks = await collectSetupChecks("/tmp/demo", {
+			loadConfig: async () => loadedConfig({ linearApiKey: "lin_secret_123" }),
+			access: async (targetPath) => {
+				if (targetPath === "/tmp/demo/skills/piv-implement/SKILL.md") {
+					throw new Error("missing");
+				}
+			},
+			readFile: async () => "",
+			runCommand: async () => okCommand(),
+		});
+
+		expect(checks).toContainEqual({
+			name: "Skill file (demo-project:implement)",
+			status: "fail",
+			message:
+				"/tmp/demo/skills/piv-implement/SKILL.md does not exist or is not accessible",
+		});
+	});
+
 	it("reports secrets in tracked config", async () => {
 		const checks = await collectSetupChecks("/tmp/demo", {
 			loadConfig: async () => loadedConfig({ linearApiKey: "lin_secret_123" }),
@@ -166,6 +188,7 @@ function loadedConfig({
 				},
 				dryRun: false,
 				skills: {
+					root: "/tmp/demo/skills",
 					plan: "/tmp/demo/skills/piv-plan/SKILL.md",
 					implement: "/tmp/demo/skills/piv-implement/SKILL.md",
 					reviewTest: "/tmp/demo/skills/piv-review-test/SKILL.md",
