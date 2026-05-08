@@ -22,6 +22,7 @@ import {
 	resolvePollingSettings,
 	resolveReviewModeForComplexityScore,
 	routeProjectsForIssueProjectId,
+	runAgentWithChatLog,
 	selectIssueQueueForCycle,
 	selectStaleRunIssueKeys,
 	shouldRetryRunStage,

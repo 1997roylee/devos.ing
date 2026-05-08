@@ -6,7 +6,7 @@ import {
 	prepareImplementationBranch,
 	updateDraftPrFromWorktree,
 } from "../services/github";
-import { LinearClient } from "../services/linear";
+import { LinearClient, sortIssuesByPriority } from "../services/linear";
 import {
 	sendHumanReviewRequiredEmail,
 	sendTaskOutcomeEmail,
