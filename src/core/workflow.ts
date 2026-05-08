@@ -741,6 +741,10 @@ async function handleImplementingStage(
 
 	const hasExistingPr = Boolean(state.pullRequest?.url);
 	const fixRound = hasExistingPr && state.bugs.length > 0;
+	const fixedBugs = fixedBugsForImplementationComment(
+		hasExistingPr,
+		state.bugs,
+	);
 	const prompt = fixRound
 		? await buildFixPrompt(
 				config.skills.implement,
@@ -800,6 +804,7 @@ async function handleImplementingStage(
 		state.issue.id,
 		buildImplementationComment(state.pullRequest?.url, result.usage, {
 			updated: hasExistingPr,
+			fixedBugs,
 		}),
 	);
 	logger.info(
