@@ -1260,6 +1260,13 @@ async function safePrComment(
 		pr: state.pullRequest.url ?? state.pullRequest.number,
 	});
 	try {
+		runLogger.info(
+			{
+				commentBody: body,
+				runState: state,
+			},
+			"Adding GitHub PR comment",
+		);
 		await commentOnPr(config, state.pullRequest, body);
 	} catch (error) {
 		runLogger.error(
