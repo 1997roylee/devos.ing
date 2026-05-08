@@ -106,4 +106,49 @@ describe("buildPlanPrompt", () => {
 			await rm(tmpDir, { recursive: true, force: true });
 		}
 	});
+
+	it("renders multiple standards supplemental skills in plan prompt", async () => {
+		const tmpDir = await mkdtemp(path.join(os.tmpdir(), "adhd-plan-skill-"));
+		const skillPath = path.join(tmpDir, "SKILL.md");
+		await writeFile(
+			skillPath,
+			["name: adhd-plan", "description: base planning skill"].join("\n"),
+			"utf8",
+		);
+
+		try {
+			const prompt = await buildPlanPrompt(skillPath, issue, {
+				supplementalSkills: [
+					{
+						name: "backend-standard",
+						description: "Backend service and reliability standards",
+						content: "name: backend-standard\ndescription: backend standards",
+						path: "/tmp/skills/backend-standard/SKILL.md",
+						tags: [],
+						source: "folder",
+						score: 12,
+					},
+					{
+						name: "typescript-biome-style",
+						description: "TypeScript and Biome coding style",
+						content:
+							"name: typescript-biome-style\ndescription: TypeScript + Biome",
+						path: "/tmp/skills/typescript-biome-style/SKILL.md",
+						tags: [],
+						source: "folder",
+						score: 11,
+					},
+				],
+			});
+
+			expect(prompt).toContain("1. backend-standard");
+			expect(prompt).toContain("2. typescript-biome-style");
+			expect(prompt).toContain("score: 12");
+			expect(prompt).toContain("score: 11");
+			expect(prompt).toContain("/tmp/skills/backend-standard/SKILL.md");
+			expect(prompt).toContain("name: typescript-biome-style");
+		} finally {
+			await rm(tmpDir, { recursive: true, force: true });
+		}
+	});
 });

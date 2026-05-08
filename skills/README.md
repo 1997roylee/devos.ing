@@ -10,6 +10,9 @@ This directory is the default skill pack root for ADHD.ai.
 - `piv-implement/SKILL.md`
 - `piv-review-test/SKILL.md`
 - `adhd-docs/SKILL.md`
+- `backend-standard/SKILL.md`
+- `frontend-standard/SKILL.md`
+- `typescript-biome-style/SKILL.md`
 
 ## Configure a custom skill root
 
@@ -45,6 +48,18 @@ You can source skills from another repo in three common ways:
 3. Copy selected skill folders into this `skills/` directory.
 
 For reproducibility, pin submodules or clone to a known commit.
+
+## Included Supplemental Standards Skills
+
+These supplemental skills are project-agnostic and can be auto-selected for
+planning when issue text matches their domain:
+
+- `backend-standard/SKILL.md`
+- `frontend-standard/SKILL.md`
+- `typescript-biome-style/SKILL.md`
+
+You can also copy these folders into another shared skill pack and keep
+`skills.root` pointed at that location.
 
 ## Included Documentation Skill
 

@@ -54,6 +54,21 @@ describe("loadFolderSkillCandidates", () => {
 			await rm(tempDir, { recursive: true, force: true });
 		}
 	});
+
+	it("discovers bundled backend/frontend/typescript standards skills", async () => {
+		const skillsRoot = path.join(process.cwd(), "skills");
+		const basePlanPath = path.join(skillsRoot, "piv-plan", "SKILL.md");
+
+		const candidates = await loadFolderSkillCandidates(
+			skillsRoot,
+			basePlanPath,
+		);
+		const names = new Set(candidates.map((candidate) => candidate.name));
+
+		expect(names.has("backend-standard")).toBe(true);
+		expect(names.has("frontend-standard")).toBe(true);
+		expect(names.has("typescript-biome-style")).toBe(true);
+	});
 });
 
 describe("loadDatabaseSkillCandidates", () => {
@@ -148,5 +163,30 @@ describe("rankSkillCandidates", () => {
 		expect(ranked).toHaveLength(1);
 		expect(ranked[0]?.name).toBe("database-planning");
 		expect(ranked[0]?.source).toBe("folder");
+	});
+
+	it("ranks coding standards skills for backend/frontend/typescript biome issues", async () => {
+		const skillsRoot = path.join(process.cwd(), "skills");
+		const basePlanPath = path.join(skillsRoot, "piv-plan", "SKILL.md");
+		const candidates = await loadFolderSkillCandidates(
+			skillsRoot,
+			basePlanPath,
+		);
+
+		const standardsIssue: IssueRef = {
+			id: "lin_roy_59",
+			key: "ROY-59",
+			title: "Enhance skill for coding structure and backend standard",
+			description:
+				"We need a backend skill, frontend skill, and coding styles for TypeScript with Biome.",
+			url: "https://linear.app/roy/issue/ROY-59/enhance-skill",
+		};
+
+		const ranked = rankSkillCandidates(candidates, standardsIssue, 5);
+		const rankedNames = ranked.map((candidate) => candidate.name);
+
+		expect(rankedNames).toContain("backend-standard");
+		expect(rankedNames).toContain("frontend-standard");
+		expect(rankedNames).toContain("typescript-biome-style");
 	});
 });
