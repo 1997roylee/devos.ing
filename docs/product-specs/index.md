@@ -5,6 +5,7 @@ ADHD.ai turns Linear issues into staged agent execution with planning, implement
 ## Current Specs
 
 - [new-user-onboarding.md](/Users/roy/Desktop/SourceCode/agentic/show-me-ur-agents/docs/product-specs/new-user-onboarding.md)
+- [NON_TECHNICAL_GUIDE.md](/Users/roy/Desktop/SourceCode/agentic/show-me-ur-agents/docs/NON_TECHNICAL_GUIDE.md)
 
 ## Product Workflow Summary
 
