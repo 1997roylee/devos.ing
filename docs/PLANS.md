@@ -18,6 +18,30 @@ Planning output should remain concise and implementation-focused, including:
 3. `bun run src/index.ts status --project default --issue ENG-123`
 4. `bun run src/index.ts projects`
 
+## Hourly Review Cron Example
+
+Use an hourly review-only cron job to re-run PR review/testing in parallel across resumable runs:
+
+```ts
+export default {
+  cron: {
+    jobs: [
+      {
+        id: "hourly-pr-review",
+        schedule: { frequency: "hourly", every: 1, minute: 0 },
+        run: { reviewOnly: true, allProjects: true },
+      },
+    ],
+  },
+};
+```
+
+Run it manually with:
+
+1. `bun run src/index.ts cron --job hourly-pr-review`
+
+Per-issue leases still prevent duplicate workers from processing the same issue concurrently.
+
 ## Quality Commands
 
 1. `bun run check`

@@ -571,11 +571,22 @@ function resolveCronRun(
 					: invalidCronRunBoolean(
 							`cron.jobs[${index}].run.poll must be a boolean`,
 						);
+	const reviewOnly =
+		run.reviewOnly === undefined
+			? undefined
+			: run.reviewOnly === true
+				? true
+				: run.reviewOnly === false
+					? false
+					: invalidCronRunBoolean(
+							`cron.jobs[${index}].run.reviewOnly must be a boolean`,
+						);
 
 	return {
 		issueArg,
 		projectId,
 		allProjects,
+		reviewOnly,
 		poll,
 		pollIntervalMs,
 		maxPollCycles,
@@ -1000,6 +1011,11 @@ function validateCronRun(jobId: string, run: RunOptions): void {
 	if (run.projectId && run.allProjects) {
 		throw new Error(
 			`Cron job '${jobId}' run cannot use projectId with allProjects`,
+		);
+	}
+	if (run.reviewOnly && run.issueArg) {
+		throw new Error(
+			`Cron job '${jobId}' run cannot use issueArg with reviewOnly`,
 		);
 	}
 }

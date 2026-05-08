@@ -24,6 +24,7 @@ import {
 	routeProjectsForIssueProjectId,
 	runAgentWithChatLog,
 	selectIssueQueueForCycle,
+	selectReviewOnlyIssueKeys,
 	selectStaleRunIssueKeys,
 	shouldRetryRunStage,
 	shouldStopPolling,
@@ -199,6 +200,49 @@ describe("buildPrioritizedIssueQueue", () => {
 			staleRetryIssues,
 		);
 		expect(queue.map((issue) => issue.identifier)).toEqual(["ROY-9"]);
+	});
+});
+
+describe("review-only selection", () => {
+	it("selects resumable review-stage run states with an existing PR", () => {
+		const now = Date.parse("2026-05-07T12:00:00.000Z");
+		const runStates: RunState[] = [
+			{
+				...createRunState("ROY-1", "pr_created", now),
+				pullRequest: {
+					branch: "codex/roy-1",
+					title: "PR",
+					url: "https://pr/1",
+				},
+			},
+			{
+				...createRunState("ROY-2", "reviewing", now),
+				pullRequest: {
+					branch: "codex/roy-2",
+					title: "PR",
+					url: "https://pr/2",
+				},
+			},
+			{
+				...createRunState("ROY-3", "testing", now),
+				pullRequest: {
+					branch: "codex/roy-3",
+					title: "PR",
+					url: "https://pr/3",
+				},
+			},
+			{
+				...createRunState("ROY-4", "reviewing", now),
+				pullRequest: { branch: "codex/roy-4", title: "PR" },
+			},
+			createRunState("ROY-5", "implementing", now),
+		];
+
+		expect(selectReviewOnlyIssueKeys(runStates)).toEqual([
+			"ROY-1",
+			"ROY-2",
+			"ROY-3",
+		]);
 	});
 });
 

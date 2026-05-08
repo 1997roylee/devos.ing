@@ -350,6 +350,22 @@ async function runProjectCycle(
 		projectLogger.info({ cycle }, "No eligible Linear issues found.");
 	}
 
+	if (options.reviewOnly) {
+		await Promise.all(
+			issueQueue.map((issue) =>
+				processIssue(
+					config,
+					notifications,
+					linear,
+					issue,
+					polling.staleRunTimeoutMs,
+					buildRunLeaseOwnerId(),
+				),
+			),
+		);
+		return issueQueue.length;
+	}
+
 	for (const issue of issueQueue) {
 		await processIssue(
 			config,
@@ -370,6 +386,15 @@ async function buildIssueQueueForProjectCycle(
 	linear: LinearClient,
 	polling: PollingSettings,
 ): Promise<{ issueQueue: WorkflowIssue[]; staleRetryCount: number }> {
+	if (options.reviewOnly) {
+		const runStates = await listRunStates(config.workspacePath, config.id);
+		const reviewOnlyIssues = await fetchReviewOnlyIssues(linear, runStates);
+		return {
+			issueQueue: sortIssuesByPriority(reviewOnlyIssues),
+			staleRetryCount: 0,
+		};
+	}
+
 	const assignedIssues = await linear.fetchWork(options.issueArg);
 	if (options.issueArg !== undefined) {
 		return {
@@ -377,6 +402,7 @@ async function buildIssueQueueForProjectCycle(
 				options.issueArg,
 				assignedIssues,
 				[],
+				options,
 			),
 			staleRetryCount: 0,
 		};
@@ -392,6 +418,7 @@ async function buildIssueQueueForProjectCycle(
 			options.issueArg,
 			assignedIssues,
 			staleRetryIssues,
+			options,
 		),
 		staleRetryCount: staleRetryIssues.length,
 	};
@@ -410,11 +437,30 @@ export function selectIssueQueueForCycle(
 	issueArg: string | undefined,
 	assignedIssues: WorkflowIssue[],
 	staleRetryIssues: WorkflowIssue[],
+	options: Pick<RunOptions, "reviewOnly"> = {},
 ): WorkflowIssue[] {
+	if (options.reviewOnly) {
+		return [];
+	}
 	if (issueArg !== undefined) {
 		return assignedIssues;
 	}
 	return buildPrioritizedIssueQueue(assignedIssues, staleRetryIssues);
+}
+
+export function isReviewOnlyEligibleRunState(state: RunState): boolean {
+	return (
+		(state.stage === "pr_created" ||
+			state.stage === "reviewing" ||
+			state.stage === "testing") &&
+		Boolean(state.pullRequest?.url)
+	);
+}
+
+export function selectReviewOnlyIssueKeys(runStates: RunState[]): string[] {
+	return runStates
+		.filter((state) => isReviewOnlyEligibleRunState(state))
+		.map((state) => normalizeIssueKey(state.issue.key));
 }
 
 export function shouldRetryRunStage(stage: WorkflowStage): boolean {
@@ -506,6 +552,31 @@ async function fetchStaleIssuesForRetry(
 		});
 	}
 	return staleIssues;
+}
+
+async function fetchReviewOnlyIssues(
+	linear: LinearClient,
+	runStates: RunState[],
+): Promise<WorkflowIssue[]> {
+	const issueKeys = selectReviewOnlyIssueKeys(runStates);
+	const issues: WorkflowIssue[] = [];
+	for (const key of issueKeys) {
+		const issue = await linear.fetchIssueByIdentifier(key);
+		if (!issue) {
+			continue;
+		}
+		issues.push({
+			id: issue.id,
+			identifier: issue.identifier,
+			title: issue.title,
+			url: issue.url,
+			teamId: issue.teamId,
+			priority: issue.priority,
+			labels: issue.labels,
+			state: issue.state,
+		});
+	}
+	return dedupeIssuesByKey(issues);
 }
 
 async function processIssue(
@@ -967,6 +1038,7 @@ async function handleReviewTestingStage(
 	const outcome = parseReviewOutcome(review.finalMessage || review.stdout);
 	const retryBugs = normalizeFailedReviewBugs(outcome);
 	appendCodexUsage(state, "testing", review.usage);
+	state.reviewSessionId = review.sessionId;
 
 	state.reviewSummary = outcome.summary;
 	state.testingSummary = outcome.summary;
