@@ -180,6 +180,48 @@ export async function commentOnPr(
 	assertCommandOk("gh", ["pr", "comment", target], result);
 }
 
+export async function markPrReadyForReview(
+	config: ResolvedProjectConfig,
+	pr: PullRequestRef,
+	deps?: {
+		runCommand?: typeof runCommand;
+		assertCommandOk?: typeof assertCommandOk;
+		ensureGhAuth?: typeof ensureGhAuth;
+	},
+): Promise<boolean> {
+	const commandRunner = deps?.runCommand ?? runCommand;
+	const assertOk = deps?.assertCommandOk ?? assertCommandOk;
+	const ensureAuth = deps?.ensureGhAuth ?? ensureGhAuth;
+
+	if (config.dryRun) {
+		return false;
+	}
+	if (!pr.url && !pr.number) {
+		throw new Error("PR URL or number is required to mark PR as ready");
+	}
+	const target = pr.url ?? String(pr.number);
+
+	await ensureAuth(config);
+	const view = await commandRunner(
+		"gh",
+		["pr", "view", target, "--json", "isDraft", "--jq", ".isDraft"],
+		{
+			cwd: config.executionPath,
+		},
+	);
+	assertOk("gh", ["pr", "view", target], view);
+
+	if (view.stdout.trim().toLowerCase() !== "true") {
+		return false;
+	}
+
+	const ready = await commandRunner("gh", ["pr", "ready", target], {
+		cwd: config.executionPath,
+	});
+	assertOk("gh", ["pr", "ready", target], ready);
+	return true;
+}
+
 export function buildBugIssueBody(
 	bugTitle: string,
 	bugBody: string,

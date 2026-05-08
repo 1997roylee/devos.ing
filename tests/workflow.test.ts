@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, mock } from "bun:test";
 import type {
 	PollingConfig,
 	ResolvedProjectConfig,
@@ -12,6 +12,7 @@ import {
 	isRunStateStaleForRetry,
 	normalizeFailedReviewBugs,
 	parsePlannerDecision,
+	readyPullRequestAfterPassingReview,
 	resolvePollingSettings,
 	routeProjectsForIssueProjectId,
 	selectStaleRunIssueKeys,
@@ -361,6 +362,65 @@ describe("appendCodexUsage", () => {
 
 		appendCodexUsage(state, "planning", undefined);
 		expect(state.codexUsage).toHaveLength(0);
+	});
+});
+
+describe("readyPullRequestAfterPassingReview", () => {
+	it("marks PR as ready only when review passed", async () => {
+		const markPrReady = mock(async () => true);
+		const updated = await readyPullRequestAfterPassingReview(
+			createProject("default"),
+			{
+				branch: "codex/eng-1",
+				title: "PR",
+				url: "https://github.com/acme/repo/pull/1",
+			},
+			true,
+			{
+				markPrReadyForReview: markPrReady,
+			},
+		);
+
+		expect(updated).toBe(true);
+		expect(markPrReady).toHaveBeenCalledTimes(1);
+	});
+
+	it("does not mark PR as ready when review failed", async () => {
+		const markPrReady = mock(async () => true);
+		const updated = await readyPullRequestAfterPassingReview(
+			createProject("default"),
+			{
+				branch: "codex/eng-1",
+				title: "PR",
+				url: "https://github.com/acme/repo/pull/1",
+			},
+			false,
+			{
+				markPrReadyForReview: markPrReady,
+			},
+		);
+
+		expect(updated).toBe(false);
+		expect(markPrReady).not.toHaveBeenCalled();
+	});
+
+	it("does not mark PR as ready in dry-run mode", async () => {
+		const markPrReady = mock(async () => true);
+		const updated = await readyPullRequestAfterPassingReview(
+			{ ...createProject("default"), dryRun: true },
+			{
+				branch: "codex/eng-1",
+				title: "PR",
+				url: "https://github.com/acme/repo/pull/1",
+			},
+			true,
+			{
+				markPrReadyForReview: markPrReady,
+			},
+		);
+
+		expect(updated).toBe(false);
+		expect(markPrReady).not.toHaveBeenCalled();
 	});
 });
 
