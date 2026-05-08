@@ -4,6 +4,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type {
 	AdhdAiRootConfig,
+	CodexReasoningEffort,
 	CronConfig,
 	CronJobConfig,
 	CronJobSchedule,
@@ -183,10 +184,28 @@ function buildEnvBase(cwd: string, env: ResolvedEnv): ProjectRuntimeConfig {
 			binary: env.CODEX_BINARY ?? "codex",
 			streamLogs: env.PIV_DEV_MODE === "1" || env.PIV_PRINT_CODEX_LOGS === "1",
 			model: env.CODEX_MODEL,
+			reasoningEffort: normalizeReasoningEffortValue(
+				env.CODEX_REASONING_EFFORT,
+				"CODEX_REASONING_EFFORT",
+			),
 			models: {
 				plan: env.CODEX_MODEL_PLAN,
 				implement: env.CODEX_MODEL_IMPLEMENT,
 				reviewTest: env.CODEX_MODEL_REVIEW_TEST,
+			},
+			reasoningEfforts: {
+				plan: normalizeReasoningEffortValue(
+					env.CODEX_REASONING_EFFORT_PLAN,
+					"CODEX_REASONING_EFFORT_PLAN",
+				),
+				implement: normalizeReasoningEffortValue(
+					env.CODEX_REASONING_EFFORT_IMPLEMENT,
+					"CODEX_REASONING_EFFORT_IMPLEMENT",
+				),
+				reviewTest: normalizeReasoningEffortValue(
+					env.CODEX_REASONING_EFFORT_REVIEW_TEST,
+					"CODEX_REASONING_EFFORT_REVIEW_TEST",
+				),
 			},
 			sandbox,
 			codexHome,
@@ -841,6 +860,32 @@ function normalizeSandboxValue(
 
 	throw new Error(
 		`Invalid CODEX_SANDBOX value '${input}'. Use read-only, workspace-write, danger-full-access, or leave empty.`,
+	);
+}
+
+function normalizeReasoningEffortValue(
+	input: string | undefined,
+	envName: string,
+): CodexReasoningEffort | undefined {
+	if (!input) {
+		return undefined;
+	}
+
+	const value = input.trim().toLowerCase();
+	if (!value || value === "off" || value === "none" || value === "0") {
+		return undefined;
+	}
+	if (
+		value === "low" ||
+		value === "medium" ||
+		value === "high" ||
+		value === "xhigh"
+	) {
+		return value;
+	}
+
+	throw new Error(
+		`Invalid ${envName} value '${input}'. Use low, medium, high, xhigh, or leave empty.`,
 	);
 }
 

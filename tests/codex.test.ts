@@ -38,10 +38,15 @@ const config: ResolvedProjectConfig = {
 		binary: "codex",
 		streamLogs: false,
 		model: "gpt-5.4",
+		reasoningEffort: "medium",
 		models: {
 			plan: "gpt-5.5",
 			implement: "gpt-5.3-codex",
 			reviewTest: "gpt-5.3-codex",
+		},
+		reasoningEfforts: {
+			plan: "high",
+			implement: "low",
 		},
 		plugins: ["github@openai-curated", "linear@openai-curated"],
 		skillsets: ["adhd-ai", "repo-defaults"],
@@ -98,5 +103,49 @@ describe("codex adapter", () => {
 		expect(typeof adapter.runPlan).toBe("function");
 		expect(typeof adapter.resume).toBe("function");
 		expect(typeof adapter.runReview).toBe("function");
+	});
+
+	it("uses stage-specific reasoning effort overrides", async () => {
+		const adapter = new CodexAdapter(config);
+		const calls: string[][] = [];
+		(
+			adapter as unknown as { runCodex: (args: string[]) => Promise<unknown> }
+		).runCodex = async (args: string[]) => {
+			calls.push(args);
+			return { finalMessage: "", stdout: "" };
+		};
+		(
+			adapter as unknown as { nextOutputFile: () => Promise<string> }
+		).nextOutputFile = async () => "/tmp/out.txt";
+
+		await adapter.runPlan("plan prompt");
+		await adapter.resume("session-1", "implement prompt");
+		await adapter.runReview("review prompt");
+
+		expect(calls).toHaveLength(3);
+		expect(calls[0]).toContain('model_reasoning_effort="high"');
+		expect(calls[1]).toContain('model_reasoning_effort="low"');
+		expect(calls[2]).toContain('model_reasoning_effort="low"');
+	});
+
+	it("keeps raw config override as final reasoning-effort escape hatch", () => {
+		const adapter = new CodexAdapter({
+			...config,
+			codex: {
+				...config.codex,
+				configOverrides: {
+					model_reasoning_effort: '"xhigh"',
+				},
+			},
+		});
+		const overrides = (
+			adapter as unknown as {
+				buildConfigOverrides: (effort?: string) => string[];
+			}
+		).buildConfigOverrides("low");
+		const first = overrides.indexOf('model_reasoning_effort="low"');
+		const second = overrides.indexOf('model_reasoning_effort="xhigh"');
+		expect(first).toBeGreaterThanOrEqual(0);
+		expect(second).toBeGreaterThan(first);
 	});
 });

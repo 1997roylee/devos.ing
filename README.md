@@ -70,6 +70,8 @@ Codex capability configuration can be set at root or per project:
 
 - `codex.plugins`: plugin IDs to enable for spawned Codex sessions (translated to `--config plugins."<id>".enabled=true`)
 - `codex.skillsets`: skillset names passed to Codex as a `skillsets=[...]` config override
+- `codex.reasoningEffort`: global Codex reasoning effort (`low|medium|high|xhigh`)
+- `codex.reasoningEfforts`: stage-specific reasoning effort overrides for `plan`, `implement`, `reviewTest`
 - `codex.configOverrides`: raw `key -> TOML literal` map forwarded as repeated `--config key=value`
 
 Path behavior:
@@ -239,6 +241,10 @@ The `PIV_*` environment variable namespace remains supported for compatibility w
 - `CODEX_MODEL_PLAN` (optional; overrides planning model)
 - `CODEX_MODEL_IMPLEMENT` (optional; overrides implementation model)
 - `CODEX_MODEL_REVIEW_TEST` (optional; overrides review/testing model)
+- `CODEX_REASONING_EFFORT` (optional; global reasoning effort: `low|medium|high|xhigh`)
+- `CODEX_REASONING_EFFORT_PLAN` (optional; planning reasoning effort override)
+- `CODEX_REASONING_EFFORT_IMPLEMENT` (optional; implementation reasoning effort override; set `low` for fast implementation)
+- `CODEX_REASONING_EFFORT_REVIEW_TEST` (optional; review/testing reasoning effort override)
 - `CODEX_HOME` to override Codex runtime state directory
 - `PIV_LOG_LEVEL` (optional; default `info`)
 - `PIV_LOG_PRETTY` (optional; default `1` in TTY, `0` otherwise)

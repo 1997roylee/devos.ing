@@ -20,6 +20,10 @@ const envKeys = [
 	"PIV_EXECUTION_PATH",
 	"CODEX_SANDBOX",
 	"CODEX_HOME",
+	"CODEX_REASONING_EFFORT",
+	"CODEX_REASONING_EFFORT_PLAN",
+	"CODEX_REASONING_EFFORT_IMPLEMENT",
+	"CODEX_REASONING_EFFORT_REVIEW_TEST",
 	"CODEX_MODEL_PLAN",
 	"CODEX_MODEL_IMPLEMENT",
 	"CODEX_MODEL_REVIEW_TEST",
@@ -50,6 +54,10 @@ describe("loadConfig", () => {
 					: key === "CODEX_SANDBOX"
 						? "workspace-write"
 						: key === "CODEX_HOME" ||
+								key === "CODEX_REASONING_EFFORT" ||
+								key === "CODEX_REASONING_EFFORT_PLAN" ||
+								key === "CODEX_REASONING_EFFORT_IMPLEMENT" ||
+								key === "CODEX_REASONING_EFFORT_REVIEW_TEST" ||
 								key === "CLAUDE_CODE_MODEL" ||
 								key === "CLAUDE_CODE_ALLOWED_TOOLS"
 							? ""
@@ -478,6 +486,51 @@ describe("loadConfig", () => {
 			expect(config.projects[0]?.codex.models?.implement).toBe("gpt-5.3-codex");
 			expect(config.projects[0]?.codex.models?.reviewTest).toBe(
 				"gpt-5.3-codex",
+			);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("loads global and stage-specific codex reasoning effort from env", async () => {
+		process.env.CODEX_REASONING_EFFORT = "medium";
+		process.env.CODEX_REASONING_EFFORT_PLAN = "high";
+		process.env.CODEX_REASONING_EFFORT_IMPLEMENT = "low";
+		process.env.CODEX_REASONING_EFFORT_REVIEW_TEST = "xhigh";
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			["export default { projects: [{ id: 'default' }] };", ""].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.projects[0]?.codex.reasoningEffort).toBe("medium");
+			expect(config.projects[0]?.codex.reasoningEfforts?.plan).toBe("high");
+			expect(config.projects[0]?.codex.reasoningEfforts?.implement).toBe("low");
+			expect(config.projects[0]?.codex.reasoningEfforts?.reviewTest).toBe(
+				"xhigh",
+			);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("throws on invalid codex reasoning effort env value", async () => {
+		process.env.CODEX_REASONING_EFFORT_IMPLEMENT = "fast";
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			["export default { projects: [{ id: 'default' }] };", ""].join("\n"),
+		);
+
+		try {
+			await expect(loadConfig(tempDir)).rejects.toThrow(
+				"Invalid CODEX_REASONING_EFFORT_IMPLEMENT value",
 			);
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });

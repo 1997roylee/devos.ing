@@ -26,6 +26,8 @@ export interface LinearLabelMap {
 	testing?: string;
 }
 
+export type CodexReasoningEffort = "low" | "medium" | "high" | "xhigh";
+
 export type DeepPartial<T> = {
 	[K in keyof T]?: T[K] extends Array<infer U>
 		? Array<DeepPartial<U>>
@@ -67,10 +69,16 @@ export interface ProjectRuntimeConfig {
 		binary: string;
 		streamLogs: boolean;
 		model?: string;
+		reasoningEffort?: CodexReasoningEffort;
 		models?: {
 			plan?: string;
 			implement?: string;
 			reviewTest?: string;
+		};
+		reasoningEfforts?: {
+			plan?: CodexReasoningEffort;
+			implement?: CodexReasoningEffort;
+			reviewTest?: CodexReasoningEffort;
 		};
 		plugins?: string[];
 		skillsets?: string[];

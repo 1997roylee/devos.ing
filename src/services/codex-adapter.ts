@@ -1,7 +1,10 @@
 import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { AgentAdapter, AgentResult } from "../core/agent-adapter";
-import type { ResolvedProjectConfig } from "../core/types";
+import type {
+	CodexReasoningEffort,
+	ResolvedProjectConfig,
+} from "../core/types";
 import { assertCommandOk, runCommand } from "../utils/shell";
 
 export class CodexAdapter implements AgentAdapter {
@@ -9,20 +12,32 @@ export class CodexAdapter implements AgentAdapter {
 
 	async runPlan(prompt: string): Promise<AgentResult> {
 		const model = this.config.codex.models?.plan ?? this.config.codex.model;
+		const reasoningEffort =
+			this.config.codex.reasoningEfforts?.plan ??
+			this.config.codex.reasoningEffort;
 		return this.runCodex(
-			this.buildExecArgs(prompt, await this.nextOutputFile(), model),
+			this.buildExecArgs(
+				prompt,
+				await this.nextOutputFile(),
+				model,
+				reasoningEffort,
+			),
 		);
 	}
 
 	async resume(sessionId: string, prompt: string): Promise<AgentResult> {
 		const model =
 			this.config.codex.models?.implement ?? this.config.codex.model;
+		const reasoningEffort =
+			this.config.codex.reasoningEfforts?.implement ??
+			this.config.codex.reasoningEffort;
 		return this.runCodex(
 			this.buildResumeArgs(
 				sessionId,
 				prompt,
 				await this.nextOutputFile(),
 				model,
+				reasoningEffort,
 			),
 		);
 	}
@@ -32,8 +47,17 @@ export class CodexAdapter implements AgentAdapter {
 			this.config.codex.models?.reviewTest ??
 			this.config.codex.models?.implement ??
 			this.config.codex.model;
+		const reasoningEffort =
+			this.config.codex.reasoningEfforts?.reviewTest ??
+			this.config.codex.reasoningEfforts?.implement ??
+			this.config.codex.reasoningEffort;
 		return this.runCodex(
-			this.buildExecArgs(prompt, await this.nextOutputFile(), model),
+			this.buildExecArgs(
+				prompt,
+				await this.nextOutputFile(),
+				model,
+				reasoningEffort,
+			),
 		);
 	}
 
@@ -41,6 +65,7 @@ export class CodexAdapter implements AgentAdapter {
 		prompt: string,
 		outputFile: string,
 		modelOverride?: string,
+		reasoningEffortOverride?: CodexReasoningEffort,
 	): string[] {
 		const args = [
 			"exec",
@@ -58,7 +83,7 @@ export class CodexAdapter implements AgentAdapter {
 		if (this.config.codex.sandbox) {
 			args.push("--sandbox", this.config.codex.sandbox);
 		}
-		this.appendConfigArgs(args);
+		this.appendConfigArgs(args, reasoningEffortOverride);
 		args.push(prompt);
 		return args;
 	}
@@ -68,6 +93,7 @@ export class CodexAdapter implements AgentAdapter {
 		prompt: string,
 		outputFile: string,
 		modelOverride?: string,
+		reasoningEffortOverride?: CodexReasoningEffort,
 	): string[] {
 		const args = [
 			"exec",
@@ -81,7 +107,7 @@ export class CodexAdapter implements AgentAdapter {
 		if (model) {
 			args.push("--model", model);
 		}
-		this.appendConfigArgs(args);
+		this.appendConfigArgs(args, reasoningEffortOverride);
 		args.push(sessionId, prompt);
 		return args;
 	}
@@ -120,13 +146,18 @@ export class CodexAdapter implements AgentAdapter {
 		);
 	}
 
-	private appendConfigArgs(args: string[]): void {
-		for (const override of this.buildConfigOverrides()) {
+	private appendConfigArgs(
+		args: string[],
+		reasoningEffortOverride?: CodexReasoningEffort,
+	): void {
+		for (const override of this.buildConfigOverrides(reasoningEffortOverride)) {
 			args.push("--config", override);
 		}
 	}
 
-	private buildConfigOverrides(): string[] {
+	private buildConfigOverrides(
+		reasoningEffortOverride?: CodexReasoningEffort,
+	): string[] {
 		const overrides: string[] = [];
 		const plugins = normalizeList(this.config.codex.plugins);
 		const skillsets = normalizeList(this.config.codex.skillsets);
@@ -137,6 +168,11 @@ export class CodexAdapter implements AgentAdapter {
 		}
 		if (skillsets.length > 0) {
 			overrides.push(`skillsets=${toTomlStringArray(skillsets)}`);
+		}
+		if (reasoningEffortOverride) {
+			overrides.push(
+				`model_reasoning_effort=${JSON.stringify(reasoningEffortOverride)}`,
+			);
 		}
 		for (const [rawKey, rawValue] of Object.entries(
 			this.config.codex.configOverrides ?? {},

@@ -5,6 +5,7 @@ import type { LoadedConfig } from "../src/core/config";
 import { loadSqliteEnv } from "../src/core/config";
 import {
 	DEFAULT_LABEL_MAP,
+	DEFAULT_REASONING_EFFORTS,
 	DEFAULT_STATUS_MAP,
 	type SetupDraft,
 	collectSetupChecks,
@@ -29,6 +30,11 @@ const draft: SetupDraft = {
 	statusMap: DEFAULT_STATUS_MAP,
 	labelMap: DEFAULT_LABEL_MAP,
 	codex: {
+		reasoningEfforts: {
+			plan: "medium",
+			implement: "low",
+			reviewTest: "medium",
+		},
 		models: {
 			plan: "gpt-5.5",
 			implement: "gpt-5.3-codex",
@@ -57,6 +63,12 @@ describe("setup helpers", () => {
 		expect(localConfig).toContain("demo-project");
 		expect(localConfig).toContain('"root": `${cwd}/skills`');
 		expect(localConfig).toContain('"plan": "piv-plan/SKILL.md"');
+		expect(localConfig).toContain('"reasoningEfforts": {');
+		expect(localConfig).toContain('"implement": "low"');
+	});
+
+	it("uses low as default implementation reasoning effort", () => {
+		expect(DEFAULT_REASONING_EFFORTS.implement).toBe("low");
 	});
 
 	it("merges env updates without dropping unrelated values", () => {

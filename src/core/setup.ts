@@ -7,6 +7,7 @@ import type { CommandResult } from "../utils/shell";
 import { runCommand } from "../utils/shell";
 import type { LoadedConfig } from "./config";
 import { loadConfig, saveSqliteEnv } from "./config";
+import type { CodexReasoningEffort } from "./types";
 
 const ENV_FILE = ".env";
 const LOCAL_CONFIG_FILE = "adhd-ai.local.config.ts";
@@ -40,6 +41,12 @@ export interface SetupDraft {
 		testing: string;
 	};
 	codex: {
+		reasoningEffort?: CodexReasoningEffort;
+		reasoningEfforts?: {
+			plan?: CodexReasoningEffort;
+			implement?: CodexReasoningEffort;
+			reviewTest?: CodexReasoningEffort;
+		};
 		models: {
 			plan: string;
 			implement: string;
@@ -91,6 +98,12 @@ export const DEFAULT_LABEL_MAP: SetupDraft["labelMap"] = {
 	reviewing: "Reviewing",
 	testing: "Testing",
 };
+
+export const DEFAULT_REASONING_EFFORTS = {
+	plan: "medium",
+	implement: "low",
+	reviewTest: "medium",
+} as const satisfies Record<string, CodexReasoningEffort>;
 
 export function normalizeProjectId(input: string): string {
 	const normalized = input
@@ -493,6 +506,30 @@ export async function runSetupWizard(cwd: string): Promise<void> {
 			"gpt-5.3-codex",
 		);
 		const reviewModel = await ask(io, "Review/testing model", "gpt-5.3-codex");
+		const planReasoningEffort = normalizeReasoningEffort(
+			await ask(
+				io,
+				"Planning reasoning effort",
+				DEFAULT_REASONING_EFFORTS.plan,
+			),
+			DEFAULT_REASONING_EFFORTS.plan,
+		);
+		const implementReasoningEffort = normalizeReasoningEffort(
+			await ask(
+				io,
+				"Implementation reasoning effort",
+				DEFAULT_REASONING_EFFORTS.implement,
+			),
+			DEFAULT_REASONING_EFFORTS.implement,
+		);
+		const reviewReasoningEffort = normalizeReasoningEffort(
+			await ask(
+				io,
+				"Review/testing reasoning effort",
+				DEFAULT_REASONING_EFFORTS.reviewTest,
+			),
+			DEFAULT_REASONING_EFFORTS.reviewTest,
+		);
 		const enablePlugins = parseYesNo(
 			await ask(io, "Enable GitHub and Linear Codex plugins? (Y/n)", "Y"),
 		);
@@ -511,6 +548,11 @@ export async function runSetupWizard(cwd: string): Promise<void> {
 			statusMap,
 			labelMap: DEFAULT_LABEL_MAP,
 			codex: {
+				reasoningEfforts: {
+					plan: planReasoningEffort,
+					implement: implementReasoningEffort,
+					reviewTest: reviewReasoningEffort,
+				},
 				models: {
 					plan: planModel,
 					implement: implementModel,
@@ -734,6 +776,22 @@ function normalizeSandbox(
 		return value;
 	}
 	return "workspace-write";
+}
+
+function normalizeReasoningEffort(
+	input: string,
+	fallback: CodexReasoningEffort,
+): CodexReasoningEffort {
+	const value = input.trim().toLowerCase();
+	if (
+		value === "low" ||
+		value === "medium" ||
+		value === "high" ||
+		value === "xhigh"
+	) {
+		return value;
+	}
+	return fallback;
 }
 
 function parseYesNo(input: string): boolean {
