@@ -272,17 +272,30 @@ describe("loadConfig", () => {
 	});
 
 	it("loads notification settings from RESEND env vars", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
 		process.env.RESEND_API_KEY = "re_test_key";
 		process.env.RESEND_FROM = "ADHD.ai <ops@example.com>";
 		process.env.RESEND_TO = "a@example.com,b@example.com";
-		const config = await loadConfig(process.cwd());
-		expect(config.notifications.email.enabled).toBe(true);
-		expect(config.notifications.email.resendApiKey).toBe("re_test_key");
-		expect(config.notifications.email.from).toBe("ADHD.ai <ops@example.com>");
-		expect(config.notifications.email.to).toEqual([
-			"a@example.com",
-			"b@example.com",
-		]);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			["export default {", "  projects: [{ id: 'default' }]", "};", ""].join(
+				"\n",
+			),
+		);
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.notifications.email.enabled).toBe(true);
+			expect(config.notifications.email.resendApiKey).toBe("re_test_key");
+			expect(config.notifications.email.from).toBe("ADHD.ai <ops@example.com>");
+			expect(config.notifications.email.to).toEqual([
+				"a@example.com",
+				"b@example.com",
+			]);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
 	});
 
 	it("supports disabling notifications even with RESEND_API_KEY", async () => {
@@ -314,12 +327,25 @@ describe("loadConfig", () => {
 	});
 
 	it("rejects missing sender when notifications are enabled", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
 		process.env.RESEND_API_KEY = "re_test_key";
 		process.env.RESEND_FROM = "";
 		process.env.RESEND_TO = "a@example.com";
-		await expect(loadConfig(process.cwd())).rejects.toThrow(
-			"notifications.email.from (or RESEND_FROM) is required when email notifications are enabled",
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			["export default {", "  projects: [{ id: 'default' }]", "};", ""].join(
+				"\n",
+			),
 		);
+		try {
+			await expect(loadConfig(tempDir)).rejects.toThrow(
+				"notifications.email.from (or RESEND_FROM) is required when email notifications are enabled",
+			);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
 	});
 
 	it("rejects project-level notification overrides", async () => {
