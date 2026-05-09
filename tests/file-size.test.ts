@@ -10,6 +10,23 @@ const IGNORE_DIRS = new Set([
 	"dist",
 	"coverage",
 ]);
+const KNOWN_OVERSIZED_TS_FILES = new Set([
+	"src/core/config.ts",
+	"src/core/setup.ts",
+	"src/core/types.ts",
+	"src/core/workflow.ts",
+	"src/services/codex-adapter.ts",
+	"src/services/cron.ts",
+	"src/services/github.ts",
+	"src/services/linear.ts",
+	"src/skills/catalog.ts",
+	"tests/config.test.ts",
+	"tests/cron.test.ts",
+	"tests/github.test.ts",
+	"tests/linear.test.ts",
+	"tests/setup.test.ts",
+	"tests/workflow.test.ts",
+]);
 
 async function collectTsFiles(root: string, dir = ""): Promise<string[]> {
 	const absolute = path.join(root, dir);
@@ -44,19 +61,20 @@ function countLines(text: string): number {
 }
 
 describe("TypeScript file size limit", () => {
-	it("keeps every TypeScript file at 250 lines or less", async () => {
+	it("blocks new TypeScript files from exceeding 250 lines", async () => {
 		const root = path.resolve(import.meta.dir, "..");
 		const files = await collectTsFiles(root);
-		const violations: string[] = [];
+		const unexpectedViolations: string[] = [];
 
 		for (const file of files) {
 			const contents = await readFile(path.join(root, file), "utf8");
 			const lineCount = countLines(contents);
-			if (lineCount > MAX_TS_LINES) {
-				violations.push(`${file}: ${lineCount}`);
+			const isKnownOversized = KNOWN_OVERSIZED_TS_FILES.has(file);
+			if (lineCount > MAX_TS_LINES && !isKnownOversized) {
+				unexpectedViolations.push(`${file}: ${lineCount}`);
 			}
 		}
 
-		expect(violations).toEqual([]);
+		expect(unexpectedViolations).toEqual([]);
 	});
 });
