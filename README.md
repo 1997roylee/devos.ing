@@ -1,6 +1,6 @@
 # Agent-Driven Development Hub (ADHD.ai)
 
-ADHD.ai turns Linear issues into an agent-driven engineering workflow: plan -> implement -> review/test. It can run one issue at a time, poll for new work, or run scheduled cron sweeps across projects.
+ADHD.ai turns Linear issues into an agent-driven engineering workflow: plan -> implement -> review/test. It can run one issue at a time, poll for new work, or run scheduled automation sweeps across projects.
 
 For non-technical operators, start with [docs/NON_TECHNICAL_GUIDE.md](docs/NON_TECHNICAL_GUIDE.md).
 
@@ -54,7 +54,7 @@ After linking/installing the package bin, you can also use `adhd-ai ...` directl
 2. ADHD.ai plans the task.
 3. ADHD.ai implements code changes and updates PR context.
 4. ADHD.ai runs review/testing and loops on failures until `done` or `blocked`.
-5. Review-only cron approves completed PRs with `COMPLEXITY_SCORE < 5`; scores `>= 5` trigger a human approval email.
+5. Review-only automations approve completed PRs with `COMPLEXITY_SCORE < 5`; scores `>= 5` trigger a human approval email.
 
 ## Configuration Notes
 
@@ -63,7 +63,7 @@ After linking/installing the package bin, you can also use `adhd-ai ...` directl
 - Legacy `piv-loop.config.ts` is still supported.
 - Guided setup stores local secrets in `.piv-loop/config/env.sqlite` (and writes `.env` for compatibility).
 
-For full config shape, polling, cron, env vars, and routing behavior, use:
+For full config shape, polling, automations/cron compatibility, env vars, and routing behavior, use:
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)
 - [docs/PLANS.md](docs/PLANS.md)
