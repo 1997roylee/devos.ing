@@ -105,7 +105,7 @@ export async function buildReviewPrompt(
 		`Linear issue: ${issue.key}`,
 		prText,
 		"",
-		"Review code changes and execute tests where possible.",
+		"Review code changes and run `bun test` to verify the workspace is workable. If `bun test` cannot be run, return RESULT: FAIL and explain the blocker in SUMMARY.",
 		"Return your final section in this exact format:",
 		"RESULT: PASS or FAIL",
 		"SUMMARY: <one-paragraph summary>",

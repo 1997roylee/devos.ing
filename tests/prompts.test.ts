@@ -3,7 +3,11 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { IssueRef, PullRequestRef } from "../src/core/types";
-import { buildFixPrompt, buildPlanPrompt } from "../src/skills/prompts";
+import {
+	buildFixPrompt,
+	buildPlanPrompt,
+	buildReviewPrompt,
+} from "../src/skills/prompts";
 
 const issue: IssueRef = {
 	id: "lin_123",
@@ -40,6 +44,20 @@ describe("buildFixPrompt", () => {
 		expect(prompt).toContain(
 			"Address every bug, update the existing branch/PR",
 		);
+	});
+});
+
+describe("buildReviewPrompt", () => {
+	it("requires bun test for review/testing validation", async () => {
+		const prompt = await buildReviewPrompt(
+			"/tmp/missing-skill-file.md",
+			issue,
+			pr,
+		);
+
+		expect(prompt).toContain("run `bun test`");
+		expect(prompt).toContain("If `bun test` cannot be run");
+		expect(prompt).toContain("RESULT: FAIL");
 	});
 });
 
