@@ -312,6 +312,42 @@ export async function markPrReadyForReview(
 	return true;
 }
 
+export async function approvePullRequest(
+	config: ResolvedProjectConfig,
+	pr: PullRequestRef,
+	body = "ADHD.ai review/testing passed for this PR.",
+	deps?: {
+		runCommand?: typeof runCommand;
+		assertCommandOk?: typeof assertCommandOk;
+		ensureGhAuth?: typeof ensureGhAuth;
+	},
+): Promise<boolean> {
+	const commandRunner = deps?.runCommand ?? runCommand;
+	const assertOk = deps?.assertCommandOk ?? assertCommandOk;
+	const ensureAuth = deps?.ensureGhAuth ?? ensureGhAuth;
+
+	if (config.dryRun) {
+		return false;
+	}
+	if (!pr.url && !pr.number) {
+		throw new Error("PR URL or number is required to approve PR");
+	}
+	const target = pr.url ?? String(pr.number);
+
+	await ensureAuth(config);
+	await withRetries("gh pr review --approve", async () => {
+		const result = await commandRunner(
+			"gh",
+			["pr", "review", target, "--approve", "--body", body],
+			{
+				cwd: config.executionPath,
+			},
+		);
+		assertOk("gh", ["pr", "review", target, "--approve"], result);
+	});
+	return true;
+}
+
 export async function findOpenPullRequestForIssue(
 	config: ResolvedProjectConfig,
 	issueKey: string,

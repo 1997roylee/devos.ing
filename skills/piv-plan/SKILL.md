@@ -24,8 +24,8 @@ You are the planning agent.
 - Required routing contract for all plans:
   - `COMPLEXITY: SIMPLE|COMPLEX`
   - `COMPLEXITY_SCORE: 0..10` (integer)
-    - `< 5`: bot review can run
-    - `>= 5`: requires human review (email notification + pause automated review)
+    - `< 5`: completed PR can be approved by the review cron
+    - `>= 5`: completed PR requires human approval by email
   - `ISSUE_REFINEMENT_JSON: {"title":"...","description":"..."}`
     - Both fields must be non-empty strings.
     - Preserve user intent; do not invent scope or requirements.

@@ -39,6 +39,9 @@ bun run src/index.ts run --project <PROJECT_ID> --poll
 # unattended scheduled mode
 bun run src/index.ts cron
 
+# run the hourly PR review job
+bun run review:hourly
+
 # inspect run state for one issue
 bun run src/index.ts status --project <PROJECT_ID> --issue ENG-123
 ```
@@ -51,7 +54,7 @@ After linking/installing the package bin, you can also use `adhd-ai ...` directl
 2. ADHD.ai plans the task.
 3. ADHD.ai implements code changes and updates PR context.
 4. ADHD.ai runs review/testing and loops on failures until `done` or `blocked`.
-5. If planning returns `COMPLEXITY_SCORE >= 5`, review is routed to human approval.
+5. Review-only cron approves completed PRs with `COMPLEXITY_SCORE < 5`; scores `>= 5` trigger a human approval email.
 
 ## Configuration Notes
 

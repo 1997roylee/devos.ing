@@ -216,6 +216,7 @@ export class LinearClient {
 			this.requiredStatusMap().pr_created,
 			this.requiredStatusMap().reviewing,
 			this.requiredStatusMap().testing,
+			this.requiredStatusMap().done,
 		]);
 		const testingLabelName = this.config.linear.labelMap.testing?.trim();
 		const issues = await Promise.all(

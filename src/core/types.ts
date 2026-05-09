@@ -327,6 +327,7 @@ export interface RunState {
 	complexityScore?: number;
 	reviewMode?: "bot" | "human";
 	humanReviewNotifiedAt?: string;
+	pullRequestApprovedAt?: string;
 	pullRequest?: PullRequestRef;
 	bugs: BugRecord[];
 	splitTasks?: SplitTaskRef[];

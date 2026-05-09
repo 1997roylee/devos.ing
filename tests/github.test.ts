@@ -1,6 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import type { ResolvedProjectConfig } from "../src/core/types";
 import {
+	approvePullRequest,
 	buildBugIssueBody,
 	commentOnPr,
 	createDraftPrFromWorktree,
@@ -125,6 +126,71 @@ describe("commentOnPr", () => {
 			),
 		).rejects.toThrow("gh pr comment failed after 3 attempts");
 		expect(attempts).toBe(3);
+	});
+});
+
+describe("approvePullRequest", () => {
+	it("approves a pull request through gh", async () => {
+		const calls: string[][] = [];
+		const runCommand = mock(
+			async (_command: string, args: string[]): Promise<CommandResult> => {
+				calls.push(args);
+				return { code: 0, stdout: "", stderr: "" };
+			},
+		);
+
+		const approved = await approvePullRequest(
+			createProjectConfig(),
+			{
+				url: "https://github.com/acme/repo/pull/77",
+				branch: "codex/eng-42",
+				title: "ENG-42",
+			},
+			"Approved by ADHD.ai.",
+			{
+				runCommand,
+				assertCommandOk: assertOk,
+				ensureGhAuth: async () => {},
+			},
+		);
+
+		expect(approved).toBe(true);
+		expect(calls).toEqual([
+			[
+				"pr",
+				"review",
+				"https://github.com/acme/repo/pull/77",
+				"--approve",
+				"--body",
+				"Approved by ADHD.ai.",
+			],
+		]);
+	});
+
+	it("returns false without calling gh when dry run is enabled", async () => {
+		const runCommand = mock(async (): Promise<CommandResult> => {
+			return { code: 0, stdout: "", stderr: "" };
+		});
+		const config = createProjectConfig();
+		config.dryRun = true;
+
+		const approved = await approvePullRequest(
+			config,
+			{
+				number: 77,
+				branch: "codex/eng-42",
+				title: "ENG-42",
+			},
+			undefined,
+			{
+				runCommand,
+				assertCommandOk: assertOk,
+				ensureGhAuth: async () => {},
+			},
+		);
+
+		expect(approved).toBe(false);
+		expect(runCommand).not.toHaveBeenCalled();
 	});
 });
 

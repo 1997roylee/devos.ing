@@ -21,6 +21,7 @@ import {
 	buildReviewOnlyIssueQueue,
 	buildRunLeaseOwnerId,
 	fixedBugsForImplementationComment,
+	isReviewOnlyEligibleRunState,
 	isReviewOnlyExecutableStage,
 	isRunStateStaleForRetry,
 	normalizeFailedReviewBugs,
@@ -37,6 +38,7 @@ import {
 	selectIssueQueueForCycle,
 	selectReviewOnlyIssueKeys,
 	selectStaleRunIssueKeys,
+	shouldApprovePullRequestForComplexityScore,
 	shouldRetryRunStage,
 	shouldSkipReviewOnlyRunState,
 	shouldStopPolling,
@@ -248,13 +250,31 @@ describe("review-only selection", () => {
 				...createRunState("ROY-4", "reviewing", now),
 				pullRequest: { branch: "codex/roy-4", title: "PR" },
 			},
-			createRunState("ROY-5", "implementing", now),
+			{
+				...createRunState("ROY-5", "done", now),
+				pullRequest: {
+					branch: "codex/roy-5",
+					title: "PR",
+					url: "https://pr/5",
+				},
+			},
+			{
+				...createRunState("ROY-6", "done", now),
+				pullRequestApprovedAt: "2026-05-07T12:30:00.000Z",
+				pullRequest: {
+					branch: "codex/roy-6",
+					title: "PR",
+					url: "https://pr/6",
+				},
+			},
+			createRunState("ROY-7", "implementing", now),
 		];
 
 		expect(selectReviewOnlyIssueKeys(runStates)).toEqual([
 			"ROY-1",
 			"ROY-2",
 			"ROY-3",
+			"ROY-5",
 		]);
 	});
 
@@ -332,6 +352,12 @@ describe("review-only selection", () => {
 				statusMap,
 			),
 		).toBe("testing");
+		expect(
+			resolveReviewOnlyBootstrapStage(
+				{ id: "unknown", name: "Done" },
+				statusMap,
+			),
+		).toBe("done");
 	});
 });
 
@@ -340,10 +366,45 @@ describe("isReviewOnlyExecutableStage", () => {
 		expect(isReviewOnlyExecutableStage("pr_created")).toBe(true);
 		expect(isReviewOnlyExecutableStage("reviewing")).toBe(true);
 		expect(isReviewOnlyExecutableStage("testing")).toBe(true);
+		expect(isReviewOnlyExecutableStage("done")).toBe(true);
 		expect(isReviewOnlyExecutableStage("implementing")).toBe(false);
 		expect(isReviewOnlyExecutableStage("human_review")).toBe(false);
 		expect(isReviewOnlyExecutableStage("planning")).toBe(false);
 		expect(isReviewOnlyExecutableStage("received")).toBe(false);
+	});
+});
+
+describe("isReviewOnlyEligibleRunState", () => {
+	it("includes done states with unapproved PRs", () => {
+		const state = createRunState("ENG-90", "done", Date.now());
+		state.pullRequest = {
+			branch: "codex/eng-90",
+			title: "ENG-90",
+			url: "https://github.com/acme/repo/pull/90",
+		};
+
+		expect(isReviewOnlyEligibleRunState(state)).toBe(true);
+	});
+
+	it("excludes done states after approval or human notification", () => {
+		const approved = createRunState("ENG-91", "done", Date.now());
+		approved.pullRequest = {
+			branch: "codex/eng-91",
+			title: "ENG-91",
+			url: "https://github.com/acme/repo/pull/91",
+		};
+		approved.pullRequestApprovedAt = "2026-05-07T12:00:00.000Z";
+
+		const notified = createRunState("ENG-92", "done", Date.now());
+		notified.pullRequest = {
+			branch: "codex/eng-92",
+			title: "ENG-92",
+			url: "https://github.com/acme/repo/pull/92",
+		};
+		notified.humanReviewNotifiedAt = "2026-05-07T12:00:00.000Z";
+
+		expect(isReviewOnlyEligibleRunState(approved)).toBe(false);
+		expect(isReviewOnlyEligibleRunState(notified)).toBe(false);
 	});
 });
 
@@ -1071,6 +1132,15 @@ describe("resolveReviewModeForComplexityScore", () => {
 	it("uses human review for threshold and above", () => {
 		expect(resolveReviewModeForComplexityScore(5)).toBe("human");
 		expect(resolveReviewModeForComplexityScore(10)).toBe("human");
+	});
+});
+
+describe("shouldApprovePullRequestForComplexityScore", () => {
+	it("allows PR approval only below the human review threshold", () => {
+		expect(shouldApprovePullRequestForComplexityScore(0)).toBe(true);
+		expect(shouldApprovePullRequestForComplexityScore(4)).toBe(true);
+		expect(shouldApprovePullRequestForComplexityScore(5)).toBe(false);
+		expect(shouldApprovePullRequestForComplexityScore(10)).toBe(false);
 	});
 });
 

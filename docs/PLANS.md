@@ -20,7 +20,7 @@ Planning output should remain concise and implementation-focused, including:
 
 ## Hourly Review Cron Example
 
-Use an hourly review-only cron job to re-run PR review/testing in parallel across resumable runs:
+Use an hourly review-only cron job to re-run PR review/testing in parallel across resumable runs and approve completed PRs whose complexity score is below the human approval threshold:
 
 ```ts
 export default {
@@ -38,7 +38,7 @@ export default {
 
 Run it manually with:
 
-1. `bun run src/index.ts cron --job hourly-pr-review`
+1. `bun run review:hourly`
 
 Per-issue leases still prevent duplicate workers from processing the same issue concurrently.
 

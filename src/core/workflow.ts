@@ -1,4 +1,5 @@
 import {
+	approvePullRequest,
 	commentOnPr,
 	createDraftPrFromWorktree,
 	findOpenPullRequestForIssue,
@@ -463,7 +464,10 @@ export function isReviewOnlyEligibleRunState(state: RunState): boolean {
 	return (
 		(state.stage === "pr_created" ||
 			state.stage === "reviewing" ||
-			state.stage === "testing") &&
+			state.stage === "testing" ||
+			(state.stage === "done" &&
+				!state.pullRequestApprovedAt &&
+				!state.humanReviewNotifiedAt)) &&
 		Boolean(state.pullRequest?.url)
 	);
 }
@@ -477,6 +481,9 @@ export function resolveReviewOnlyBootstrapStage(
 	}
 	if (matchesIssueStateConfigValue(state, statusMap.reviewing)) {
 		return "reviewing";
+	}
+	if (matchesIssueStateConfigValue(state, statusMap.done)) {
+		return "done";
 	}
 	return "testing";
 }
@@ -507,7 +514,11 @@ export function buildReviewOnlyIssueQueue(input: {
 
 	for (const issue of merged) {
 		const key = normalizeIssueKey(issue.identifier);
-		const runStatePr = runStateByKey.get(key)?.pullRequest;
+		const runState = runStateByKey.get(key);
+		if (runState?.stage === "done" && !isReviewOnlyEligibleRunState(runState)) {
+			continue;
+		}
+		const runStatePr = runState?.pullRequest;
 		const discoveredPr = input.discoveredPullRequestsByIssueKey.get(key);
 		const pullRequest = runStatePr?.url ? runStatePr : discoveredPr;
 
@@ -540,7 +551,12 @@ export function selectReviewOnlyIssueKeys(runStates: RunState[]): string[] {
 }
 
 export function isReviewOnlyExecutableStage(stage: WorkflowStage): boolean {
-	return stage === "pr_created" || stage === "reviewing" || stage === "testing";
+	return (
+		stage === "pr_created" ||
+		stage === "reviewing" ||
+		stage === "testing" ||
+		stage === "done"
+	);
 }
 
 export function shouldSkipReviewOnlyRunState(
@@ -967,6 +983,11 @@ async function executeIssue(
 ): Promise<void> {
 	const agent = createAgentAdapter(config);
 
+	if (options.reviewOnly && state.stage === "done") {
+		await handleDoneReviewApprovalStage(config, notifications, linear, state);
+		return;
+	}
+
 	while (
 		state.stage !== "done" &&
 		state.stage !== "blocked" &&
@@ -1233,9 +1254,6 @@ async function handlePrCreatedStage(
 	await saveRunState(config.workspacePath, state);
 	await linear.markStage(state.issue.id, "reviewing");
 	await linear.applyStageLabel(state.issue.id, "reviewing");
-	if (state.reviewMode === "human") {
-		await parkIssueForHumanReview(config, notifications, linear, state);
-	}
 }
 
 async function handleReviewTestingStage(
@@ -1245,11 +1263,6 @@ async function handleReviewTestingStage(
 	linear: LinearClient,
 	state: RunState,
 ): Promise<void> {
-	if (state.reviewMode === "human") {
-		await parkIssueForHumanReview(config, notifications, linear, state);
-		return;
-	}
-
 	logger.info(buildIssueJobLogFields(state, "testing"), "Testing issue");
 	await linear.markStage(state.issue.id, "testing");
 	await linear.applyStageLabel(state.issue.id, "testing");
@@ -1329,36 +1342,45 @@ async function handleReviewTestingStage(
 	);
 }
 
-async function parkIssueForHumanReview(
+async function handleDoneReviewApprovalStage(
 	config: ResolvedProjectConfig,
 	notifications: ResolvedNotificationConfig,
 	linear: LinearClient,
 	state: RunState,
 ): Promise<void> {
-	if (state.stage !== "reviewing") {
-		Object.assign(state, transitionStage(state, "reviewing"));
-		await saveRunState(config.workspacePath, state);
-		await linear.markStage(state.issue.id, "reviewing");
-		await linear.applyStageLabel(state.issue.id, "reviewing");
+	if (state.pullRequestApprovedAt) {
+		return;
 	}
 
 	const score = state.complexityScore ?? DEFAULT_PLANNER_COMPLEXITY_SCORE;
-	const reason = `Planning complexity score ${score}/10 requires human review (threshold >= ${HUMAN_REVIEW_COMPLEXITY_THRESHOLD}).`;
-	if (!state.humanReviewNotifiedAt) {
-		const reviewComment = [
-			`Human review required for ${state.issue.key}.`,
-			reason,
-			state.pullRequest?.url ? `PR: ${state.pullRequest.url}` : undefined,
-		]
-			.filter(Boolean)
-			.join("\n");
-		await linear.comment(state.issue.id, reviewComment);
-		await safeNotifyHumanReviewRequired(notifications, state, score, reason);
-		state.humanReviewNotifiedAt = new Date().toISOString();
+	if (!shouldApprovePullRequestForComplexityScore(score)) {
+		const reason = `Planning complexity score ${score}/10 requires human PR approval (threshold >= ${HUMAN_REVIEW_COMPLEXITY_THRESHOLD}).`;
+		if (!state.humanReviewNotifiedAt) {
+			await linear.comment(
+				state.issue.id,
+				[
+					`Human PR approval required for ${state.issue.key}.`,
+					reason,
+					state.pullRequest?.url ? `PR: ${state.pullRequest.url}` : undefined,
+				]
+					.filter(Boolean)
+					.join("\n"),
+			);
+			await safeNotifyHumanReviewRequired(notifications, state, score, reason);
+			state.humanReviewNotifiedAt = new Date().toISOString();
+			await saveRunState(config.workspacePath, state);
+		}
+		return;
 	}
 
-	Object.assign(state, transitionStage(state, "human_review"));
+	const approved = await safeApprovePullRequest(config, state);
+	if (!approved) {
+		return;
+	}
+
+	state.pullRequestApprovedAt = new Date().toISOString();
 	await saveRunState(config.workspacePath, state);
+	await linear.comment(state.issue.id, "PR approved after completed review.");
 }
 
 export function normalizeFailedReviewBugs(
@@ -1650,6 +1672,12 @@ export function resolveReviewModeForComplexityScore(
 	complexityScore: number,
 ): "bot" | "human" {
 	return complexityScore < HUMAN_REVIEW_COMPLEXITY_THRESHOLD ? "bot" : "human";
+}
+
+export function shouldApprovePullRequestForComplexityScore(
+	complexityScore: number,
+): boolean {
+	return complexityScore < HUMAN_REVIEW_COMPLEXITY_THRESHOLD;
 }
 
 export function parsePlannerSplitTasks(
@@ -1969,6 +1997,29 @@ async function safePrComment(
 			{ err: normalizeError(error) },
 			"Failed to add GitHub PR comment",
 		);
+	}
+}
+
+async function safeApprovePullRequest(
+	config: ResolvedProjectConfig,
+	state: RunState,
+): Promise<boolean> {
+	if (!state.pullRequest) {
+		return false;
+	}
+	const runLogger = logger.child({
+		projectId: state.projectId,
+		issueKey: state.issue.key,
+		pr: state.pullRequest.url ?? state.pullRequest.number,
+	});
+	try {
+		return await approvePullRequest(config, state.pullRequest);
+	} catch (error) {
+		runLogger.error(
+			{ err: normalizeError(error) },
+			"Failed to approve GitHub PR",
+		);
+		return false;
 	}
 }
 
