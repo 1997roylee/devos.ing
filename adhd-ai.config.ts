@@ -4,7 +4,7 @@ import type { AdhdAiRootConfig, DeepPartial } from "./src/core/types";
 const cwd = process.cwd();
 
 const config: DeepPartial<AdhdAiRootConfig> = {
-	cron: {
+	automations: {
 		jobs: [
 			{
 				id: "hourly-pr-review",

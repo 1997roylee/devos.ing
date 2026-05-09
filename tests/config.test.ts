@@ -826,6 +826,7 @@ describe("loadConfig", () => {
 
 		try {
 			const config = await loadConfig(tempDir);
+			expect(config.automations.jobs).toHaveLength(1);
 			expect(config.cron.jobs).toHaveLength(1);
 			expect(config.cron.jobs[0]).toEqual({
 				id: "weekday-sweep",
@@ -845,6 +846,54 @@ describe("loadConfig", () => {
 					pollIntervalMs: undefined,
 					exitWhenIdle: undefined,
 				},
+			});
+			expect(config.automations.jobs[0]).toEqual(config.cron.jobs[0]);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("loads automations jobs with per-job skill overrides", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			[
+				"export default {",
+				"  automations: {",
+				"    jobs: [",
+				"      {",
+				"        id: 'weekday-sweep',",
+				"        schedule: { frequency: 'weekly', dayOfWeek: 'mon', time: '09:30' },",
+				"        run: { projectId: 'default' },",
+				"        skills: {",
+				"          plan: 'planning/SKILL.md',",
+				"          implement: '/opt/implement/SKILL.md'",
+				"        }",
+				"      }",
+				"    ]",
+				"  },",
+				"  projects: [",
+				"    { id: 'default' }",
+				"  ]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.automations.jobs).toHaveLength(1);
+			expect(config.automations.jobs[0]?.skills).toEqual({
+				plan: "planning/SKILL.md",
+				implement: "/opt/implement/SKILL.md",
+				reviewTest: undefined,
+			});
+			expect(config.cron.jobs[0]?.skills).toEqual({
+				plan: "planning/SKILL.md",
+				implement: "/opt/implement/SKILL.md",
+				reviewTest: undefined,
 			});
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });

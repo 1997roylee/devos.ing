@@ -164,17 +164,89 @@ describe("runCronSchedulerCycle", () => {
 		expect(called).toBe(0);
 		expect(state.nextRunAtByJobId.get("busy")).toBeGreaterThan(now.getTime());
 	});
+
+	it("applies job skill overrides relative to skills.root", async () => {
+		const now = new Date(2026, 4, 7, 10, 0, 0);
+		const jobs: CronJobConfig[] = [
+			{
+				id: "skill-override",
+				schedule: { frequency: "minute", every: 1 },
+				run: { projectId: "default" },
+				skills: {
+					plan: "custom/plan.md",
+					implement: "/tmp/absolute-implement.md",
+				},
+			},
+		];
+		const state = {
+			nextRunAtByJobId: new Map<string, number>([
+				["skill-override", now.getTime() - 1000],
+			]),
+			activeJobIds: new Set<string>(),
+		};
+		let capturedPlan = "";
+		let capturedImplement = "";
+		let capturedReview = "";
+
+		await runCronSchedulerCycle(createLoadedConfig(jobs), jobs, state, {
+			now: () => now,
+			runWorkflow: async (config) => {
+				capturedPlan = config.projects[0]?.skills.plan ?? "";
+				capturedImplement = config.projects[0]?.skills.implement ?? "";
+				capturedReview = config.projects[0]?.skills.reviewTest ?? "";
+			},
+		});
+
+		expect(capturedPlan).toBe("/tmp/skills/custom/plan.md");
+		expect(capturedImplement).toBe("/tmp/absolute-implement.md");
+		expect(capturedReview).toBe("/tmp/skills/default-review.md");
+	});
 });
 
 function createLoadedConfig(jobs: CronJobConfig[]): LoadedConfig {
 	return {
-		projects: [],
+		projects: [
+			{
+				id: "default",
+				name: "Default",
+				workspacePath: "/tmp/ws",
+				executionPath: "/tmp/ws",
+				repo: { owner: "acme", name: "repo", baseBranch: "main" },
+				linear: {
+					apiKey: "k",
+					apiUrl: "https://api.linear.app/graphql",
+					pollLimit: 10,
+					statusMap: {
+						assigned: "Todo",
+						planning: "In Progress",
+						implementing: "In Progress",
+						pr_created: "In Review",
+						reviewing: "In Review",
+						testing: "In Review",
+						blocked: "Canceled",
+						done: "Done",
+					},
+					labelMap: {},
+					autoCreateLabels: true,
+				},
+				github: { useGhCli: true, defaultBugLabel: "bug" },
+				codex: { binary: "codex", streamLogs: false },
+				skills: {
+					root: "/tmp/skills",
+					plan: "/tmp/skills/default-plan.md",
+					implement: "/tmp/skills/default-implement.md",
+					reviewTest: "/tmp/skills/default-review.md",
+				},
+				dryRun: false,
+			},
+		],
 		polling: {
 			intervalMs: 30000,
 			maxCycles: undefined,
 			exitWhenIdle: true,
 			staleRunTimeoutMs: 3600000,
 		},
+		automations: { jobs },
 		cron: { jobs },
 		notifications: {
 			email: {

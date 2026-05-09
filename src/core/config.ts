@@ -36,6 +36,7 @@ type AnyOverride = RootOverride | LegacyOverride;
 export interface LoadedConfig {
 	projects: ResolvedProjectConfig[];
 	polling: PollingConfig;
+	automations: CronConfig;
 	cron: CronConfig;
 	notifications: ResolvedNotificationConfig;
 }
@@ -51,16 +52,17 @@ export async function loadConfig(cwd: string): Promise<LoadedConfig> {
 	assertNoProjectNotifications(root.projects);
 	const projects = resolveProjects(cwd, envBase, root);
 	const polling = resolvePolling(envPolling, root.polling);
-	const cron = resolveCron(root.cron);
+	const automations = resolveAutomations(root.automations, root.cron);
+	const cron = automations;
 	const notifications = resolveNotifications(
 		envNotifications,
 		root.notifications,
 	);
 	validateProjects(projects);
 	validatePolling(polling);
-	validateCron(cron);
+	validateCron(automations);
 	validateNotifications(notifications);
-	return { projects, polling, cron, notifications };
+	return { projects, polling, automations, cron, notifications };
 }
 
 export function getProjectById(
@@ -317,8 +319,10 @@ function stripProjects(
 	const {
 		projects: _,
 		polling: __,
-		cron: ___,
-		notifications: ____,
+		automations: ___,
+		cron: ____,
+		notifications: _____,
+		// keep root-only keys out of runtime project defaults
 		...rest
 	} = root;
 	return rest;
@@ -334,17 +338,20 @@ function resolvePolling(
 	};
 }
 
-function resolveCron(
-	override: DeepPartial<CronConfig> | undefined,
+function resolveAutomations(
+	automationsOverride: DeepPartial<CronConfig> | undefined,
+	cronOverride: DeepPartial<CronConfig> | undefined,
 ): CronConfig {
-	const jobs = override?.jobs;
+	const jobs = automationsOverride?.jobs ?? cronOverride?.jobs;
+	const fieldPath =
+		automationsOverride?.jobs !== undefined ? "automations.jobs" : "cron.jobs";
 	if (jobs === undefined) {
 		return {
 			jobs: buildDefaultCronJobs(),
 		};
 	}
 	return {
-		jobs: jobs.map((job, index) => resolveCronJob(job, index)),
+		jobs: jobs.map((job, index) => resolveCronJob(job, index, fieldPath)),
 	};
 }
 
@@ -456,14 +463,20 @@ function parseRecipientsFromEnv(input: string | undefined): string[] {
 function resolveCronJob(
 	job: DeepPartial<CronJobConfig>,
 	index: number,
+	fieldPath: string,
 ): CronJobConfig {
 	if (!job || typeof job !== "object") {
-		throw new Error(`cron.jobs[${index}] must be an object`);
+		throw new Error(`${fieldPath}[${index}] must be an object`);
 	}
 	if (typeof job.id !== "string" || job.id.trim() === "") {
-		throw new Error(`cron.jobs[${index}].id is required`);
+		throw new Error(`${fieldPath}[${index}].id is required`);
 	}
 
+	const resolvedSkills = resolveCronSkillOverrides(
+		job.skills,
+		index,
+		fieldPath,
+	);
 	return {
 		id: job.id.trim(),
 		name:
@@ -471,24 +484,26 @@ function resolveCronJob(
 				? job.name.trim()
 				: undefined,
 		enabled: job.enabled === undefined ? true : job.enabled === true,
-		schedule: resolveCronSchedule(job.schedule, index),
-		run: resolveCronRun(job.run, index),
+		schedule: resolveCronSchedule(job.schedule, index, fieldPath),
+		run: resolveCronRun(job.run, index, fieldPath),
+		...(resolvedSkills ? { skills: resolvedSkills } : {}),
 	};
 }
 
 function resolveCronSchedule(
 	schedule: DeepPartial<CronJobSchedule> | undefined,
 	index: number,
+	fieldPath: string,
 ): CronJobSchedule {
 	if (!schedule || typeof schedule !== "object") {
-		throw new Error(`cron.jobs[${index}].schedule is required`);
+		throw new Error(`${fieldPath}[${index}].schedule is required`);
 	}
 	if (schedule.frequency === "minute") {
 		return {
 			frequency: "minute",
 			every: parseOptionalPositiveIntStrict(
 				schedule.every,
-				`cron.jobs[${index}].schedule.every`,
+				`${fieldPath}[${index}].schedule.every`,
 			),
 		};
 	}
@@ -497,18 +512,18 @@ function resolveCronSchedule(
 			frequency: "hourly",
 			every: parseOptionalPositiveIntStrict(
 				schedule.every,
-				`cron.jobs[${index}].schedule.every`,
+				`${fieldPath}[${index}].schedule.every`,
 			),
 			minute: parseOptionalPositiveIntStrict(
 				schedule.minute,
-				`cron.jobs[${index}].schedule.minute`,
+				`${fieldPath}[${index}].schedule.minute`,
 				true,
 			),
 		};
 	}
 	if (schedule.frequency === "daily") {
 		if (typeof schedule.time !== "string") {
-			throw new Error(`cron.jobs[${index}].schedule.time is required`);
+			throw new Error(`${fieldPath}[${index}].schedule.time is required`);
 		}
 		return {
 			frequency: "daily",
@@ -517,10 +532,10 @@ function resolveCronSchedule(
 	}
 	if (schedule.frequency === "weekly") {
 		if (typeof schedule.time !== "string") {
-			throw new Error(`cron.jobs[${index}].schedule.time is required`);
+			throw new Error(`${fieldPath}[${index}].schedule.time is required`);
 		}
 		if (typeof schedule.dayOfWeek !== "string") {
-			throw new Error(`cron.jobs[${index}].schedule.dayOfWeek is required`);
+			throw new Error(`${fieldPath}[${index}].schedule.dayOfWeek is required`);
 		}
 		return {
 			frequency: "weekly",
@@ -530,13 +545,14 @@ function resolveCronSchedule(
 	}
 
 	throw new Error(
-		`cron.jobs[${index}].schedule.frequency must be one of minute, hourly, daily, weekly`,
+		`${fieldPath}[${index}].schedule.frequency must be one of minute, hourly, daily, weekly`,
 	);
 }
 
 function resolveCronRun(
 	run: DeepPartial<RunOptions> | undefined,
 	index: number,
+	fieldPath: string,
 ): RunOptions {
 	if (!run || typeof run !== "object") {
 		return {};
@@ -551,11 +567,11 @@ function resolveCronRun(
 			: undefined;
 	const pollIntervalMs = parseOptionalPositiveIntStrict(
 		run.pollIntervalMs,
-		`cron.jobs[${index}].run.pollIntervalMs`,
+		`${fieldPath}[${index}].run.pollIntervalMs`,
 	);
 	const maxPollCycles = parseOptionalPositiveIntStrict(
 		run.maxPollCycles,
-		`cron.jobs[${index}].run.maxPollCycles`,
+		`${fieldPath}[${index}].run.maxPollCycles`,
 	);
 	const exitWhenIdle =
 		run.exitWhenIdle === undefined
@@ -565,7 +581,7 @@ function resolveCronRun(
 				: run.exitWhenIdle === false
 					? false
 					: invalidCronRunBoolean(
-							`cron.jobs[${index}].run.exitWhenIdle must be a boolean`,
+							`${fieldPath}[${index}].run.exitWhenIdle must be a boolean`,
 						);
 	const allProjects =
 		run.allProjects === undefined
@@ -575,7 +591,7 @@ function resolveCronRun(
 				: run.allProjects === false
 					? false
 					: invalidCronRunBoolean(
-							`cron.jobs[${index}].run.allProjects must be a boolean`,
+							`${fieldPath}[${index}].run.allProjects must be a boolean`,
 						);
 	const poll =
 		run.poll === undefined
@@ -585,7 +601,7 @@ function resolveCronRun(
 				: run.poll === false
 					? false
 					: invalidCronRunBoolean(
-							`cron.jobs[${index}].run.poll must be a boolean`,
+							`${fieldPath}[${index}].run.poll must be a boolean`,
 						);
 	const reviewOnly =
 		run.reviewOnly === undefined
@@ -595,7 +611,7 @@ function resolveCronRun(
 				: run.reviewOnly === false
 					? false
 					: invalidCronRunBoolean(
-							`cron.jobs[${index}].run.reviewOnly must be a boolean`,
+							`${fieldPath}[${index}].run.reviewOnly must be a boolean`,
 						);
 
 	return {
@@ -608,6 +624,52 @@ function resolveCronRun(
 		maxPollCycles,
 		exitWhenIdle,
 	};
+}
+
+function resolveCronSkillOverrides(
+	skills: unknown,
+	index: number,
+	fieldPath: string,
+): CronJobConfig["skills"] {
+	if (skills === undefined) {
+		return undefined;
+	}
+	if (!skills || typeof skills !== "object") {
+		throw new Error(`${fieldPath}[${index}].skills must be an object`);
+	}
+
+	const parsed = skills as {
+		plan?: unknown;
+		implement?: unknown;
+		reviewTest?: unknown;
+	};
+	return {
+		plan: normalizeSkillOverridePath(
+			parsed.plan,
+			`${fieldPath}[${index}].skills.plan`,
+		),
+		implement: normalizeSkillOverridePath(
+			parsed.implement,
+			`${fieldPath}[${index}].skills.implement`,
+		),
+		reviewTest: normalizeSkillOverridePath(
+			parsed.reviewTest,
+			`${fieldPath}[${index}].skills.reviewTest`,
+		),
+	};
+}
+
+function normalizeSkillOverridePath(
+	input: unknown,
+	field: string,
+): string | undefined {
+	if (input === undefined) {
+		return undefined;
+	}
+	if (typeof input !== "string") {
+		throw new Error(`${field} must be a string`);
+	}
+	return normalizeOptionalValue(input);
 }
 
 function invalidCronRunBoolean(_message: string): never {

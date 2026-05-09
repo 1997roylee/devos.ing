@@ -167,12 +167,19 @@ export type CronJobSchedule =
 			time: string;
 	  };
 
+export interface CronJobSkillOverrides {
+	plan?: string;
+	implement?: string;
+	reviewTest?: string;
+}
+
 export interface CronJobConfig {
 	id: string;
 	name?: string;
 	enabled?: boolean;
 	schedule: CronJobSchedule;
 	run: RunOptions;
+	skills?: CronJobSkillOverrides;
 }
 
 export interface CronConfig {
@@ -203,6 +210,7 @@ export interface ResolvedNotificationConfig {
 
 export type AdhdAiRootConfig = DeepPartial<ProjectRuntimeConfig> & {
 	polling?: DeepPartial<PollingConfig>;
+	automations?: DeepPartial<CronConfig>;
 	cron?: DeepPartial<CronConfig>;
 	notifications?: DeepPartial<NotificationConfig>;
 	projects: ProjectConfig[];
