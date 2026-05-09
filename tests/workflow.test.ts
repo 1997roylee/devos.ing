@@ -337,6 +337,7 @@ describe("isReviewOnlyExecutableStage", () => {
 		expect(isReviewOnlyExecutableStage("reviewing")).toBe(true);
 		expect(isReviewOnlyExecutableStage("testing")).toBe(true);
 		expect(isReviewOnlyExecutableStage("implementing")).toBe(false);
+		expect(isReviewOnlyExecutableStage("human_review")).toBe(false);
 		expect(isReviewOnlyExecutableStage("planning")).toBe(false);
 		expect(isReviewOnlyExecutableStage("received")).toBe(false);
 	});
@@ -953,9 +954,9 @@ describe("resolveReviewFailureStage", () => {
 		);
 	});
 
-	it("routes to reviewing when codex session is missing", () => {
+	it("routes to human_review when codex session is missing", () => {
 		expect(resolveReviewFailureStage({ codexSessionId: undefined })).toBe(
-			"reviewing",
+			"human_review",
 		);
 	});
 });

@@ -544,8 +544,8 @@ export function isReviewOnlyExecutableStage(stage: WorkflowStage): boolean {
 
 export function resolveReviewFailureStage(
 	state: Pick<RunState, "codexSessionId">,
-): Extract<WorkflowStage, "implementing" | "reviewing"> {
-	return state.codexSessionId ? "implementing" : "reviewing";
+): Extract<WorkflowStage, "implementing" | "human_review"> {
+	return state.codexSessionId ? "implementing" : "human_review";
 }
 
 export async function withExecutionPathLock<T>(
@@ -1277,7 +1277,11 @@ async function handleReviewTestingStage(
 		const nextStage = resolveReviewFailureStage(state);
 		Object.assign(state, transitionStage(state, nextStage));
 		await saveRunState(config.workspacePath, state);
-		await linear.markStage(state.issue.id, nextStage);
+		if (nextStage === "implementing") {
+			await linear.markStage(state.issue.id, nextStage);
+		} else {
+			await linear.markStage(state.issue.id, "reviewing");
+		}
 		if (nextStage === "implementing") {
 			await linear.comment(
 				state.issue.id,
@@ -1287,7 +1291,7 @@ async function handleReviewTestingStage(
 			await linear.applyStageLabel(state.issue.id, "reviewing");
 			await linear.comment(
 				state.issue.id,
-				"Review/testing failed, but no resumable implementation session is available. Keeping issue in review/testing for manual PR updates.",
+				"Review/testing failed, but no resumable implementation session is available. Parked for manual review and PR updates.",
 			);
 		}
 		return;
