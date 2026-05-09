@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -109,6 +109,36 @@ describe("skills manage", () => {
 			await expect(removeSkill(tempDir, "../escape")).rejects.toThrow(
 				"Invalid skill name: '../escape'",
 			);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("preserves frontmatter skill content when updating metadata only", async () => {
+		const tempDir = await mkdtemp(
+			path.join(os.tmpdir(), "adhd-skills-manage-"),
+		);
+		const skillDir = path.join(tempDir, "piv-plan");
+		const skillPath = path.join(skillDir, "SKILL.md");
+		try {
+			await mkdir(skillDir, { recursive: true });
+			const sourceSkill = await readFile(
+				path.join(process.cwd(), "skills", "piv-plan", "SKILL.md"),
+				"utf8",
+			);
+			await writeFile(skillPath, sourceSkill, "utf8");
+
+			await updateSkill(tempDir, "piv-plan", {
+				description: "Updated planning description",
+			});
+
+			const updatedSkill = await readFile(skillPath, "utf8");
+			expect(updatedSkill).toContain("---\nname: adhd-plan");
+			expect(updatedSkill).toContain(
+				"description: Updated planning description",
+			);
+			expect(updatedSkill).toContain("# ADHD.ai Plan Skill");
+			expect(updatedSkill).toContain("## Goals");
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });
 		}
