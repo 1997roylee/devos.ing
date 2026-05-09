@@ -1,11 +1,12 @@
 {
-	"name": "adhd.ai",
-	"version": "0.1.0",
+	"name": "adhdai",
+	"version": "0.0.1",
 	"license": "MIT",
-	"private": true,
+	"private": false,
 	"type": "module",
+	"files": ["dist", "README.md", "LICENSE"],
 	"bin": {
-		"adhd-ai": "./src/index.ts"
+		"adhd-ai": "./dist/index.js"
 	},
 	"scripts": {
 		"build": "bun build ./src/index.ts --target bun --outdir dist",
@@ -17,6 +18,7 @@
 		"lint": "biome lint .",
 		"check": "biome check .",
 		"check:write": "biome check --write .",
+		"prepare:publish": "bun run check && bun run typecheck && bun test && bun run build && npm pack --dry-run",
 		"prepare": "husky"
 	},
 	"devDependencies": {
