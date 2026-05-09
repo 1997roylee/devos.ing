@@ -352,6 +352,78 @@ describe("findOpenPullRequestForIssue", () => {
 
 		expect(pr).toBeUndefined();
 	});
+
+	it("returns undefined when only substring issue-key matches exist", async () => {
+		const runCommand = mock(
+			async (_command: string, args: string[]): Promise<CommandResult> => {
+				if (args[0] === "pr" && args[1] === "list") {
+					return {
+						code: 0,
+						stdout: JSON.stringify([
+							{
+								number: 160,
+								url: "https://github.com/acme/repo/pull/160",
+								title: "[codex] ROY-60: Hourly review changes",
+								headRefName: "codex/roy-60",
+							},
+						]),
+						stderr: "",
+					};
+				}
+				return { code: 0, stdout: "", stderr: "" };
+			},
+		);
+
+		const pr = await findOpenPullRequestForIssue(
+			createProjectConfig(),
+			"ROY-6",
+			{
+				runCommand,
+				assertCommandOk: assertOk,
+			},
+		);
+
+		expect(pr).toBeUndefined();
+	});
+
+	it("does not fall back to first result when no exact issue match exists", async () => {
+		const runCommand = mock(
+			async (_command: string, args: string[]): Promise<CommandResult> => {
+				if (args[0] === "pr" && args[1] === "list") {
+					return {
+						code: 0,
+						stdout: JSON.stringify([
+							{
+								number: 70,
+								url: "https://github.com/acme/repo/pull/70",
+								title: "[codex] ROY-70: Another issue",
+								headRefName: "codex/roy-70",
+							},
+							{
+								number: 80,
+								url: "https://github.com/acme/repo/pull/80",
+								title: "[codex] ROY-80: Different issue",
+								headRefName: "codex/roy-80",
+							},
+						]),
+						stderr: "",
+					};
+				}
+				return { code: 0, stdout: "", stderr: "" };
+			},
+		);
+
+		const pr = await findOpenPullRequestForIssue(
+			createProjectConfig(),
+			"ROY-6",
+			{
+				runCommand,
+				assertCommandOk: assertOk,
+			},
+		);
+
+		expect(pr).toBeUndefined();
+	});
 });
 
 function assertOk(

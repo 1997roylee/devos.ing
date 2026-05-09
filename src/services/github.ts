@@ -347,10 +347,12 @@ export async function findOpenPullRequestForIssue(
 		return undefined;
 	}
 	const key = issueKey.trim().toLowerCase();
-	const matched =
-		parsed.find((entry) =>
-			isMatchingIssuePullRequest(entry, key, issueBranchName(issueKey)),
-		) ?? parsed[0];
+	const matched = parsed.find((entry) =>
+		isMatchingIssuePullRequest(entry, key, issueBranchName(issueKey)),
+	);
+	if (!matched) {
+		return undefined;
+	}
 	if (!matched?.url) {
 		return undefined;
 	}
@@ -564,10 +566,26 @@ function isMatchingIssuePullRequest(
 	const branch = entry.headRefName?.toLowerCase() ?? "";
 	const defaultBranch = defaultBranchName.toLowerCase();
 	return (
-		title.includes(normalizedIssueKey) ||
-		branch.includes(normalizedIssueKey) ||
+		matchesIssueKeyToken(title, normalizedIssueKey) ||
+		matchesIssueKeyToken(branch, normalizedIssueKey) ||
 		branch === defaultBranch
 	);
+}
+
+function matchesIssueKeyToken(
+	value: string,
+	normalizedIssueKey: string,
+): boolean {
+	if (!value || !normalizedIssueKey) {
+		return false;
+	}
+	const escaped = escapeRegExp(normalizedIssueKey.toLowerCase());
+	const pattern = new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i");
+	return pattern.test(value);
+}
+
+function escapeRegExp(value: string): string {
+	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function withRetries<T>(
