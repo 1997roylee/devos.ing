@@ -1,4 +1,9 @@
 import {
+	type AgentAdapter,
+	type AgentResult,
+	createAgentAdapter,
+} from "../agent-adapters";
+import {
 	commentOnPr,
 	createDraftPrFromWorktree,
 	findOpenPullRequestForIssue,
@@ -27,11 +32,6 @@ import {
 	buildReviewComment,
 } from "../utils/comments";
 import { logger, normalizeError } from "../utils/logger";
-import {
-	type AgentAdapter,
-	type AgentResult,
-	createAgentAdapter,
-} from "./agent-adapter";
 import { type LoadedConfig, getProjectById } from "./config";
 import { type ReviewOutcome, parseReviewOutcome } from "./review";
 import {
