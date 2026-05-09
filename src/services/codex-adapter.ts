@@ -15,12 +15,14 @@ export class CodexAdapter implements AgentAdapter {
 		const reasoningEffort =
 			this.config.codex.reasoningEfforts?.plan ??
 			this.config.codex.reasoningEffort;
+		const fastModeEnabled = this.config.codex.fastModes?.plan;
 		return this.runCodex(
 			this.buildExecArgs(
 				prompt,
 				await this.nextOutputFile(),
 				model,
 				reasoningEffort,
+				fastModeEnabled,
 			),
 		);
 	}
@@ -31,6 +33,7 @@ export class CodexAdapter implements AgentAdapter {
 		const reasoningEffort =
 			this.config.codex.reasoningEfforts?.implement ??
 			this.config.codex.reasoningEffort;
+		const fastModeEnabled = this.config.codex.fastModes?.implement;
 		return this.runCodex(
 			this.buildResumeArgs(
 				sessionId,
@@ -38,6 +41,7 @@ export class CodexAdapter implements AgentAdapter {
 				await this.nextOutputFile(),
 				model,
 				reasoningEffort,
+				fastModeEnabled,
 			),
 		);
 	}
@@ -51,12 +55,16 @@ export class CodexAdapter implements AgentAdapter {
 			this.config.codex.reasoningEfforts?.reviewTest ??
 			this.config.codex.reasoningEfforts?.implement ??
 			this.config.codex.reasoningEffort;
+		const fastModeEnabled =
+			this.config.codex.fastModes?.reviewTest ??
+			this.config.codex.fastModes?.implement;
 		return this.runCodex(
 			this.buildExecArgs(
 				prompt,
 				await this.nextOutputFile(),
 				model,
 				reasoningEffort,
+				fastModeEnabled,
 			),
 		);
 	}
@@ -66,6 +74,7 @@ export class CodexAdapter implements AgentAdapter {
 		outputFile: string,
 		modelOverride?: string,
 		reasoningEffortOverride?: CodexReasoningEffort,
+		fastModeEnabled?: boolean,
 	): string[] {
 		const args = [
 			"exec",
@@ -83,7 +92,7 @@ export class CodexAdapter implements AgentAdapter {
 		if (this.config.codex.sandbox) {
 			args.push("--sandbox", this.config.codex.sandbox);
 		}
-		this.appendConfigArgs(args, reasoningEffortOverride);
+		this.appendConfigArgs(args, reasoningEffortOverride, fastModeEnabled);
 		args.push(prompt);
 		return args;
 	}
@@ -94,6 +103,7 @@ export class CodexAdapter implements AgentAdapter {
 		outputFile: string,
 		modelOverride?: string,
 		reasoningEffortOverride?: CodexReasoningEffort,
+		fastModeEnabled?: boolean,
 	): string[] {
 		const args = [
 			"exec",
@@ -107,7 +117,7 @@ export class CodexAdapter implements AgentAdapter {
 		if (model) {
 			args.push("--model", model);
 		}
-		this.appendConfigArgs(args, reasoningEffortOverride);
+		this.appendConfigArgs(args, reasoningEffortOverride, fastModeEnabled);
 		args.push(sessionId, prompt);
 		return args;
 	}
@@ -149,14 +159,19 @@ export class CodexAdapter implements AgentAdapter {
 	private appendConfigArgs(
 		args: string[],
 		reasoningEffortOverride?: CodexReasoningEffort,
+		fastModeEnabled?: boolean,
 	): void {
-		for (const override of this.buildConfigOverrides(reasoningEffortOverride)) {
+		for (const override of this.buildConfigOverrides(
+			reasoningEffortOverride,
+			fastModeEnabled,
+		)) {
 			args.push("--config", override);
 		}
 	}
 
 	private buildConfigOverrides(
 		reasoningEffortOverride?: CodexReasoningEffort,
+		fastModeEnabled?: boolean,
 	): string[] {
 		const overrides: string[] = [];
 		const plugins = normalizeList(this.config.codex.plugins);
@@ -173,6 +188,10 @@ export class CodexAdapter implements AgentAdapter {
 			overrides.push(
 				`model_reasoning_effort=${JSON.stringify(reasoningEffortOverride)}`,
 			);
+		}
+		if (fastModeEnabled) {
+			overrides.push('service_tier="fast"');
+			overrides.push("features.fast_mode=true");
 		}
 		for (const [rawKey, rawValue] of Object.entries(
 			this.config.codex.configOverrides ?? {},

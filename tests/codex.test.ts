@@ -48,6 +48,11 @@ const config: ResolvedProjectConfig = {
 			plan: "high",
 			implement: "low",
 		},
+		fastModes: {
+			plan: true,
+			implement: false,
+			reviewTest: true,
+		},
 		plugins: ["github@openai-curated", "linear@openai-curated"],
 		skillsets: ["adhd-ai", "repo-defaults"],
 		configOverrides: {
@@ -128,6 +133,32 @@ describe("codex adapter", () => {
 		expect(calls[2]).toContain('model_reasoning_effort="low"');
 	});
 
+	it("uses stage-specific fast mode overrides", async () => {
+		const adapter = new CodexAdapter(config);
+		const calls: string[][] = [];
+		(
+			adapter as unknown as { runCodex: (args: string[]) => Promise<unknown> }
+		).runCodex = async (args: string[]) => {
+			calls.push(args);
+			return { finalMessage: "", stdout: "" };
+		};
+		(
+			adapter as unknown as { nextOutputFile: () => Promise<string> }
+		).nextOutputFile = async () => "/tmp/out.txt";
+
+		await adapter.runPlan("plan prompt");
+		await adapter.resume("session-1", "implement prompt");
+		await adapter.runReview("review prompt");
+
+		expect(calls).toHaveLength(3);
+		expect(calls[0]).toContain('service_tier="fast"');
+		expect(calls[0]).toContain("features.fast_mode=true");
+		expect(calls[1]).not.toContain('service_tier="fast"');
+		expect(calls[1]).not.toContain("features.fast_mode=true");
+		expect(calls[2]).toContain('service_tier="fast"');
+		expect(calls[2]).toContain("features.fast_mode=true");
+	});
+
 	it("keeps raw config override as final reasoning-effort escape hatch", () => {
 		const adapter = new CodexAdapter({
 			...config,
@@ -140,12 +171,38 @@ describe("codex adapter", () => {
 		});
 		const overrides = (
 			adapter as unknown as {
-				buildConfigOverrides: (effort?: string) => string[];
+				buildConfigOverrides: (effort?: string, fastMode?: boolean) => string[];
 			}
 		).buildConfigOverrides("low");
 		const first = overrides.indexOf('model_reasoning_effort="low"');
 		const second = overrides.indexOf('model_reasoning_effort="xhigh"');
 		expect(first).toBeGreaterThanOrEqual(0);
 		expect(second).toBeGreaterThan(first);
+	});
+
+	it("keeps raw config override as final fast-mode escape hatch", () => {
+		const adapter = new CodexAdapter({
+			...config,
+			codex: {
+				...config.codex,
+				configOverrides: {
+					service_tier: '"default"',
+					"features.fast_mode": "false",
+				},
+			},
+		});
+		const overrides = (
+			adapter as unknown as {
+				buildConfigOverrides: (effort?: string, fastMode?: boolean) => string[];
+			}
+		).buildConfigOverrides(undefined, true);
+		const fastTier = overrides.indexOf('service_tier="fast"');
+		const defaultTier = overrides.indexOf('service_tier="default"');
+		const fastModeTrue = overrides.indexOf("features.fast_mode=true");
+		const fastModeFalse = overrides.indexOf("features.fast_mode=false");
+		expect(fastTier).toBeGreaterThanOrEqual(0);
+		expect(defaultTier).toBeGreaterThan(fastTier);
+		expect(fastModeTrue).toBeGreaterThanOrEqual(0);
+		expect(fastModeFalse).toBeGreaterThan(fastModeTrue);
 	});
 });

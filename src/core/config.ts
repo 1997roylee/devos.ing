@@ -209,6 +209,20 @@ function buildEnvBase(cwd: string, env: ResolvedEnv): ProjectRuntimeConfig {
 					"CODEX_REASONING_EFFORT_REVIEW_TEST",
 				),
 			},
+			fastModes: {
+				plan: normalizeBooleanEnvValue(
+					env.CODEX_FAST_MODE_PLAN,
+					"CODEX_FAST_MODE_PLAN",
+				),
+				implement: normalizeBooleanEnvValue(
+					env.CODEX_FAST_MODE_IMPLEMENT,
+					"CODEX_FAST_MODE_IMPLEMENT",
+				),
+				reviewTest: normalizeBooleanEnvValue(
+					env.CODEX_FAST_MODE_REVIEW_TEST,
+					"CODEX_FAST_MODE_REVIEW_TEST",
+				),
+			},
 			sandbox,
 			codexHome,
 		},
@@ -788,6 +802,11 @@ function mergeRuntime(
 				...(rootDefaults.codex?.reasoningEfforts ?? {}),
 				...(project.codex?.reasoningEfforts ?? {}),
 			},
+			fastModes: {
+				...(base.codex.fastModes ?? {}),
+				...(rootDefaults.codex?.fastModes ?? {}),
+				...(project.codex?.fastModes ?? {}),
+			},
 		},
 		skills: {
 			root: skillRoot,
@@ -980,6 +999,30 @@ function normalizeReasoningEffortValue(
 
 	throw new Error(
 		`Invalid ${envName} value '${input}'. Use low, medium, high, xhigh, or leave empty.`,
+	);
+}
+
+function normalizeBooleanEnvValue(
+	input: string | undefined,
+	envName: string,
+): boolean | undefined {
+	if (!input) {
+		return undefined;
+	}
+
+	const value = input.trim().toLowerCase();
+	if (!value || value === "off" || value === "none") {
+		return undefined;
+	}
+	if (value === "1" || value === "true" || value === "yes" || value === "on") {
+		return true;
+	}
+	if (value === "0" || value === "false" || value === "no") {
+		return false;
+	}
+
+	throw new Error(
+		`Invalid ${envName} value '${input}'. Use true/false, 1/0, yes/no, or leave empty.`,
 	);
 }
 

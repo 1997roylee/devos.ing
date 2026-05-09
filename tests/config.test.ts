@@ -24,6 +24,9 @@ const envKeys = [
 	"CODEX_REASONING_EFFORT_PLAN",
 	"CODEX_REASONING_EFFORT_IMPLEMENT",
 	"CODEX_REASONING_EFFORT_REVIEW_TEST",
+	"CODEX_FAST_MODE_PLAN",
+	"CODEX_FAST_MODE_IMPLEMENT",
+	"CODEX_FAST_MODE_REVIEW_TEST",
 	"CODEX_MODEL_PLAN",
 	"CODEX_MODEL_IMPLEMENT",
 	"CODEX_MODEL_REVIEW_TEST",
@@ -58,6 +61,9 @@ describe("loadConfig", () => {
 								key === "CODEX_REASONING_EFFORT_PLAN" ||
 								key === "CODEX_REASONING_EFFORT_IMPLEMENT" ||
 								key === "CODEX_REASONING_EFFORT_REVIEW_TEST" ||
+								key === "CODEX_FAST_MODE_PLAN" ||
+								key === "CODEX_FAST_MODE_IMPLEMENT" ||
+								key === "CODEX_FAST_MODE_REVIEW_TEST" ||
 								key === "CLAUDE_CODE_MODEL" ||
 								key === "CLAUDE_CODE_ALLOWED_TOOLS"
 							? ""
@@ -585,6 +591,82 @@ describe("loadConfig", () => {
 		try {
 			await expect(loadConfig(tempDir)).rejects.toThrow(
 				"Invalid CODEX_REASONING_EFFORT_IMPLEMENT value",
+			);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("loads stage-specific codex fast mode from env", async () => {
+		process.env.CODEX_FAST_MODE_PLAN = "true";
+		process.env.CODEX_FAST_MODE_IMPLEMENT = "1";
+		process.env.CODEX_FAST_MODE_REVIEW_TEST = "no";
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			["export default { projects: [{ id: 'default' }] };", ""].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.projects[0]?.codex.fastModes).toEqual({
+				plan: true,
+				implement: true,
+				reviewTest: false,
+			});
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("preserves env fast mode values when config overrides only plan", async () => {
+		process.env.CODEX_FAST_MODE_IMPLEMENT = "true";
+		process.env.CODEX_FAST_MODE_REVIEW_TEST = "false";
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			[
+				"export default {",
+				"  codex: {",
+				"    fastModes: {",
+				"      plan: true",
+				"    }",
+				"  },",
+				"  projects: [{ id: 'default' }]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.projects[0]?.codex.fastModes).toEqual({
+				plan: true,
+				implement: true,
+				reviewTest: false,
+			});
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("throws on invalid codex fast mode env value", async () => {
+		process.env.CODEX_FAST_MODE_PLAN = "maybe";
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			["export default { projects: [{ id: 'default' }] };", ""].join("\n"),
+		);
+
+		try {
+			await expect(loadConfig(tempDir)).rejects.toThrow(
+				"Invalid CODEX_FAST_MODE_PLAN value",
 			);
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });

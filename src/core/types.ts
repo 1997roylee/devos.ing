@@ -81,6 +81,11 @@ export interface ProjectRuntimeConfig {
 			implement?: CodexReasoningEffort;
 			reviewTest?: CodexReasoningEffort;
 		};
+		fastModes?: {
+			plan?: boolean;
+			implement?: boolean;
+			reviewTest?: boolean;
+		};
 		plugins?: string[];
 		skillsets?: string[];
 		/**
