@@ -8,7 +8,6 @@ import {
 	createDraftPrFromWorktree,
 	findOpenPullRequestForIssue,
 	issueBranchName,
-	markPrReadyForReview,
 	prepareImplementationBranch,
 	squashMergePullRequest,
 	updateDraftPrFromWorktree,
@@ -18,31 +17,19 @@ import {
 	sendHumanReviewRequiredEmail,
 	sendTaskOutcomeEmail,
 } from "../services/notifications";
-import { selectPlanningSupplementalSkills } from "../skills/catalog";
-import {
-	buildFixPrompt,
-	buildImplementPrompt,
-	buildPlanPrompt,
-	buildReviewPrompt,
-} from "../skills/prompts";
-import {
-	buildImplementationComment,
-	buildPlanComment,
-	buildPlanSplitComment,
-	buildReviewComment,
-} from "../utils/comments";
+import { buildFixPrompt, buildImplementPrompt } from "../skills/prompts";
+import { buildImplementationComment } from "../utils/comments";
 import { logger, normalizeError } from "../utils/logger";
 import { runAgentWithChatLog } from "./agent-chat-log";
 import { type LoadedConfig, getProjectById } from "./config";
 import {
-	safeLinearComment,
-	safeLinearMoveToCanceled,
-	safeNotifyHumanReviewRequired,
-	safeNotifyTaskOutcome,
-	safePrComment,
-	safeSquashMergePullRequest,
-} from "./integration-wrappers";
-import { type ReviewOutcome, parseReviewOutcome } from "./review";
+	handlePlanningStage,
+	shouldSquashMergePullRequestForComplexityScore,
+} from "./plan";
+import {
+	finalizeIssueAfterReviewMerge as finalizeIssueAfterReviewMergeInternal,
+	handleReviewTestingStage as handleReviewTestingStageInternal,
+} from "./review-stage";
 import {
 	appendProjectErrorLog,
 	isRunLeaseExpired,
@@ -67,8 +54,6 @@ import {
 export { buildRunLeaseOwnerId } from "./workflow-lease";
 import type {
 	CodexUsageRecord,
-	IssueRef,
-	PlannedSplitTask,
 	PollingConfig,
 	PullRequestRef,
 	ResolvedNotificationConfig,
@@ -586,12 +571,6 @@ export function shouldSkipReviewOnlyRunState(
 	return options.reviewOnly === true && state?.stage === "human_review";
 }
 
-export function resolveReviewFailureStage(
-	state: Pick<RunState, "codexSessionId">,
-): Extract<WorkflowStage, "implementing" | "human_review"> {
-	return state.codexSessionId ? "implementing" : "human_review";
-}
-
 export async function withExecutionPathLock<T>(
 	executionPath: string,
 	run: () => Promise<T>,
@@ -1034,7 +1013,17 @@ async function executeIssue(
 		}
 
 		if (state.stage === "planning") {
-			await handlePlanningStage(config, agent, notifications, linear, state);
+			await handlePlanningStage(config, agent, notifications, linear, state, {
+				runAgentWithChatLog,
+				appendCodexUsage,
+				saveRunState,
+				transitionStage,
+				safeNotifyTaskOutcome,
+				loggerInfo: logger.info.bind(logger),
+				buildIssueJobLogFields: (runState, stage, stageOptions) => ({
+					...buildIssueJobLogFields(runState, stage, stageOptions),
+				}),
+			});
 			continue;
 		}
 
@@ -1063,6 +1052,49 @@ async function executeIssue(
 	}
 }
 
+export async function handleReviewTestingStage(
+	config: ResolvedProjectConfig,
+	agent: AgentAdapter,
+	_notifications: ResolvedNotificationConfig,
+	linear: LinearClient,
+	state: RunState,
+): Promise<void> {
+	await handleReviewTestingStageInternal(config, agent, linear, state, {
+		runAgentWithChatLog,
+		appendCodexUsage,
+		transitionStage,
+		saveRunState,
+		safePrComment,
+		loggerInfo: logger.info.bind(logger),
+		buildIssueJobLogFields: (runState, stage, stageOptions) => ({
+			...buildIssueJobLogFields(runState, stage, stageOptions),
+		}),
+	});
+}
+
+export async function finalizeIssueAfterReviewMerge(
+	config: ResolvedProjectConfig,
+	notifications: ResolvedNotificationConfig,
+	linear: LinearClient,
+	state: RunState,
+	deps?: {
+		saveRunState?: typeof saveRunState;
+		safeNotifyTaskOutcome?: typeof safeNotifyTaskOutcome;
+	},
+): Promise<void> {
+	await finalizeIssueAfterReviewMergeInternal(
+		config,
+		notifications,
+		linear,
+		state,
+		{
+			saveRunState: deps?.saveRunState ?? saveRunState,
+			safeNotifyTaskOutcome:
+				deps?.safeNotifyTaskOutcome ?? safeNotifyTaskOutcome,
+		},
+	);
+}
+
 async function handleReceivedStage(
 	config: ResolvedProjectConfig,
 	linear: LinearClient,
@@ -1072,77 +1104,6 @@ async function handleReceivedStage(
 	await linear.comment(state.issue.id, "ADHD.ai started planning.");
 	Object.assign(state, transitionStage(state, "planning"));
 	await saveRunState(config.workspacePath, state);
-}
-
-async function handlePlanningStage(
-	config: ResolvedProjectConfig,
-	agent: AgentAdapter,
-	notifications: ResolvedNotificationConfig,
-	linear: LinearClient,
-	state: RunState,
-): Promise<void> {
-	logger.info(buildIssueJobLogFields(state, "planning"), "Planning issue");
-	const supplemental = await selectPlanningSupplementalSkills(
-		config,
-		state.issue,
-	);
-	const prompt = await buildPlanPrompt(config.skills.plan, state.issue, {
-		supplementalSkills: supplemental.selected,
-		autoSelectWarnings: supplemental.warnings,
-	});
-	const result = await runAgentWithChatLog({
-		workspacePath: config.workspacePath,
-		projectId: config.id,
-		issue: state.issue,
-		agentRole: "planning",
-		skillPath: config.skills.plan,
-		prompt,
-		invoke: () => agent.runPlan(prompt),
-	});
-	state.codexSessionId = result.sessionId ?? state.codexSessionId;
-	state.planSummary = result.finalMessage || result.stdout;
-	appendCodexUsage(state, "planning", result.usage);
-	await applyPlannerIssueRefinement(linear, state.issue, state.planSummary);
-
-	const parsedPlan = parsePlannerDecision(state.planSummary);
-	state.complexityScore = parsedPlan.complexityScore;
-	state.reviewMode = resolveReviewModeForComplexityScore(
-		parsedPlan.complexityScore,
-	);
-	if (parsedPlan.complexity === "SIMPLE") {
-		Object.assign(state, transitionStage(state, "implementing"));
-		await saveRunState(config.workspacePath, state);
-		await linear.markStage(state.issue.id, "implementing");
-		await linear.comment(
-			state.issue.id,
-			buildPlanComment(state.issue.key, state.planSummary, result.usage),
-		);
-		logger.info(buildIssueJobLogFields(state, "planning"), "Plan completed");
-		return;
-	}
-
-	const createdTasks = [];
-	for (const task of parsedPlan.splitTasks) {
-		const created = await linear.createTodoIssueFromPlan(state.issue, task);
-		createdTasks.push({
-			title: created.title,
-			issueKey: created.identifier,
-			issueUrl: created.url,
-		});
-	}
-	state.splitTasks = createdTasks;
-	Object.assign(state, transitionStage(state, "done"));
-	await saveRunState(config.workspacePath, state);
-	await linear.markStage(state.issue.id, "done");
-	await linear.clearWorkflowStageLabels(state.issue.id);
-	await linear.comment(
-		state.issue.id,
-		buildPlanSplitComment(state.issue.key, state.planSummary, createdTasks, {
-			usage: result.usage,
-		}),
-	);
-	await safeNotifyTaskOutcome(notifications, state, "done");
-	logger.info(buildIssueJobLogFields(state, "planning"), "Plan completed");
 }
 
 export function fixedBugsForImplementationComment(
@@ -1283,95 +1244,6 @@ async function handlePrCreatedStage(
 	await linear.applyStageLabel(state.issue.id, "reviewing");
 }
 
-export async function handleReviewTestingStage(
-	config: ResolvedProjectConfig,
-	agent: AgentAdapter,
-	notifications: ResolvedNotificationConfig,
-	linear: LinearClient,
-	state: RunState,
-): Promise<void> {
-	logger.info(buildIssueJobLogFields(state, "testing"), "Testing issue");
-	await linear.markStage(state.issue.id, "testing");
-	await linear.applyStageLabel(state.issue.id, "testing");
-	Object.assign(state, transitionStage(state, "testing"));
-	await saveRunState(config.workspacePath, state);
-
-	const prompt = await buildReviewPrompt(
-		config.skills.reviewTest,
-		state.issue,
-		state.pullRequest,
-	);
-	const review = await runAgentWithChatLog({
-		workspacePath: config.workspacePath,
-		projectId: config.id,
-		issue: state.issue,
-		agentRole: "review-testing",
-		skillPath: config.skills.reviewTest,
-		prompt,
-		invoke: () => agent.runReview(prompt),
-	});
-	const outcome = parseReviewOutcome(review.finalMessage || review.stdout);
-	const retryBugs = normalizeFailedReviewBugs(outcome);
-	appendCodexUsage(state, "testing", review.usage);
-	state.reviewSessionId = review.sessionId;
-
-	state.reviewSummary = outcome.summary;
-	state.testingSummary = outcome.summary;
-	state.bugs = retryBugs;
-	await saveRunState(config.workspacePath, state);
-
-	const reviewComment = buildReviewComment({
-		issueKey: state.issue.key,
-		passed: outcome.passed,
-		summary: outcome.summary,
-		usage: review.usage,
-		bugs: retryBugs,
-	});
-
-	if (!config.dryRun && state.pullRequest) {
-		await safePrComment(config, state, reviewComment);
-	}
-	await linear.comment(state.issue.id, reviewComment);
-
-	if (!outcome.passed) {
-		const nextStage = resolveReviewFailureStage(state);
-		Object.assign(state, transitionStage(state, nextStage));
-		await saveRunState(config.workspacePath, state);
-		if (nextStage === "implementing") {
-			await linear.markStage(state.issue.id, nextStage);
-		} else {
-			await linear.markStage(state.issue.id, "reviewing");
-		}
-		if (nextStage === "implementing") {
-			await linear.comment(
-				state.issue.id,
-				"Review/testing failed. Feedback was sent back to implementation for another pass.",
-			);
-		} else {
-			await linear.applyStageLabel(state.issue.id, "reviewing");
-			await linear.comment(
-				state.issue.id,
-				"Review/testing failed, but no resumable implementation session is available. Parked for manual review and PR updates.",
-			);
-		}
-		return;
-	}
-
-	await readyPullRequestAfterPassingReview(config, state.pullRequest, true);
-	Object.assign(state, transitionStage(state, "done"));
-	await saveRunState(config.workspacePath, state);
-	await linear.markStage(state.issue.id, "reviewing");
-	await linear.applyStageLabel(state.issue.id, "reviewing");
-	await linear.comment(
-		state.issue.id,
-		"Review/testing passed. PR is ready and issue remains in review until merge.",
-	);
-	logger.info(
-		buildIssueJobLogFields(state, "testing"),
-		"Review/testing completed",
-	);
-}
-
 async function handleDoneReviewMergeStage(
 	config: ResolvedProjectConfig,
 	notifications: ResolvedNotificationConfig,
@@ -1411,41 +1283,84 @@ async function handleDoneReviewMergeStage(
 	await finalizeIssueAfterReviewMerge(config, notifications, linear, state);
 }
 
-export async function finalizeIssueAfterReviewMerge(
-	config: ResolvedProjectConfig,
-	notifications: ResolvedNotificationConfig,
-	linear: LinearClient,
-	state: RunState,
-): Promise<void> {
-	await linear.markStage(state.issue.id, "done");
-	await linear.clearWorkflowStageLabels(state.issue.id);
-	await linear.comment(
-		state.issue.id,
-		"PR squash-merged after completed review.",
-	);
-	state.pullRequestApprovedAt = new Date().toISOString();
-	await saveRunState(config.workspacePath, state);
-	await safeNotifyTaskOutcome(notifications, state, "done");
+export interface RunAgentWithChatLogOptions {
+	workspacePath: string;
+	projectId: string;
+	issue: RunState["issue"];
+	agentRole: AgentChatLogRole;
+	skillPath: string;
+	prompt: string;
+	invoke: () => Promise<AgentResult>;
 }
 
-export function normalizeFailedReviewBugs(
-	outcome: ReviewOutcome,
-): RunState["bugs"] {
-	if (outcome.passed) {
-		return [];
+export async function runAgentWithChatLog(
+	options: RunAgentWithChatLogOptions,
+): Promise<AgentResult> {
+	try {
+		const result = await options.invoke();
+		await persistAgentChatLog(options, {
+			finalMessage: result.finalMessage,
+			stdout: result.stdout,
+			sessionId: result.sessionId,
+			usage: result.usage,
+			success: true,
+		});
+		return result;
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		await persistAgentChatLog(options, {
+			finalMessage: "",
+			stdout: "",
+			success: false,
+			error: message,
+		});
+		throw error;
 	}
-	if (outcome.bugs.length > 0) {
-		return outcome.bugs;
+}
+
+interface PersistedAgentChatLogResult {
+	finalMessage: string;
+	stdout: string;
+	sessionId?: string;
+	usage?: AgentResult["usage"];
+	success: boolean;
+	error?: string;
+}
+
+async function persistAgentChatLog(
+	options: RunAgentWithChatLogOptions,
+	result: PersistedAgentChatLogResult,
+): Promise<void> {
+	const entry: AgentChatLogEntry = {
+		projectId: options.projectId,
+		issueKey: options.issue.key,
+		issueId: options.issue.id,
+		issueTitle: options.issue.title,
+		agentRole: options.agentRole,
+		skillPath: options.skillPath,
+		prompt: options.prompt,
+		finalMessage: result.finalMessage,
+		stdout: result.stdout,
+		sessionId: result.sessionId,
+		usage: result.usage,
+		success: result.success,
+		error: result.error,
+		recordedAt: new Date().toISOString(),
+	};
+	try {
+		await appendAgentChatLog(options.workspacePath, options.projectId, entry);
+	} catch (error) {
+		logger.error(
+			{
+				projectId: options.projectId,
+				issueKey: options.issue.key,
+				agentRole: options.agentRole,
+				skillPath: options.skillPath,
+				err: normalizeError(error),
+			},
+			"Failed to append agent chat log entry",
+		);
 	}
-	const summary =
-		outcome.summary.trim() ||
-		"Review/testing failed but no structured BUGS_JSON details were provided.";
-	return [
-		{
-			title: "Review/testing failed without structured bug details",
-			body: summary,
-		},
-	];
 }
 
 export function appendCodexUsage(
@@ -1470,401 +1385,21 @@ export function appendCodexUsage(
 	];
 }
 
-export async function readyPullRequestAfterPassingReview(
-	config: ResolvedProjectConfig,
-	pullRequest: RunState["pullRequest"],
-	passed: boolean,
-	deps?: {
-		markPrReadyForReview?: typeof markPrReadyForReview;
-	},
-): Promise<boolean> {
-	if (!passed || config.dryRun || !pullRequest) {
-		return false;
-	}
-	const markReady = deps?.markPrReadyForReview ?? markPrReadyForReview;
-	return markReady(config, pullRequest);
-}
-
-export interface PlannerDecision {
-	complexity: "SIMPLE" | "COMPLEX";
-	splitTasks: PlannedSplitTask[];
-	complexityScore: number;
-}
-
-export interface PlannerIssueRefinement {
-	title: string;
-	description: string;
-}
-
-export function parsePlannerDecision(planSummary: string): PlannerDecision {
-	const complexity = parsePlannerComplexity(planSummary);
-	const complexityScore = parsePlannerComplexityScore(planSummary);
-	if (complexity === "SIMPLE") {
-		return {
-			complexity,
-			splitTasks: [],
-			complexityScore,
-		};
-	}
-	return {
-		complexity,
-		splitTasks: parsePlannerSplitTasks(planSummary),
-		complexityScore,
-	};
-}
-
-export function parsePlannerComplexity(
-	planSummary: string,
-): "SIMPLE" | "COMPLEX" {
-	const match = planSummary.match(
-		/(?:^|\n)\s*COMPLEXITY\s*:\s*(SIMPLE|COMPLEX)\s*(?:\n|$)/i,
-	);
-	if (!match?.[1]) {
-		return "SIMPLE";
-	}
-	return match[1].toUpperCase() === "COMPLEX" ? "COMPLEX" : "SIMPLE";
-}
-
-export function parsePlannerComplexityScore(planSummary: string): number {
-	const match = planSummary.match(
-		/(?:^|\n)\s*COMPLEXITY_SCORE\s*:\s*([^\n]+)\s*(?:\n|$)/i,
-	);
-	if (!match?.[1]) {
-		return DEFAULT_PLANNER_COMPLEXITY_SCORE;
-	}
-
-	const rawScore = match[1].trim();
-	if (!/^\d+$/.test(rawScore)) {
-		throw new Error(
-			`Invalid COMPLEXITY_SCORE '${rawScore}'. Expected an integer between 0 and 10.`,
-		);
-	}
-
-	const score = Number(rawScore);
-	if (!Number.isInteger(score) || score < 0 || score > 10) {
-		throw new Error(
-			`Invalid COMPLEXITY_SCORE '${rawScore}'. Expected an integer between 0 and 10.`,
-		);
-	}
-	return score;
-}
-
-export function parsePlannerIssueRefinement(
-	planSummary: string,
-): PlannerIssueRefinement | null {
-	const marker = /\bISSUE_REFINEMENT_JSON\s*:/i;
-	const markerMatch = marker.exec(planSummary);
-	if (!markerMatch) {
-		return null;
-	}
-
-	const markerStart = markerMatch.index + markerMatch[0].length;
-	const rawPayload = planSummary.slice(markerStart).trim();
-	if (!rawPayload) {
-		throw new Error(
-			"Planner included ISSUE_REFINEMENT_JSON marker but no JSON payload.",
-		);
-	}
-
-	const jsonSource = unwrapFencedCodeBlock(rawPayload);
-	const jsonObjectText = extractFirstJsonObject(jsonSource);
-	if (!jsonObjectText) {
-		throw new Error(
-			"ISSUE_REFINEMENT_JSON must contain a JSON object with title and description.",
-		);
-	}
-
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(jsonObjectText);
-	} catch (error) {
-		throw new Error(
-			`Failed to parse ISSUE_REFINEMENT_JSON: ${error instanceof Error ? error.message : String(error)}`,
-		);
-	}
-	if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-		throw new Error("ISSUE_REFINEMENT_JSON must be a JSON object.");
-	}
-
-	const record = parsed as Record<string, unknown>;
-	const title =
-		typeof record.title === "string" ? record.title.trim() : undefined;
-	const description =
-		typeof record.description === "string"
-			? record.description.trim()
-			: undefined;
-	if (!title) {
-		throw new Error("ISSUE_REFINEMENT_JSON.title must be a non-empty string.");
-	}
-	if (!description) {
-		throw new Error(
-			"ISSUE_REFINEMENT_JSON.description must be a non-empty string.",
-		);
-	}
-
-	return { title, description };
-}
-
-export async function applyPlannerIssueRefinement(
-	linear: Pick<LinearClient, "updateIssueDetails">,
-	issue: IssueRef,
-	planSummary: string,
-): Promise<boolean> {
-	const refinement = parsePlannerIssueRefinement(planSummary);
-	if (!refinement) {
-		return false;
-	}
-
-	const currentDescription = issue.description?.trim() ?? "";
-	if (
-		issue.title.trim() === refinement.title &&
-		currentDescription === refinement.description
-	) {
-		return false;
-	}
-
-	await linear.updateIssueDetails(
-		issue.id,
-		refinement.title,
-		refinement.description,
-	);
-	issue.title = refinement.title;
-	issue.description = refinement.description;
-	return true;
-}
-
-export function resolveReviewModeForComplexityScore(
-	complexityScore: number,
-): "bot" | "human" {
-	return complexityScore < HUMAN_REVIEW_COMPLEXITY_THRESHOLD ? "bot" : "human";
-}
-
-export function shouldSquashMergePullRequestForComplexityScore(
-	complexityScore: number,
-): boolean {
-	return complexityScore < HUMAN_REVIEW_COMPLEXITY_THRESHOLD;
-}
-
-export function parsePlannerSplitTasks(
-	planSummary: string,
-): PlannedSplitTask[] {
-	const marker = /\bSPLIT_TASKS_JSON\s*:/i;
-	const markerMatch = marker.exec(planSummary);
-	if (!markerMatch) {
-		throw new Error(
-			"Planner marked task as COMPLEX but omitted SPLIT_TASKS_JSON.",
-		);
-	}
-
-	const markerStart = markerMatch.index + markerMatch[0].length;
-	const rawPayload = planSummary.slice(markerStart).trim();
-	if (!rawPayload) {
-		throw new Error(
-			"Planner marked task as COMPLEX but SPLIT_TASKS_JSON was empty.",
-		);
-	}
-
-	const jsonSource = unwrapFencedCodeBlock(rawPayload);
-	const jsonArrayText = extractFirstJsonArray(jsonSource);
-	if (!jsonArrayText) {
-		throw new Error(
-			"Planner marked task as COMPLEX but SPLIT_TASKS_JSON did not contain a JSON array.",
-		);
-	}
-
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(jsonArrayText);
-	} catch (error) {
-		throw new Error(
-			`Failed to parse SPLIT_TASKS_JSON: ${error instanceof Error ? error.message : String(error)}`,
-		);
-	}
-	if (!Array.isArray(parsed) || parsed.length === 0) {
-		throw new Error(
-			"SPLIT_TASKS_JSON must be a non-empty JSON array when COMPLEXITY is COMPLEX.",
-		);
-	}
-
-	return parsed.map((value, index) => validateSplitTask(value, index));
-}
-
-function validateSplitTask(value: unknown, index: number): PlannedSplitTask {
-	if (!value || typeof value !== "object" || Array.isArray(value)) {
-		throw new Error(`Split task at index ${index} must be an object.`);
-	}
-	const record = value as Record<string, unknown>;
-	const title =
-		typeof record.title === "string" ? record.title.trim() : undefined;
-	if (!title) {
-		throw new Error(
-			`Split task at index ${index} is missing a non-empty title.`,
-		);
-	}
-
-	const description =
-		typeof record.description === "string"
-			? record.description.trim() || undefined
-			: undefined;
-
-	const labels = parseSplitTaskLabels(record.labels, index);
-	const priority = parseSplitTaskPriority(record.priority, index);
-
-	return {
-		title,
-		description,
-		labels,
-		priority,
-	};
-}
-
-function parseSplitTaskLabels(
-	rawLabels: unknown,
-	index: number,
-): string[] | undefined {
-	if (rawLabels === undefined) {
-		return undefined;
-	}
-	if (!Array.isArray(rawLabels)) {
-		throw new Error(`Split task at index ${index} has non-array labels.`);
-	}
-	const labels = rawLabels
-		.map((label, labelIndex) => {
-			if (typeof label !== "string") {
-				throw new Error(
-					`Split task at index ${index} has non-string label at position ${labelIndex}.`,
-				);
-			}
-			return label.trim();
-		})
-		.filter(Boolean);
-	return labels.length > 0 ? labels : undefined;
-}
-
-function parseSplitTaskPriority(
-	rawPriority: unknown,
-	index: number,
-): number | undefined {
-	if (rawPriority === undefined) {
-		return undefined;
-	}
-	if (
-		typeof rawPriority !== "number" ||
-		!Number.isInteger(rawPriority) ||
-		rawPriority < 0 ||
-		rawPriority > 4
-	) {
-		throw new Error(
-			`Split task at index ${index} has invalid priority '${String(rawPriority)}'. Expected integer 0-4.`,
-		);
-	}
-	return rawPriority;
-}
-
-function unwrapFencedCodeBlock(input: string): string {
-	if (!input.startsWith("```")) {
-		return input;
-	}
-	const firstNewline = input.indexOf("\n");
-	if (firstNewline === -1) {
-		return input;
-	}
-	const closingFence = input.indexOf("\n```", firstNewline + 1);
-	if (closingFence === -1) {
-		return input.slice(firstNewline + 1);
-	}
-	return input.slice(firstNewline + 1, closingFence).trim();
-}
-
-function extractFirstJsonArray(input: string): string | null {
-	const start = input.indexOf("[");
-	if (start === -1) {
-		return null;
-	}
-	let depth = 0;
-	let inString = false;
-	let escaped = false;
-	for (let i = start; i < input.length; i += 1) {
-		const char = input[i];
-		if (!char) {
-			continue;
-		}
-		if (inString) {
-			if (escaped) {
-				escaped = false;
-				continue;
-			}
-			if (char === "\\") {
-				escaped = true;
-				continue;
-			}
-			if (char === '"') {
-				inString = false;
-			}
-			continue;
-		}
-		if (char === '"') {
-			inString = true;
-			continue;
-		}
-		if (char === "[") {
-			depth += 1;
-			continue;
-		}
-		if (char === "]") {
-			depth -= 1;
-			if (depth === 0) {
-				return input.slice(start, i + 1);
-			}
-		}
-	}
-	return null;
-}
-
-function extractFirstJsonObject(input: string): string | null {
-	const start = input.indexOf("{");
-	if (start === -1) {
-		return null;
-	}
-	let depth = 0;
-	let inString = false;
-	let escaped = false;
-	for (let i = start; i < input.length; i += 1) {
-		const char = input[i];
-		if (!char) {
-			continue;
-		}
-		if (inString) {
-			if (escaped) {
-				escaped = false;
-				continue;
-			}
-			if (char === "\\") {
-				escaped = true;
-				continue;
-			}
-			if (char === '"') {
-				inString = false;
-			}
-			continue;
-		}
-		if (char === '"') {
-			inString = true;
-			continue;
-		}
-		if (char === "{") {
-			depth += 1;
-			continue;
-		}
-		if (char === "}") {
-			depth -= 1;
-			if (depth === 0) {
-				return input.slice(start, i + 1);
-			}
-		}
-	}
-	return null;
-}
+export {
+	applyPlannerIssueRefinement,
+	parsePlannerComplexityScore,
+	parsePlannerDecision,
+	parsePlannerIssueRefinement,
+	parsePlannerSplitTasks,
+	resolveReviewModeForComplexityScore,
+	shouldSquashMergePullRequestForComplexityScore,
+} from "./plan";
+export type { PlannerDecision, PlannerIssueRefinement } from "./plan";
+export {
+	normalizeFailedReviewBugs,
+	readyPullRequestAfterPassingReview,
+	resolveReviewFailureStage,
+} from "./review-stage";
 
 async function safeLinearComment(
 	linear: LinearClient,
