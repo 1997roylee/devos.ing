@@ -69,7 +69,10 @@ interface WorkflowIssue {
 	title: string;
 	description?: string;
 	url: string;
+	projectId?: string;
 	teamId?: string;
+	creatorId?: string;
+	assigneeId?: string;
 	priority: {
 		value: number;
 		name: string;
@@ -686,7 +689,10 @@ async function fetchStaleIssuesForRetry(
 			identifier: issue.identifier,
 			title: issue.title,
 			url: issue.url,
+			projectId: issue.projectId,
 			teamId: issue.teamId,
+			creatorId: issue.creatorId,
+			assigneeId: issue.assigneeId,
 			priority: issue.priority,
 			labels: issue.labels,
 			state: issue.state,
@@ -712,7 +718,10 @@ async function fetchReviewOnlyIssues(
 			identifier: issue.identifier,
 			title: issue.title,
 			url: issue.url,
+			projectId: issue.projectId,
 			teamId: issue.teamId,
+			creatorId: issue.creatorId,
+			assigneeId: issue.assigneeId,
 			priority: issue.priority,
 			labels: issue.labels,
 			state: issue.state,
@@ -818,7 +827,10 @@ async function processIssue(
 				title: issue.title,
 				description: issue.description,
 				url: issue.url,
+				projectId: issue.projectId,
 				teamId: issue.teamId,
+				creatorId: issue.creatorId,
+				assigneeId: issue.assigneeId,
 			},
 			stage: options.reviewOnly
 				? resolveReviewOnlyBootstrapStage(issue.state, config.linear.statusMap)

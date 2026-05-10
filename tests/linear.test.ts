@@ -188,7 +188,7 @@ describe("buildWorkflowLabelUpdate", () => {
 });
 
 describe("buildTodoIssueFromPlanInput", () => {
-	it("uses assigned state id and configured team/project scope", () => {
+	it("uses parent project and creator assignee for split sub-issues", () => {
 		const input = buildTodoIssueFromPlanInput({
 			task: {
 				title: "Split task",
@@ -200,10 +200,12 @@ describe("buildTodoIssueFromPlanInput", () => {
 				key: "ROY-35",
 				title: "Parent task",
 				url: "https://linear.app/roy/issue/ROY-35/example",
+				projectId: "proj_parent",
+				creatorId: "user_creator",
 			},
 			assignedStateId: "state_todo_123",
 			teamId: "team_123",
-			projectId: "proj_456",
+			projectId: "proj_config",
 		});
 
 		expect(input).toEqual({
@@ -225,9 +227,54 @@ describe("buildTodoIssueFromPlanInput", () => {
 			stateId: "state_todo_123",
 			teamId: "team_123",
 			parentId: "lin_parent",
-			projectId: "proj_456",
+			projectId: "proj_parent",
+			assigneeId: "user_creator",
 			priority: 2,
 		});
+	});
+
+	it("falls back to configured project when parent has no project", () => {
+		const input = buildTodoIssueFromPlanInput({
+			task: {
+				title: "Split task",
+			},
+			parentIssue: {
+				id: "lin_parent",
+				key: "ROY-35",
+				title: "Parent task",
+				url: "https://linear.app/roy/issue/ROY-35/example",
+				creatorId: "user_creator",
+			},
+			assignedStateId: "state_todo_123",
+			teamId: "team_123",
+			projectId: "proj_config",
+		});
+
+		expect(input.parentId).toBe("lin_parent");
+		expect(input.projectId).toBe("proj_config");
+		expect(input.assigneeId).toBe("user_creator");
+	});
+
+	it("omits assignee when parent creator is missing", () => {
+		const input = buildTodoIssueFromPlanInput({
+			task: {
+				title: "Split task",
+			},
+			parentIssue: {
+				id: "lin_parent",
+				key: "ROY-35",
+				title: "Parent task",
+				url: "https://linear.app/roy/issue/ROY-35/example",
+				projectId: "proj_parent",
+			},
+			assignedStateId: "state_todo_123",
+			teamId: "team_123",
+			projectId: "proj_config",
+		});
+
+		expect(input.parentId).toBe("lin_parent");
+		expect(input.projectId).toBe("proj_parent");
+		expect("assigneeId" in input).toBe(false);
 	});
 });
 

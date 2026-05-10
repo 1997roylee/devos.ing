@@ -26,7 +26,10 @@ interface ParentIssueRef {
 	key: string;
 	title: string;
 	url: string;
+	projectId?: string;
 	teamId?: string;
+	creatorId?: string;
+	assigneeId?: string;
 }
 
 interface CreatedLinearIssueRef {
@@ -43,6 +46,7 @@ interface TodoIssueFromPlanInput {
 	teamId: string;
 	parentId: string;
 	projectId?: string;
+	assigneeId?: string;
 	priority?: number;
 }
 
@@ -112,6 +116,8 @@ export function buildTodoIssueFromPlanInput(input: {
 	teamId: string;
 	projectId?: string;
 }): TodoIssueFromPlanInput {
+	const projectId = input.parentIssue.projectId?.trim() || input.projectId;
+	const assigneeId = input.parentIssue.creatorId?.trim();
 	return {
 		title: buildSplitTaskIssueTitle(input.parentIssue.key, input.task.title),
 		description: buildSplitTaskIssueDescription({
@@ -121,7 +127,8 @@ export function buildTodoIssueFromPlanInput(input: {
 		stateId: input.assignedStateId,
 		teamId: input.teamId,
 		parentId: input.parentIssue.id,
-		projectId: input.projectId,
+		...(projectId ? { projectId } : {}),
+		...(assigneeId ? { assigneeId } : {}),
 		priority: input.task.priority,
 	};
 }
@@ -302,22 +309,24 @@ export class LinearClient {
 		parentIssue: ParentIssueRef,
 		task: PlannedSplitTask,
 	): Promise<CreatedLinearIssueRef> {
-		const teamId = await this.resolveTeamIdForSplitTask(parentIssue);
+		const hydratedParentIssue =
+			await this.hydrateSplitTaskParentIssue(parentIssue);
+		const teamId = await this.resolveTeamIdForSplitTask(hydratedParentIssue);
 		const assignedStateId = await this.resolveAssignedStateIdForTeam(teamId);
 
 		const createInput = buildTodoIssueFromPlanInput({
 			task,
-			parentIssue,
+			parentIssue: hydratedParentIssue,
 			assignedStateId,
 			teamId,
 			projectId: this.config.linear.projectId,
 		});
 		if (this.config.dryRun) {
 			return {
-				id: `dry-run-${normalizeIssueKey(parentIssue.key)}-${Date.now()}`,
-				identifier: `${normalizeIssueKey(parentIssue.key)}-SPLIT`,
+				id: `dry-run-${normalizeIssueKey(hydratedParentIssue.key)}-${Date.now()}`,
+				identifier: `${normalizeIssueKey(hydratedParentIssue.key)}-SPLIT`,
 				title: createInput.title,
-				url: `${parentIssue.url}#split-task`,
+				url: `${hydratedParentIssue.url}#split-task`,
 			};
 		}
 
@@ -445,6 +454,31 @@ export class LinearClient {
 
 		const refreshedParent = await this.findIssueByIdentifier(parentIssue.key);
 		return resolveSplitTaskTeamId(undefined, refreshedParent?.teamId);
+	}
+
+	private async hydrateSplitTaskParentIssue(
+		parentIssue: ParentIssueRef,
+	): Promise<ParentIssueRef> {
+		if (
+			parentIssue.projectId?.trim() &&
+			parentIssue.teamId?.trim() &&
+			parentIssue.creatorId?.trim()
+		) {
+			return parentIssue;
+		}
+
+		const refreshedParent = await this.findIssueByIdentifier(parentIssue.key);
+		if (!refreshedParent) {
+			return parentIssue;
+		}
+
+		return {
+			...parentIssue,
+			projectId: parentIssue.projectId ?? refreshedParent.projectId,
+			teamId: parentIssue.teamId ?? refreshedParent.teamId,
+			creatorId: parentIssue.creatorId ?? refreshedParent.creatorId,
+			assigneeId: parentIssue.assigneeId ?? refreshedParent.assigneeId,
+		};
 	}
 
 	private async resolveAssignedStateIdForTeam(teamId: string): Promise<string> {
@@ -709,6 +743,8 @@ export class LinearClient {
 	): Promise<LinearIssue> {
 		const state = await issue.state;
 		const project = await issue.project;
+		const creator = await issue.creator;
+		const assignee = await issue.assignee;
 		if (!state?.id) {
 			throw new Error(
 				`Issue ${issue.identifier} is missing workflow state data.`,
@@ -728,6 +764,8 @@ export class LinearClient {
 			url: issue.url,
 			projectId: project?.id ?? undefined,
 			teamId: issue.teamId ?? undefined,
+			creatorId: creator?.id ?? undefined,
+			assigneeId: assignee?.id ?? undefined,
 			priority: {
 				value: issue.priority ?? 0,
 				name: issue.priorityLabel ?? "No priority",
