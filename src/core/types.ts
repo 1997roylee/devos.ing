@@ -374,6 +374,7 @@ export interface RunOptions {
 	issueArg?: string;
 	projectId?: string;
 	allProjects?: boolean;
+	concurrency?: number;
 	reviewOnly?: boolean;
 	poll?: boolean;
 	pollIntervalMs?: number;

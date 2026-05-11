@@ -819,32 +819,37 @@ async function processIssue(
 	);
 
 	let leaseAcquired = false;
+	const executeIssueWithLease = async () => {
+		leaseAcquired = await tryAcquireRunLease(
+			config.workspacePath,
+			runState,
+			leaseOwnerId,
+			leaseTimeoutMs,
+		);
+		if (!leaseAcquired) {
+			issueLogger.info(
+				{ leaseOwnerId, currentLeaseOwnerId: runState.lease?.ownerId },
+				"Skipping issue because it is already leased by another worker",
+			);
+			return;
+		}
+		await executeIssue(
+			config,
+			notifications,
+			linear,
+			runState,
+			options,
+			leaseOwnerId,
+			leaseTimeoutMs,
+			runtime,
+		);
+	};
 	try {
-		await withExecutionPathLock(config.executionPath, async () => {
-			leaseAcquired = await tryAcquireRunLease(
-				config.workspacePath,
-				runState,
-				leaseOwnerId,
-				leaseTimeoutMs,
-			);
-			if (!leaseAcquired) {
-				issueLogger.info(
-					{ leaseOwnerId, currentLeaseOwnerId: runState.lease?.ownerId },
-					"Skipping issue because it is already leased by another worker",
-				);
-				return;
-			}
-			await executeIssue(
-				config,
-				notifications,
-				linear,
-				runState,
-				options,
-				leaseOwnerId,
-				leaseTimeoutMs,
-				runtime,
-			);
-		});
+		if (options.reviewOnly) {
+			await executeIssueWithLease();
+		} else {
+			await withExecutionPathLock(config.executionPath, executeIssueWithLease);
+		}
 		if (!leaseAcquired) {
 			return;
 		}

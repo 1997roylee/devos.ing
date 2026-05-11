@@ -7,6 +7,43 @@
 3. Status reads require explicit project id context.
 4. Default non-project invocation runs against the first configured project.
 
+## Parallel Processing Safety Model
+
+ADHD.ai combines queue behavior, per-issue leases, and execution-path locking to reduce duplicate work and checkout conflicts.
+
+### 1) Queue Processing Behavior
+
+1. Standard runs process issues sequentially within each project cycle.
+2. Review-only runs enqueue all candidate issues and schedule them via `Promise.all(...)`.
+3. This branch does not expose a user-facing concurrency control (no `--concurrency` flag and no `run.concurrency` cron option).
+
+### 2) Per-Issue Lease (Persisted Run-State Lock)
+
+1. Before processing an issue, the worker attempts to acquire a lease in run state under `.piv-loop/projects/<project-id>/runs`.
+2. Lease metadata includes `ownerId`, `acquiredAt`, `heartbeatAt`, and `expiresAt`.
+3. If another unexpired owner holds the lease, the issue is skipped for that worker.
+4. Active workers heartbeat the lease during stage execution and release it when finished.
+
+### 3) Stale Retry Guard
+
+1. Stale retry eligibility requires both conditions:
+2. The lease is expired.
+3. `updatedAt` is older than `staleRunTimeoutMs`.
+4. This prevents immediate reclaim of work that is still actively leased.
+
+### 4) Execution-Path Locking
+
+1. Issue execution is serialized by `executionPath` inside the running ADHD.ai process.
+2. This avoids concurrent checkout/branch mutation in the same execution directory when multiple workers are active.
+3. The lock is process-local and in-memory; it is not a distributed lock across separate ADHD.ai processes.
+4. Review-only runs still pass through this same execution-path lock when each issue task executes.
+
+### 5) Safety Envelope Summary
+
+1. Per-issue leases protect against duplicate processing of the same issue key.
+2. Execution-path locking reduces repository mutation conflicts for implement/review loops in one process.
+3. Multiple independent ADHD.ai processes still require operator isolation strategy (for example isolated execution paths/worktrees).
+
 ## Polling and Recovery
 
 1. Polling is configured globally (`intervalMs`, `maxCycles`, `exitWhenIdle`, `staleRunTimeoutMs`).
