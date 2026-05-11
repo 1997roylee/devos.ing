@@ -17,3 +17,10 @@
 1. Linear access is scoped by configured API key and optional project routing.
 2. GitHub actions should run through authenticated `gh` usage.
 3. Codex execution settings should remain explicit in config and per-project overrides.
+
+## Docker Isolation Caveats
+
+1. Docker isolation for Codex does not remove access to host paths that are explicitly mounted into the container.
+2. Host/container UID or GID mismatches can create files with unexpected ownership (for example root-owned artifacts) on mounted paths.
+3. Mounting `CODEX_HOME` into the container can expose Codex credentials and configuration present in that directory.
+4. Prefer minimal container privileges; avoid workflows that require privileged containers or Docker socket mounting.
