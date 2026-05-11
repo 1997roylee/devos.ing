@@ -15,6 +15,8 @@ const DEFAULT_PROJECT_NAME = "Default Project";
 const DEFAULT_BASE_BRANCH = "main";
 const RTK_INSTALL_URL = "https://github.com/rtk-ai/rtk";
 const GITHUB_CLI_INSTALL_URL = "https://cli.github.com/manual/installation";
+export const LINEAR_API_KEY_SETTINGS_URL =
+	"https://linear.app/settings/account/security";
 
 export interface SetupDraft {
 	projectId: string;
@@ -500,7 +502,11 @@ export async function runSetupWizard(cwd: string): Promise<void> {
 			"GitHub base branch",
 			defaults.baseBranch ?? DEFAULT_BASE_BRANCH,
 		);
-		const linearApiKey = await ask(io, "Linear API key", "");
+		const linearApiKey = await ask(
+			io,
+			`Linear API key (create one: ${LINEAR_API_KEY_SETTINGS_URL})`,
+			"",
+		);
 		const linearProjectId = emptyToUndefined(
 			await ask(io, "Linear project ID filter (optional)", ""),
 		);
