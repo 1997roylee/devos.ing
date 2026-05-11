@@ -267,6 +267,56 @@ describe("setup helpers", () => {
 		});
 	});
 
+	it("reports missing docker binary when codex docker is enabled", async () => {
+		const checks = await collectSetupChecks("/tmp/demo", {
+			loadConfig: async () =>
+				loadedConfig({ linearApiKey: "lin_secret_123", dockerEnabled: true }),
+			access: async () => {},
+			readFile: async () => "",
+			runCommand: async (command) =>
+				command === "docker"
+					? {
+							code: 1,
+							stdout: "",
+							stderr: "command not found: docker",
+						}
+					: okCommand(),
+		});
+
+		expect(checks).toContainEqual({
+			name: "Docker binary",
+			status: "fail",
+			message:
+				"docker unavailable for codex.docker.enabled projects: command not found: docker",
+		});
+	});
+
+	it("skips host codex check when only docker-backed codex projects are configured", async () => {
+		const checks = await collectSetupChecks("/tmp/demo", {
+			loadConfig: async () =>
+				loadedConfig({ linearApiKey: "lin_secret_123", dockerEnabled: true }),
+			access: async () => {},
+			readFile: async () => "",
+			runCommand: async (command) =>
+				command === "codex"
+					? {
+							code: 1,
+							stdout: "",
+							stderr: "command not found: codex",
+						}
+					: okCommand(),
+		});
+
+		expect(
+			checks.find((check) => check.name === "Codex binary"),
+		).toBeUndefined();
+		expect(checks).toContainEqual({
+			name: "Docker binary",
+			status: "pass",
+			message: "docker is available",
+		});
+	});
+
 	it("renders setup rtk install prompt", () => {
 		expect(renderSetupRtkInstallPrompt()).toContain(
 			"Install RTK before running workflows: https://github.com/rtk-ai/rtk",
@@ -282,8 +332,10 @@ describe("setup helpers", () => {
 
 function loadedConfig({
 	linearApiKey,
+	dockerEnabled = false,
 }: {
 	linearApiKey: string;
+	dockerEnabled?: boolean;
 }): LoadedConfig {
 	return {
 		projects: [
@@ -308,6 +360,12 @@ function loadedConfig({
 					...draft.codex,
 					binary: "codex",
 					streamLogs: false,
+					docker: dockerEnabled
+						? {
+								enabled: true,
+								image: "codex:latest",
+							}
+						: undefined,
 				},
 				github: {
 					useGhCli: true,

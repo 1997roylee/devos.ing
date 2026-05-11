@@ -111,6 +111,11 @@ function mergeRuntime(
 			...base.codex,
 			...(rootDefaults.codex ?? {}),
 			...(project.codex ?? {}),
+			docker: {
+				...(base.codex.docker ?? {}),
+				...(rootDefaults.codex?.docker ?? {}),
+				...(project.codex?.docker ?? {}),
+			},
 			reasoningEfforts: {
 				...(base.codex.reasoningEfforts ?? {}),
 				...(rootDefaults.codex?.reasoningEfforts ?? {}),
