@@ -819,7 +819,7 @@ async function processIssue(
 	);
 
 	let leaseAcquired = false;
-	try {
+	const executeIssueWithLease = async () => {
 		leaseAcquired = await tryAcquireRunLease(
 			config.workspacePath,
 			runState,
@@ -843,6 +843,16 @@ async function processIssue(
 			leaseTimeoutMs,
 			runtime,
 		);
+	};
+	try {
+		if (options.reviewOnly) {
+			await executeIssueWithLease();
+		} else {
+			await withExecutionPathLock(config.executionPath, executeIssueWithLease);
+		}
+		if (!leaseAcquired) {
+			return;
+		}
 		issueLogger.info({ stage: runState.stage }, "Issue workflow finished");
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
