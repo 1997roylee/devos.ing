@@ -11,3 +11,8 @@ export interface PrListEntry {
 	title?: string;
 	headRefName?: string;
 }
+
+export interface PullRequestMergeStatus {
+	mergeStateStatus?: string;
+	mergeable?: string;
+}

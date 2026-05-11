@@ -59,6 +59,7 @@ export async function createSmokeHarness(): Promise<SmokeHarness> {
 		createAgentAdapter: (p) => agents.get(p.id) as FakeAgent,
 		ensureBaseBranchFresh: async () => {},
 		findOpenPullRequestForIssue: async (_p, key) => pr(key),
+		getPullRequestMergeStatus: async () => ({}),
 		prepareImplementationBranch: async (_p, key) =>
 			`codex/${key.toLowerCase()}`,
 		createDraftPrFromWorktree: async (_p, key) => pr(key),

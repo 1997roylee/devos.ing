@@ -7,6 +7,7 @@ import {
 	ensureBaseBranchFresh,
 	ensureGhAuth,
 	findOpenPullRequestForIssue,
+	getPullRequestMergeStatus,
 	issueBranchName,
 	squashMergePullRequest,
 } from "../src/services/github";
@@ -545,6 +546,44 @@ describe("findOpenPullRequestForIssue", () => {
 		);
 
 		expect(pr).toBeUndefined();
+	});
+});
+
+describe("getPullRequestMergeStatus", () => {
+	it("returns merge conflict state from gh pr view", async () => {
+		const runCommand = mock(
+			async (_command: string, args: string[]): Promise<CommandResult> => {
+				if (args[0] === "pr" && args[1] === "view") {
+					return {
+						code: 0,
+						stdout: JSON.stringify({
+							mergeStateStatus: "DIRTY",
+							mergeable: "CONFLICTING",
+						}),
+						stderr: "",
+					};
+				}
+				return { code: 0, stdout: "", stderr: "" };
+			},
+		);
+
+		const status = await getPullRequestMergeStatus(
+			createProjectConfig(),
+			{
+				url: "https://github.com/acme/repo/pull/42",
+				branch: "codex/eng-42",
+				title: "ENG-42",
+			},
+			{
+				runCommand,
+				assertCommandOk: assertOk,
+			},
+		);
+
+		expect(status).toEqual({
+			mergeStateStatus: "DIRTY",
+			mergeable: "CONFLICTING",
+		});
 	});
 });
 
