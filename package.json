@@ -4,9 +4,13 @@
 	"license": "MIT",
 	"private": false,
 	"type": "module",
-	"files": ["dist", "README.md", "LICENSE"],
+	"files": [
+		"dist",
+		"README.md",
+		"LICENSE"
+	],
 	"bin": {
-		"adhd-ai": "./dist/index.js"
+		"adhd-ai": "dist/index.js"
 	},
 	"scripts": {
 		"build": "bun build ./src/index.ts --target bun --outdir dist",
