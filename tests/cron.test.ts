@@ -238,6 +238,9 @@ function createLoadedConfig(jobs: CronJobConfig[]): LoadedConfig {
 					implement: "/tmp/skills/default-implement.md",
 					reviewTest: "/tmp/skills/default-review.md",
 				},
+				workflow: {
+					issueConcurrency: 1,
+				},
 				dryRun: false,
 			},
 		],

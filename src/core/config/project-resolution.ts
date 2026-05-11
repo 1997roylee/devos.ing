@@ -139,6 +139,11 @@ function mergeRuntime(
 			...(rootDefaults.agent ?? {}),
 			...(project.agent ?? {}),
 		},
+		workflow: {
+			...base.workflow,
+			...(rootDefaults.workflow ?? {}),
+			...(project.workflow ?? {}),
+		},
 		dryRun: project.dryRun ?? rootDefaults.dryRun ?? base.dryRun,
 	};
 }

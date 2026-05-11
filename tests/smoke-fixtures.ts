@@ -91,6 +91,9 @@ export function project(
 			implement: "skills/piv-implement/SKILL.md",
 			reviewTest: "skills/piv-review-test/SKILL.md",
 		},
+		workflow: {
+			issueConcurrency: 1,
+		},
 		dryRun: true,
 	};
 }

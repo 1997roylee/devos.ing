@@ -49,6 +49,7 @@ import {
 	shouldStopPolling,
 	withExecutionPathLock,
 } from "../src/core/workflow";
+import { processIssueQueueBounded } from "../src/core/workflow-queue";
 
 describe("resolvePollingSettings", () => {
 	const polling: PollingConfig = {
@@ -467,6 +468,53 @@ describe("withExecutionPathLock", () => {
 				expect(isRunLeaseExpired(leased, acquiredAtMs)).toBe(false);
 			}),
 		]);
+	});
+});
+
+describe("processIssueQueueBounded", () => {
+	it("processes sequentially by default", async () => {
+		const events: string[] = [];
+		await processIssueQueueBounded([1, 2, 3], undefined, async (issue) => {
+			events.push(`start:${issue}`);
+			await new Promise((resolve) => setTimeout(resolve, 5));
+			events.push(`end:${issue}`);
+		});
+		expect(events).toEqual([
+			"start:1",
+			"end:1",
+			"start:2",
+			"end:2",
+			"start:3",
+			"end:3",
+		]);
+	});
+
+	it("respects concurrency bounds above one", async () => {
+		const starts: number[] = [];
+		let running = 0;
+		let maxRunning = 0;
+		const release: Array<() => void> = [];
+
+		const done = processIssueQueueBounded([1, 2, 3], 2, async (issue) => {
+			starts.push(issue);
+			running += 1;
+			maxRunning = Math.max(maxRunning, running);
+			await new Promise<void>((resolve) => {
+				release.push(resolve);
+			});
+			running -= 1;
+		});
+
+		await new Promise((resolve) => setTimeout(resolve, 5));
+		expect(starts).toEqual([1, 2]);
+		expect(maxRunning).toBe(2);
+		release.shift()?.();
+		await new Promise((resolve) => setTimeout(resolve, 5));
+		expect(starts).toEqual([1, 2, 3]);
+		while (release.length > 0) {
+			release.shift()?.();
+		}
+		await done;
 	});
 });
 
@@ -1475,6 +1523,9 @@ function createProject(
 			plan: "/tmp/plan.md",
 			implement: "/tmp/implement.md",
 			reviewTest: "/tmp/review.md",
+		},
+		workflow: {
+			issueConcurrency: 1,
 		},
 		dryRun: false,
 	};

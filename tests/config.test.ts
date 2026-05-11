@@ -43,6 +43,7 @@ const envKeys = [
 	"PIV_MAX_POLL_CYCLES",
 	"PIV_EXIT_WHEN_IDLE",
 	"PIV_STALE_RUN_TIMEOUT_MS",
+	"PIV_ISSUE_CONCURRENCY",
 	"RESEND_API_KEY",
 	"RESEND_FROM",
 	"RESEND_TO",
@@ -91,9 +92,11 @@ describe("loadConfig", () => {
 											? "1"
 											: key === "PIV_STALE_RUN_TIMEOUT_MS"
 												? "3600000"
-												: key === "AGENT_BACKEND"
-													? ""
-													: key.toLowerCase();
+												: key === "PIV_ISSUE_CONCURRENCY"
+													? "1"
+													: key === "AGENT_BACKEND"
+														? ""
+														: key.toLowerCase();
 		}
 	});
 
@@ -150,6 +153,7 @@ describe("loadConfig", () => {
 				),
 				maxSelected: 3,
 			});
+			expect(config.projects[0]?.workflow.issueConcurrency).toBe(1);
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });
 		}
@@ -413,10 +417,23 @@ describe("loadConfig", () => {
 		expect(config.polling.staleRunTimeoutMs).toBe(600000);
 	});
 
+	it("loads workflow issue concurrency from env", async () => {
+		process.env.PIV_ISSUE_CONCURRENCY = "3";
+		const config = await loadConfig(process.cwd());
+		expect(config.projects[0]?.workflow.issueConcurrency).toBe(3);
+	});
+
 	it("rejects non-positive stale run timeout", async () => {
 		process.env.PIV_STALE_RUN_TIMEOUT_MS = "0";
 		await expect(loadConfig(process.cwd())).rejects.toThrow(
 			"Polling stale run timeout must be a positive integer",
+		);
+	});
+
+	it("rejects non-positive workflow issue concurrency", async () => {
+		process.env.PIV_ISSUE_CONCURRENCY = "0";
+		await expect(loadConfig(process.cwd())).rejects.toThrow(
+			"Workflow issue concurrency must be a positive integer",
 		);
 	});
 

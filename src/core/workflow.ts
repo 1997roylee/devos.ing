@@ -34,6 +34,7 @@ import {
 import {
 	buildPrioritizedIssueQueue as buildPrioritizedIssueQueueHelper,
 	dedupeIssuesByKey,
+	processIssueQueueBounded,
 } from "./workflow-queue";
 import {
 	type WorkflowLinearClient,
@@ -343,36 +344,21 @@ async function runProjectCycle(
 		projectLogger.info({ cycle }, "No eligible Linear issues found.");
 	}
 
-	if (options.reviewOnly) {
-		await Promise.all(
-			issueQueue.map((issue) =>
-				processIssue(
-					config,
-					notifications,
-					linear,
-					issue,
-					options,
-					polling.staleRunTimeoutMs,
-					buildRunLeaseOwnerId(),
-					runtime,
-				),
+	await processIssueQueueBounded(
+		issueQueue,
+		config.workflow.issueConcurrency,
+		async (issue) =>
+			processIssue(
+				config,
+				notifications,
+				linear,
+				issue,
+				options,
+				polling.staleRunTimeoutMs,
+				buildRunLeaseOwnerId(),
+				runtime,
 			),
-		);
-		return issueQueue.length;
-	}
-
-	for (const issue of issueQueue) {
-		await processIssue(
-			config,
-			notifications,
-			linear,
-			issue,
-			options,
-			polling.staleRunTimeoutMs,
-			buildRunLeaseOwnerId(),
-			runtime,
-		);
-	}
+	);
 
 	return issueQueue.length;
 }

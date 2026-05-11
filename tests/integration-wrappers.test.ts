@@ -80,6 +80,7 @@ function createConfig(): ResolvedProjectConfig {
 			reasoningEffort: "medium",
 		},
 		skills: { root: "/tmp/skills", plan: "p", implement: "i", reviewTest: "r" },
+		workflow: { issueConcurrency: 1 },
 		dryRun: false,
 	};
 }

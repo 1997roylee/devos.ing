@@ -153,6 +153,9 @@ export function buildEnvBase(
 			allowedTools: parseCommaList(env.CLAUDE_CODE_ALLOWED_TOOLS),
 			permissionMode: normalizePermissionMode(env.CLAUDE_CODE_PERMISSION_MODE),
 		},
+		workflow: {
+			issueConcurrency: Number(env.PIV_ISSUE_CONCURRENCY ?? "1"),
+		},
 		dryRun: env.PIV_DRY_RUN === "1",
 	};
 }

@@ -42,6 +42,7 @@ function createConfig(
 		codex: { binary: process.execPath, streamLogs: false },
 		agent: backend ? { backend } : undefined,
 		skills: { root: "r", plan: "p", implement: "i", reviewTest: "r" },
+		workflow: { issueConcurrency: 1 },
 		dryRun: false,
 	};
 }

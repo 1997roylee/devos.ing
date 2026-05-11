@@ -378,6 +378,9 @@ function loadedConfig({
 					useGhCli: true,
 					defaultBugLabel: "bug",
 				},
+				workflow: {
+					issueConcurrency: 1,
+				},
 				dryRun: false,
 				skills: {
 					root: "/tmp/demo/skills",

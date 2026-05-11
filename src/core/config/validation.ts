@@ -91,6 +91,14 @@ function validateProject(project: ResolvedProjectConfig): void {
 			`Codex Docker image is required for project '${project.id}' when codex.docker.enabled is true`,
 		);
 	}
+	if (
+		!Number.isInteger(project.workflow.issueConcurrency) ||
+		project.workflow.issueConcurrency <= 0
+	) {
+		throw new Error(
+			`Workflow issue concurrency must be a positive integer for project '${project.id}'`,
+		);
+	}
 	const requiredStateIds = Object.entries(project.linear.statusMap).filter(
 		([, value]) => !value,
 	);

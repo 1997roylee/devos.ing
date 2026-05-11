@@ -601,6 +601,9 @@ function createProjectConfig(): ResolvedProjectConfig {
 			implement: "/tmp/implement.md",
 			reviewTest: "/tmp/review.md",
 		},
+		workflow: {
+			issueConcurrency: 1,
+		},
 		dryRun: false,
 	};
 }

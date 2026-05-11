@@ -30,6 +30,10 @@ export interface LinearLabelMap {
 
 export type CodexReasoningEffort = "low" | "medium" | "high" | "xhigh";
 
+export interface WorkflowRuntimeConfig {
+	issueConcurrency: number;
+}
+
 export type DeepPartial<T> = {
 	[K in keyof T]?: T[K] extends Array<infer U>
 		? Array<DeepPartial<U>>
@@ -117,6 +121,7 @@ export interface ProjectRuntimeConfig {
 			| "dontAsk"
 			| "plan";
 	};
+	workflow: WorkflowRuntimeConfig;
 	skills: {
 		root: string;
 		plan: string;
