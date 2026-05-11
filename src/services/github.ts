@@ -4,7 +4,11 @@ import type {
 	ResolvedProjectConfig,
 } from "../core/types";
 import { assertCommandOk, runCommand } from "../utils/shell";
-import type { GithubCommandDeps, PrListEntry } from "./github.types";
+import type {
+	GithubCommandDeps,
+	PrListEntry,
+	PullRequestMergeStatus,
+} from "./github.types";
 
 const GITHUB_RETRY_ATTEMPTS = 3;
 
@@ -470,6 +474,31 @@ export async function findOpenPullRequestForIssue(
 	};
 }
 
+export async function getPullRequestMergeStatus(
+	config: ResolvedProjectConfig,
+	pr: PullRequestRef,
+	deps: GithubCommandDeps = {},
+): Promise<PullRequestMergeStatus> {
+	if (!pr.url && !pr.number) {
+		throw new Error("PR URL or number is required to inspect merge status");
+	}
+	const commandRunner = deps.runCommand ?? runCommand;
+	const assertOk = deps.assertCommandOk ?? assertCommandOk;
+	const target = pr.url ?? String(pr.number);
+	const view = await withRetries("gh pr view", async () => {
+		const result = await commandRunner(
+			"gh",
+			["pr", "view", target, "--json", "mergeStateStatus,mergeable"],
+			{
+				cwd: config.executionPath,
+			},
+		);
+		assertOk("gh", ["pr", "view", target], result);
+		return result;
+	});
+	return parsePullRequestMergeStatus(view.stdout);
+}
+
 export function buildBugIssueBody(
 	bugTitle: string,
 	bugBody: string,
@@ -685,6 +714,25 @@ function matchesIssueKeyToken(
 
 function escapeRegExp(value: string): string {
 	return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parsePullRequestMergeStatus(raw: string): PullRequestMergeStatus {
+	try {
+		const parsed = JSON.parse(raw) as {
+			mergeStateStatus?: unknown;
+			mergeable?: unknown;
+		};
+		return {
+			mergeStateStatus:
+				typeof parsed.mergeStateStatus === "string"
+					? parsed.mergeStateStatus
+					: undefined,
+			mergeable:
+				typeof parsed.mergeable === "string" ? parsed.mergeable : undefined,
+		};
+	} catch {
+		return {};
+	}
 }
 
 async function withRetries<T>(

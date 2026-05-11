@@ -131,6 +131,29 @@ describe("deterministic workflow smoke flow", () => {
 		expect((await h.state("default", "ENG-7"))?.stage).toBe("human_review");
 	});
 
+	it("parks merge-conflicted review-only PRs for human review and notifies once", async () => {
+		const h = await createSmokeHarness();
+		const reviewIssue = issue("ENG-11");
+		reviewIssue.state = { id: "reviewing", name: "reviewing" };
+		h.addIssue("default", reviewIssue);
+		h.runtime.getPullRequestMergeStatus = async () => ({
+			mergeStateStatus: "DIRTY",
+			mergeable: "CONFLICTING",
+		});
+
+		await h.run({ reviewOnly: true });
+		await h.run({ reviewOnly: true });
+
+		const run = await h.state("default", "ENG-11");
+		expect(run?.stage).toBe("human_review");
+		expect(run?.humanReviewNotifiedAt).toBeDefined();
+		expect(h.notifications.filter((n) => n.type === "human")).toHaveLength(1);
+		expect(h.agent("default").reviews).toHaveLength(0);
+		expect(h.linear("default").comments.join("\n")).toContain(
+			"Hourly review skipped because the PR has merge conflicts.",
+		);
+	});
+
 	it("blocks and records outcome when an agent stage fails", async () => {
 		const h = await createSmokeHarness();
 		h.addIssue("default", issue("ENG-8"));

@@ -91,6 +91,7 @@ export type {
 
 export { runAgentWithChatLog } from "./agent-chat-log";
 
+const DEFAULT_PLANNER_COMPLEXITY_SCORE = 4;
 const executionPathLockTails = new Map<string, Promise<void>>();
 
 export async function runWorkflow(
@@ -815,6 +816,18 @@ async function executeIssue(
 		}
 
 		if (state.stage === "reviewing" || state.stage === "testing") {
+			if (options.reviewOnly) {
+				const parkedForConflict = await maybeParkReviewOnlyConflict(
+					config,
+					notifications,
+					linear,
+					state,
+					runtime,
+				);
+				if (parkedForConflict) {
+					continue;
+				}
+			}
 			await handleReviewTestingStage(
 				config,
 				agent,
@@ -828,6 +841,60 @@ async function executeIssue(
 
 		throw new Error(`Unsupported workflow stage: ${state.stage}`);
 	}
+}
+
+async function maybeParkReviewOnlyConflict(
+	config: ResolvedProjectConfig,
+	notifications: ResolvedNotificationConfig,
+	linear: WorkflowLinearClient,
+	state: RunState,
+	runtime: WorkflowRuntime,
+): Promise<boolean> {
+	if (!state.pullRequest) {
+		return false;
+	}
+	const mergeStatus = await runtime.getPullRequestMergeStatus(
+		config,
+		state.pullRequest,
+	);
+	if (!isPullRequestMergeConflicted(mergeStatus)) {
+		return false;
+	}
+
+	const reason = `PR merge conflict detected for ${state.issue.key}; skipping automated review/testing and requiring human review.`;
+	Object.assign(state, transitionStage(state, "human_review"));
+	if (!state.humanReviewNotifiedAt) {
+		await linear.comment(
+			state.issue.id,
+			[
+				"Hourly review skipped because the PR has merge conflicts.",
+				reason,
+				state.pullRequest.url ? `PR: ${state.pullRequest.url}` : undefined,
+			]
+				.filter(Boolean)
+				.join("\n"),
+		);
+		await safeNotifyHumanReviewRequired(
+			notifications,
+			state,
+			state.complexityScore ?? DEFAULT_PLANNER_COMPLEXITY_SCORE,
+			reason,
+			runtime,
+		);
+		state.humanReviewNotifiedAt = new Date().toISOString();
+	}
+	await saveRunState(config.workspacePath, state);
+	return true;
+}
+
+function isPullRequestMergeConflicted(input: {
+	mergeStateStatus?: string;
+	mergeable?: string;
+}): boolean {
+	return (
+		input.mergeStateStatus?.toUpperCase() === "DIRTY" ||
+		input.mergeable?.toUpperCase() === "CONFLICTING"
+	);
 }
 
 export async function handleReviewTestingStage(

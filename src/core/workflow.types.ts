@@ -85,6 +85,10 @@ export interface WorkflowRuntime {
 		config: ResolvedProjectConfig,
 		issueKey: string,
 	): Promise<PullRequestRef | undefined>;
+	getPullRequestMergeStatus(
+		config: ResolvedProjectConfig,
+		pr: PullRequestRef,
+	): Promise<{ mergeStateStatus?: string; mergeable?: string }>;
 	prepareImplementationBranch(
 		config: ResolvedProjectConfig,
 		issueKey: string,
