@@ -125,3 +125,10 @@ export interface WorkflowRuntime {
 		input: { complexityScore: number; reason: string },
 	): Promise<void>;
 }
+
+export interface ReviewOnlyQueueInput {
+	runStates: RunState[];
+	localIssues: WorkflowIssue[];
+	linearIssues: WorkflowIssue[];
+	discoveredPullRequestsByIssueKey: Map<string, PullRequestRef | undefined>;
+}
