@@ -1,19 +1,6 @@
-import { type AgentAdapter, createAgentAdapter } from "../agent-adapters";
-import {
-	commentOnPr,
-	createDraftPrFromWorktree,
-	ensureBaseBranchFresh,
-	findOpenPullRequestForIssue,
-	issueBranchName,
-	prepareImplementationBranch,
-	squashMergePullRequest,
-	updateDraftPrFromWorktree,
-} from "../services/github";
-import { LinearClient, sortIssuesByPriority } from "../services/linear";
-import {
-	sendHumanReviewRequiredEmail,
-	sendTaskOutcomeEmail,
-} from "../services/notifications";
+import type { AgentAdapter } from "../agent-adapters";
+import { issueBranchName } from "../services/github";
+import { sortIssuesByPriority } from "../services/linear";
 import { buildFixPrompt, buildImplementPrompt } from "../skills/prompts";
 import { buildImplementationComment } from "../utils/comments";
 import { logger, normalizeError } from "../utils/logger";
@@ -26,6 +13,7 @@ import {
 import {
 	finalizeIssueAfterReviewMerge as finalizeIssueAfterReviewMergeInternal,
 	handleReviewTestingStage as handleReviewTestingStageInternal,
+	readyPullRequestAfterPassingReview,
 } from "./review-stage";
 import {
 	appendProjectErrorLog,
@@ -47,6 +35,11 @@ import {
 	buildPrioritizedIssueQueue as buildPrioritizedIssueQueueHelper,
 	dedupeIssuesByKey,
 } from "./workflow-queue";
+import {
+	type WorkflowLinearClient,
+	type WorkflowRuntime,
+	createWorkflowRuntime,
+} from "./workflow-runtime";
 
 export { buildRunLeaseOwnerId } from "./workflow-lease";
 import type {
@@ -94,6 +87,7 @@ const executionPathLockTails = new Map<string, Promise<void>>();
 export async function runWorkflow(
 	config: LoadedConfig,
 	options: RunOptions,
+	runtime: WorkflowRuntime = createWorkflowRuntime(),
 ): Promise<void> {
 	const projects = pickProjects(config, options);
 	if (projects.length === 0) {
@@ -103,7 +97,7 @@ export async function runWorkflow(
 
 	let projectContexts = projects.map((project) => ({
 		config: project,
-		linear: new LinearClient(project),
+		linear: runtime.createLinearClient(project),
 	}));
 
 	if (options.issueArg && options.allProjects && !options.projectId) {
@@ -132,6 +126,7 @@ export async function runWorkflow(
 					context.linear,
 					cycle,
 					globalPolling,
+					runtime,
 				);
 			} catch (error) {
 				if (!globalPolling.enabled || options.issueArg) {
@@ -215,9 +210,14 @@ function pickProjects(
 }
 
 async function routeProjectContextsForTargetIssue(
-	contexts: Array<{ config: ResolvedProjectConfig; linear: LinearClient }>,
+	contexts: Array<{
+		config: ResolvedProjectConfig;
+		linear: WorkflowLinearClient;
+	}>,
 	issueArg: string,
-): Promise<Array<{ config: ResolvedProjectConfig; linear: LinearClient }>> {
+): Promise<
+	Array<{ config: ResolvedProjectConfig; linear: WorkflowLinearClient }>
+> {
 	const routeLogger = logger.child({ issueArg });
 	const issue = await contexts[0]?.linear.fetchIssueByIdentifier(issueArg);
 	if (!issue) {
@@ -333,9 +333,10 @@ async function runProjectCycle(
 	config: ResolvedProjectConfig,
 	notifications: ResolvedNotificationConfig,
 	options: RunOptions,
-	linear: LinearClient,
+	linear: WorkflowLinearClient,
 	cycle: number,
 	polling: PollingSettings,
+	runtime: WorkflowRuntime,
 ): Promise<number> {
 	const projectLogger = logger.child({ projectId: config.id });
 	const { issueQueue, staleRetryCount } = await buildIssueQueueForProjectCycle(
@@ -343,6 +344,7 @@ async function runProjectCycle(
 		options,
 		linear,
 		polling,
+		runtime,
 	);
 	projectLogger.info(
 		{
@@ -369,6 +371,7 @@ async function runProjectCycle(
 					options,
 					polling.staleRunTimeoutMs,
 					buildRunLeaseOwnerId(),
+					runtime,
 				),
 			),
 		);
@@ -384,6 +387,7 @@ async function runProjectCycle(
 			options,
 			polling.staleRunTimeoutMs,
 			buildRunLeaseOwnerId(),
+			runtime,
 		);
 	}
 
@@ -393,8 +397,9 @@ async function runProjectCycle(
 async function buildIssueQueueForProjectCycle(
 	config: ResolvedProjectConfig,
 	options: RunOptions,
-	linear: LinearClient,
+	linear: WorkflowLinearClient,
 	polling: PollingSettings,
+	runtime: WorkflowRuntime,
 ): Promise<{ issueQueue: WorkflowIssue[]; staleRetryCount: number }> {
 	if (options.reviewOnly) {
 		const runStates = await listRunStates(config.workspacePath, config.id);
@@ -402,6 +407,7 @@ async function buildIssueQueueForProjectCycle(
 			config,
 			linear,
 			runStates,
+			runtime,
 		);
 		return {
 			issueQueue: sortIssuesByPriority(reviewOnlyIssues),
@@ -641,7 +647,7 @@ export function selectStaleRunIssueKeys(
 
 async function fetchStaleIssuesForRetry(
 	config: ResolvedProjectConfig,
-	linear: LinearClient,
+	linear: WorkflowLinearClient,
 	timeoutMs: number,
 	assignedIssues: WorkflowIssue[],
 ): Promise<WorkflowIssue[]> {
@@ -682,8 +688,9 @@ async function fetchStaleIssuesForRetry(
 
 async function fetchReviewOnlyIssues(
 	config: ResolvedProjectConfig,
-	linear: LinearClient,
+	linear: WorkflowLinearClient,
 	runStates: RunState[],
+	runtime: WorkflowRuntime,
 ): Promise<WorkflowIssue[]> {
 	const issueKeys = selectReviewOnlyIssueKeys(runStates);
 	const localIssues: WorkflowIssue[] = [];
@@ -725,7 +732,7 @@ async function fetchReviewOnlyIssues(
 		try {
 			discoveredPullRequestsByIssueKey.set(
 				key,
-				await findOpenPullRequestForIssue(config, key),
+				await runtime.findOpenPullRequestForIssue(config, key),
 			);
 		} catch (error) {
 			discoveredPullRequestsByIssueKey.set(key, undefined);
@@ -765,11 +772,12 @@ async function fetchReviewOnlyIssues(
 async function processIssue(
 	config: ResolvedProjectConfig,
 	notifications: ResolvedNotificationConfig,
-	linear: LinearClient,
+	linear: WorkflowLinearClient,
 	issue: WorkflowIssue,
 	options: RunOptions,
 	leaseTimeoutMs: number,
 	leaseOwnerId: string,
+	runtime: WorkflowRuntime,
 ): Promise<void> {
 	const key = normalizeIssueKey(issue.identifier);
 	const issueLogger = logger.child({ projectId: config.id, issueKey: key });
@@ -872,6 +880,7 @@ async function processIssue(
 				options,
 				leaseOwnerId,
 				leaseTimeoutMs,
+				runtime,
 			);
 		});
 		if (!leaseAcquired) {
@@ -907,7 +916,13 @@ async function processIssue(
 			},
 			"Issue workflow failed",
 		);
-		await safeNotifyTaskOutcome(notifications, runState, "blocked", message);
+		await safeNotifyTaskOutcome(
+			notifications,
+			runState,
+			"blocked",
+			message,
+			runtime,
+		);
 	} finally {
 		if (leaseAcquired) {
 			await releaseRunLease(config.workspacePath, runState, leaseOwnerId);
@@ -977,19 +992,26 @@ export function buildIssueJobLogFields(
 async function executeIssue(
 	config: ResolvedProjectConfig,
 	notifications: ResolvedNotificationConfig,
-	linear: LinearClient,
+	linear: WorkflowLinearClient,
 	state: RunState,
 	options: RunOptions,
 	leaseOwnerId: string,
 	leaseTimeoutMs: number,
+	runtime: WorkflowRuntime,
 ): Promise<void> {
 	if (options.reviewOnly && state.stage === "done") {
-		await handleDoneReviewMergeStage(config, notifications, linear, state);
+		await handleDoneReviewMergeStage(
+			config,
+			notifications,
+			linear,
+			state,
+			runtime,
+		);
 		return;
 	}
 
-	await ensureBaseBranchFresh(config);
-	const agent = createAgentAdapter(config);
+	await runtime.ensureBaseBranchFresh(config);
+	const agent = runtime.createAgentAdapter(config);
 
 	while (
 		state.stage !== "done" &&
@@ -1016,7 +1038,14 @@ async function executeIssue(
 				appendCodexUsage,
 				saveRunState,
 				transitionStage,
-				safeNotifyTaskOutcome,
+				safeNotifyTaskOutcome: (notifyConfig, runState, outcome, error) =>
+					safeNotifyTaskOutcome(
+						notifyConfig,
+						runState,
+						outcome,
+						error,
+						runtime,
+					),
 				loggerInfo: logger.info.bind(logger),
 				buildIssueJobLogFields: (runState, stage, stageOptions) => ({
 					...buildIssueJobLogFields(runState, stage, stageOptions),
@@ -1026,7 +1055,7 @@ async function executeIssue(
 		}
 
 		if (state.stage === "implementing") {
-			await handleImplementingStage(config, agent, linear, state);
+			await handleImplementingStage(config, agent, linear, state, runtime);
 			continue;
 		}
 
@@ -1042,6 +1071,7 @@ async function executeIssue(
 				notifications,
 				linear,
 				state,
+				runtime,
 			);
 			continue;
 		}
@@ -1054,15 +1084,21 @@ export async function handleReviewTestingStage(
 	config: ResolvedProjectConfig,
 	agent: AgentAdapter,
 	_notifications: ResolvedNotificationConfig,
-	linear: LinearClient,
+	linear: WorkflowLinearClient,
 	state: RunState,
+	runtime: WorkflowRuntime = createWorkflowRuntime(),
 ): Promise<void> {
 	await handleReviewTestingStageInternal(config, agent, linear, state, {
 		runAgentWithChatLog,
 		appendCodexUsage,
 		transitionStage,
 		saveRunState,
-		safePrComment,
+		safePrComment: (prConfig, runState, body) =>
+			safePrComment(prConfig, runState, body, runtime),
+		readyPullRequestAfterPassingReview: (prConfig, pr, passed) =>
+			readyPullRequestAfterPassingReview(prConfig, pr, passed, {
+				markPrReadyForReview: runtime.markPrReadyForReview,
+			}),
 		loggerInfo: logger.info.bind(logger),
 		buildIssueJobLogFields: (runState, stage, stageOptions) => ({
 			...buildIssueJobLogFields(runState, stage, stageOptions),
@@ -1073,12 +1109,13 @@ export async function handleReviewTestingStage(
 export async function finalizeIssueAfterReviewMerge(
 	config: ResolvedProjectConfig,
 	notifications: ResolvedNotificationConfig,
-	linear: LinearClient,
+	linear: WorkflowLinearClient,
 	state: RunState,
 	deps?: {
 		saveRunState?: typeof saveRunState;
 		safeNotifyTaskOutcome?: typeof safeNotifyTaskOutcome;
 	},
+	runtime: WorkflowRuntime = createWorkflowRuntime(),
 ): Promise<void> {
 	await finalizeIssueAfterReviewMergeInternal(
 		config,
@@ -1088,14 +1125,22 @@ export async function finalizeIssueAfterReviewMerge(
 		{
 			saveRunState: deps?.saveRunState ?? saveRunState,
 			safeNotifyTaskOutcome:
-				deps?.safeNotifyTaskOutcome ?? safeNotifyTaskOutcome,
+				deps?.safeNotifyTaskOutcome ??
+				((notifyConfig, runState, outcome, error) =>
+					safeNotifyTaskOutcome(
+						notifyConfig,
+						runState,
+						outcome,
+						error,
+						runtime,
+					)),
 		},
 	);
 }
 
 async function handleReceivedStage(
 	config: ResolvedProjectConfig,
-	linear: LinearClient,
+	linear: WorkflowLinearClient,
 	state: RunState,
 ): Promise<void> {
 	await linear.markStage(state.issue.id, "planning");
@@ -1120,8 +1165,9 @@ export function fixedBugsForImplementationComment(
 async function handleImplementingStage(
 	config: ResolvedProjectConfig,
 	agent: AgentAdapter,
-	linear: LinearClient,
+	linear: WorkflowLinearClient,
 	state: RunState,
+	runtime: WorkflowRuntime,
 ): Promise<void> {
 	if (!state.codexSessionId) {
 		throw new Error("Missing codex session id for implement step");
@@ -1133,7 +1179,7 @@ async function handleImplementingStage(
 	);
 
 	if (!config.dryRun) {
-		const preparedBranch = await prepareImplementationBranch(
+		const preparedBranch = await runtime.prepareImplementationBranch(
 			config,
 			state.issue.key,
 			state.pullRequest,
@@ -1186,7 +1232,7 @@ async function handleImplementingStage(
 				url: "https://example.invalid/dry-run",
 			};
 		} else {
-			state.pullRequest = await createDraftPrFromWorktree(
+			state.pullRequest = await runtime.createDraftPrFromWorktree(
 				config,
 				state.issue.key,
 				state.issue.title,
@@ -1196,7 +1242,7 @@ async function handleImplementingStage(
 		if (!state.pullRequest?.branch) {
 			throw new Error("Missing pull request branch for feedback pass");
 		}
-		const updated = await updateDraftPrFromWorktree(
+		const updated = await runtime.updateDraftPrFromWorktree(
 			config,
 			state.pullRequest.branch,
 			state.issue.key,
@@ -1233,7 +1279,7 @@ async function handleImplementingStage(
 async function handlePrCreatedStage(
 	config: ResolvedProjectConfig,
 	notifications: ResolvedNotificationConfig,
-	linear: LinearClient,
+	linear: WorkflowLinearClient,
 	state: RunState,
 ): Promise<void> {
 	Object.assign(state, transitionStage(state, "reviewing"));
@@ -1245,8 +1291,9 @@ async function handlePrCreatedStage(
 async function handleDoneReviewMergeStage(
 	config: ResolvedProjectConfig,
 	notifications: ResolvedNotificationConfig,
-	linear: LinearClient,
+	linear: WorkflowLinearClient,
 	state: RunState,
+	runtime: WorkflowRuntime,
 ): Promise<void> {
 	if (state.pullRequestApprovedAt) {
 		return;
@@ -1266,19 +1313,32 @@ async function handleDoneReviewMergeStage(
 					.filter(Boolean)
 					.join("\n"),
 			);
-			await safeNotifyHumanReviewRequired(notifications, state, score, reason);
+			await safeNotifyHumanReviewRequired(
+				notifications,
+				state,
+				score,
+				reason,
+				runtime,
+			);
 			state.humanReviewNotifiedAt = new Date().toISOString();
 			await saveRunState(config.workspacePath, state);
 		}
 		return;
 	}
 
-	const merged = await safeSquashMergePullRequest(config, state);
+	const merged = await safeSquashMergePullRequest(config, state, runtime);
 	if (!merged) {
 		return;
 	}
 
-	await finalizeIssueAfterReviewMerge(config, notifications, linear, state);
+	await finalizeIssueAfterReviewMerge(
+		config,
+		notifications,
+		linear,
+		state,
+		undefined,
+		runtime,
+	);
 }
 
 export function appendCodexUsage(
@@ -1320,7 +1380,7 @@ export {
 } from "./review-stage";
 
 async function safeLinearComment(
-	linear: LinearClient,
+	linear: WorkflowLinearClient,
 	issueId: string,
 	body: string,
 ): Promise<void> {
@@ -1339,6 +1399,7 @@ async function safePrComment(
 	config: ResolvedProjectConfig,
 	state: RunState,
 	body: string,
+	runtime: WorkflowRuntime,
 ): Promise<void> {
 	if (!state.pullRequest) {
 		return;
@@ -1356,7 +1417,7 @@ async function safePrComment(
 			},
 			"Adding GitHub PR comment",
 		);
-		await commentOnPr(config, state.pullRequest, body);
+		await runtime.commentOnPr(config, state.pullRequest, body);
 	} catch (error) {
 		runLogger.error(
 			{ err: normalizeError(error) },
@@ -1368,6 +1429,7 @@ async function safePrComment(
 async function safeSquashMergePullRequest(
 	config: ResolvedProjectConfig,
 	state: RunState,
+	runtime: WorkflowRuntime,
 ): Promise<boolean> {
 	if (!state.pullRequest) {
 		return false;
@@ -1378,7 +1440,7 @@ async function safeSquashMergePullRequest(
 		pr: state.pullRequest.url ?? state.pullRequest.number,
 	});
 	try {
-		return await squashMergePullRequest(config, state.pullRequest);
+		return await runtime.squashMergePullRequest(config, state.pullRequest);
 	} catch (error) {
 		runLogger.error(
 			{ err: normalizeError(error) },
@@ -1393,6 +1455,7 @@ async function safeNotifyTaskOutcome(
 	state: RunState,
 	outcome: "done" | "blocked",
 	errorMessage?: string,
+	runtime: WorkflowRuntime = createWorkflowRuntime(),
 ): Promise<void> {
 	const runLogger = logger.child({
 		projectId: state.projectId,
@@ -1400,7 +1463,7 @@ async function safeNotifyTaskOutcome(
 		outcome,
 	});
 	try {
-		await sendTaskOutcomeEmail(
+		await runtime.sendTaskOutcomeEmail(
 			notifications.email,
 			state,
 			outcome,
@@ -1419,6 +1482,7 @@ async function safeNotifyHumanReviewRequired(
 	state: RunState,
 	complexityScore: number,
 	reason: string,
+	runtime: WorkflowRuntime,
 ): Promise<void> {
 	const runLogger = logger.child({
 		projectId: state.projectId,
@@ -1426,7 +1490,7 @@ async function safeNotifyHumanReviewRequired(
 		outcome: "human_review_required",
 	});
 	try {
-		await sendHumanReviewRequiredEmail(notifications.email, state, {
+		await runtime.sendHumanReviewRequiredEmail(notifications.email, state, {
 			complexityScore,
 			reason,
 		});
@@ -1439,7 +1503,7 @@ async function safeNotifyHumanReviewRequired(
 }
 
 async function safeLinearMoveToCanceled(
-	linear: LinearClient,
+	linear: WorkflowLinearClient,
 	issueId: string,
 ): Promise<void> {
 	const runLogger = logger.child({ issueId, stage: "canceled" });

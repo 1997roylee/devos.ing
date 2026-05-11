@@ -1,5 +1,4 @@
 import type { AgentAdapter } from "../agent-adapters";
-import type { LinearClient } from "../services/linear";
 import { selectPlanningSupplementalSkills } from "../skills/catalog";
 import { buildPlanPrompt } from "../skills/prompts";
 import { buildPlanComment, buildPlanSplitComment } from "../utils/comments";
@@ -14,6 +13,21 @@ import type {
 
 const DEFAULT_PLANNER_COMPLEXITY_SCORE = 4;
 const HUMAN_REVIEW_COMPLEXITY_THRESHOLD = 5;
+
+interface PlanningLinearClient {
+	updateIssueDetails(
+		issueId: string,
+		title: string,
+		description: string,
+	): Promise<void>;
+	markStage(issueId: string, stage: string): Promise<void>;
+	comment(issueId: string, body: string): Promise<void>;
+	createTodoIssueFromPlan(
+		parentIssue: IssueRef,
+		task: PlannedSplitTask,
+	): Promise<{ identifier: string; title: string; url: string }>;
+	clearWorkflowStageLabels(issueId: string): Promise<void>;
+}
 
 export interface PlannerDecision {
 	complexity: "SIMPLE" | "COMPLEX";
@@ -81,7 +95,7 @@ export async function handlePlanningStage(
 	config: ResolvedProjectConfig,
 	agent: AgentAdapter,
 	notifications: ResolvedNotificationConfig,
-	linear: LinearClient,
+	linear: PlanningLinearClient,
 	state: RunState,
 	deps: HandlePlanningStageDeps,
 ): Promise<void> {
@@ -257,7 +271,7 @@ export function parsePlannerIssueRefinement(
 }
 
 export async function applyPlannerIssueRefinement(
-	linear: Pick<LinearClient, "updateIssueDetails">,
+	linear: Pick<PlanningLinearClient, "updateIssueDetails">,
 	issue: IssueRef,
 	planSummary: string,
 ): Promise<boolean> {

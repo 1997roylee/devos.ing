@@ -1,0 +1,104 @@
+import type {
+	LinearIssue,
+	PullRequestRef,
+	ResolvedProjectConfig,
+	RunState,
+	WorkflowStage,
+} from "../src/core/types";
+
+const now = "2026-05-11T00:00:00.000Z";
+
+export const passReview = "RESULT: PASS\nSUMMARY: clean\nBUGS_JSON: []";
+export const failReview =
+	'RESULT: FAIL\nSUMMARY: broken\nBUGS_JSON: [{"title":"Bug","body":"Fix it"}]';
+export const simplePlan = "COMPLEXITY: SIMPLE\nCOMPLEXITY_SCORE: 3\nShip it.";
+export const humanPlan = "COMPLEXITY: SIMPLE\nCOMPLEXITY_SCORE: 8\nNeeds eyes.";
+export const complexPlan = [
+	"COMPLEXITY: COMPLEX",
+	"COMPLEXITY_SCORE: 6",
+	'SPLIT_TASKS_JSON: [{"title":"Part A"},{"title":"Part B"}]',
+].join("\n");
+
+export function issue(key: string, projectId = "linear-default"): LinearIssue {
+	return {
+		id: `lin_${key}`,
+		identifier: key,
+		title: `${key} title`,
+		url: `https://linear.example/${key}`,
+		projectId,
+		priority: { value: 1, name: "High" },
+		state: { id: "assigned", name: "Assigned" },
+		labels: [],
+	};
+}
+
+export function state(
+	project: ResolvedProjectConfig,
+	key: string,
+	stage: WorkflowStage,
+	score = 3,
+): RunState {
+	return {
+		projectId: project.id,
+		projectName: project.name,
+		workspacePath: project.executionPath,
+		repository: project.repo,
+		issue: { id: `lin_${key}`, key, title: `${key} title`, url: "#" },
+		stage,
+		complexityScore: score,
+		reviewMode: "bot",
+		pullRequest: pr(key),
+		bugs: [],
+		startedAt: now,
+		updatedAt: now,
+	};
+}
+
+export function project(
+	id: string,
+	linearProjectId = "linear-default",
+): ResolvedProjectConfig {
+	return {
+		id,
+		name: id,
+		workspacePath: "",
+		executionPath: "",
+		repo: { owner: "acme", name: id, baseBranch: "main" },
+		linear: {
+			apiKey: "fake",
+			apiUrl: "https://linear.example/graphql",
+			projectId: linearProjectId,
+			pollLimit: 20,
+			statusMap: {
+				backlog: "backlog",
+				assigned: "assigned",
+				planning: "planning",
+				implementing: "implementing",
+				pr_created: "pr_created",
+				reviewing: "reviewing",
+				testing: "testing",
+				blocked: "blocked",
+				done: "done",
+			},
+			labelMap: {},
+			autoCreateLabels: false,
+		},
+		github: { useGhCli: false, defaultBugLabel: "bug" },
+		codex: { binary: "codex", streamLogs: false },
+		skills: {
+			root: "skills",
+			plan: "skills/piv-plan/SKILL.md",
+			implement: "skills/piv-implement/SKILL.md",
+			reviewTest: "skills/piv-review-test/SKILL.md",
+		},
+		dryRun: true,
+	};
+}
+
+export function pr(key: string): PullRequestRef {
+	return {
+		branch: `codex/${key.toLowerCase()}`,
+		title: key,
+		url: `https://github.example/pull/${key}`,
+	};
+}

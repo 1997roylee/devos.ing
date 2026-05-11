@@ -1,6 +1,5 @@
 import type { AgentAdapter } from "../agent-adapters";
 import { markPrReadyForReview } from "../services/github";
-import type { LinearClient } from "../services/linear";
 import { buildReviewPrompt } from "../skills/prompts";
 import { buildReviewComment } from "../utils/comments";
 import type { ReviewOutcome } from "./review";
@@ -54,6 +53,7 @@ interface HandleReviewTestingStageDeps {
 		state: RunState,
 		body: string,
 	) => Promise<void>;
+	readyPullRequestAfterPassingReview?: typeof readyPullRequestAfterPassingReview;
 	loggerInfo: (fields: Record<string, unknown>, message: string) => void;
 	buildIssueJobLogFields: (
 		state: RunState,
@@ -70,6 +70,13 @@ interface FinalizeReviewMergeDeps {
 		outcome: "done" | "blocked",
 		errorMessage?: string,
 	) => Promise<void>;
+}
+
+interface ReviewLinearClient {
+	markStage(issueId: string, stage: string): Promise<void>;
+	applyStageLabel(issueId: string, stage: string): Promise<void>;
+	clearWorkflowStageLabels(issueId: string): Promise<void>;
+	comment(issueId: string, body: string): Promise<void>;
 }
 
 export function resolveReviewFailureStage(
@@ -116,7 +123,7 @@ export async function readyPullRequestAfterPassingReview(
 export async function handleReviewTestingStage(
 	config: ResolvedProjectConfig,
 	agent: AgentAdapter,
-	linear: LinearClient,
+	linear: ReviewLinearClient,
 	state: RunState,
 	deps: HandleReviewTestingStageDeps,
 ): Promise<void> {
@@ -186,7 +193,10 @@ export async function handleReviewTestingStage(
 		return;
 	}
 
-	await readyPullRequestAfterPassingReview(config, state.pullRequest, true);
+	await (
+		deps.readyPullRequestAfterPassingReview ??
+		readyPullRequestAfterPassingReview
+	)(config, state.pullRequest, true);
 	Object.assign(state, deps.transitionStage(state, "done"));
 	await deps.saveRunState(config.workspacePath, state);
 	await linear.markStage(state.issue.id, "reviewing");
@@ -204,7 +214,7 @@ export async function handleReviewTestingStage(
 export async function finalizeIssueAfterReviewMerge(
 	config: ResolvedProjectConfig,
 	notifications: ResolvedNotificationConfig,
-	linear: LinearClient,
+	linear: ReviewLinearClient,
 	state: RunState,
 	deps: FinalizeReviewMergeDeps,
 ): Promise<void> {
