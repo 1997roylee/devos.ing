@@ -407,6 +407,7 @@ export async function squashMergePullRequest(
 				"merge",
 				target,
 				"--squash",
+				"--delete-branch",
 				"--subject",
 				pr.title,
 				"--body",
