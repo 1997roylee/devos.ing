@@ -16,3 +16,8 @@ export interface PullRequestMergeStatus {
 	mergeStateStatus?: string;
 	mergeable?: string;
 }
+
+export interface RemoveWorktreeResult {
+	removed: boolean;
+	reason?: string;
+}

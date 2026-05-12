@@ -20,19 +20,19 @@ Planning output should remain concise and implementation-focused, including:
 
 ## Parallel Processing Operating Guidance
 
-1. This branch does not currently expose user-configurable issue concurrency controls.
-2. Standard runs process issue queues sequentially per project.
-3. Review-only runs schedule issue tasks in parallel, and each task still acquires per-issue leases and passes through the in-process execution-path lock.
+1. Standard runs process issue queues sequentially by default; use `--concurrency <N>` or `run.concurrency` to enable bounded parallelism.
+2. Use `--isolated-worktrees`, `PIV_ISOLATED_WORKTREES=1`, or `workflow.isolatedWorktrees.enabled` when parallel workers should make changes concurrently.
+3. Isolated worktrees are created per issue under `.piv-loop/projects/<project-id>/worktrees/<issue-key>/` unless `workflow.isolatedWorktrees.root` is configured.
 4. Per-issue leases prevent duplicate processing of the same issue key, but they do not serialize all repository mutations across separate ADHD.ai processes.
 
 Safe usage patterns:
 
-1. Shared `executionPath` in a single ADHD.ai process:
+1. Shared `executionPath` in a single ADHD.ai process without isolated worktrees:
    execution-path locking serializes issue execution in-process and helps avoid concurrent checkout mutation.
 2. Shared `executionPath` across multiple ADHD.ai processes:
    avoid this layout when possible; process-local locks do not coordinate between processes.
 3. Isolated worktrees or distinct `executionPath` per project/process:
-   preferred for multi-project unattended automation.
+   preferred for multi-project and parallel unattended automation.
 4. Shared `workspacePath` state directories:
    ensure project IDs remain distinct and operator ownership is clear; per-issue leases are scoped by project run-state files.
 

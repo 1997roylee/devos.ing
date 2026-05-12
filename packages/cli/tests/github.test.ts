@@ -6,9 +6,11 @@ import {
 	createDraftPrFromWorktree,
 	ensureBaseBranchFresh,
 	ensureGhAuth,
+	ensureIssueWorktree,
 	findOpenPullRequestForIssue,
 	getPullRequestMergeStatus,
 	issueBranchName,
+	removeIssueWorktree,
 	squashMergePullRequest,
 } from "../src/integrations/github";
 import type { CommandResult } from "../src/utils/shell";
@@ -412,6 +414,177 @@ describe("createDraftPrFromWorktree", () => {
 
 		expect(commitAttempts).toBe(1);
 		expect(pr.number).toBe(99);
+	});
+});
+
+describe("ensureIssueWorktree", () => {
+	it("creates a new issue worktree from the base branch", async () => {
+		const calls: string[][] = [];
+		const runCommand = mock(
+			async (_command: string, args: string[]): Promise<CommandResult> => {
+				calls.push(args);
+				if (args[0] === "rev-parse") {
+					return { code: 0, stdout: "true\n", stderr: "" };
+				}
+				if (args[0] === "show-ref") {
+					return { code: 1, stdout: "", stderr: "" };
+				}
+				return { code: 0, stdout: "", stderr: "" };
+			},
+		);
+
+		const branch = await ensureIssueWorktree(
+			createProjectConfig(),
+			"ENG-42",
+			undefined,
+			"/tmp/worktrees/eng-42",
+			{ runCommand, assertCommandOk: assertOk },
+		);
+
+		expect(branch).toBe("codex/eng-42");
+		expect(calls).toContainEqual([
+			"worktree",
+			"add",
+			"-b",
+			"codex/eng-42",
+			"/tmp/worktrees/eng-42",
+			"origin/main",
+		]);
+	});
+
+	it("creates an existing PR worktree from the remote PR branch", async () => {
+		const calls: string[][] = [];
+		const runCommand = mock(
+			async (_command: string, args: string[]): Promise<CommandResult> => {
+				calls.push(args);
+				if (args[0] === "rev-parse") {
+					return { code: 0, stdout: "true\n", stderr: "" };
+				}
+				if (args[0] === "show-ref") {
+					return { code: 1, stdout: "", stderr: "" };
+				}
+				return { code: 0, stdout: "", stderr: "" };
+			},
+		);
+
+		const branch = await ensureIssueWorktree(
+			createProjectConfig(),
+			"ENG-42",
+			{
+				branch: "codex/eng-42",
+				title: "ENG-42",
+				url: "https://github.example/pull/42",
+			},
+			"/tmp/worktrees/eng-42",
+			{ runCommand, assertCommandOk: assertOk },
+		);
+
+		expect(branch).toBe("codex/eng-42");
+		expect(calls).toContainEqual([
+			"fetch",
+			"origin",
+			"codex/eng-42:refs/remotes/origin/codex/eng-42",
+		]);
+		expect(calls).toContainEqual([
+			"worktree",
+			"add",
+			"-b",
+			"codex/eng-42",
+			"/tmp/worktrees/eng-42",
+			"origin/codex/eng-42",
+		]);
+	});
+
+	it("reuses an existing issue worktree on the expected branch", async () => {
+		const calls: string[][] = [];
+		const runCommand = mock(
+			async (_command: string, args: string[]): Promise<CommandResult> => {
+				calls.push(args);
+				if (args[0] === "rev-parse") {
+					return { code: 0, stdout: "true\n", stderr: "" };
+				}
+				if (args[0] === "branch") {
+					return { code: 0, stdout: "codex/eng-42\n", stderr: "" };
+				}
+				return { code: 0, stdout: "", stderr: "" };
+			},
+		);
+
+		const branch = await ensureIssueWorktree(
+			createProjectConfig(),
+			"ENG-42",
+			undefined,
+			"/tmp",
+			{ runCommand, assertCommandOk: assertOk },
+		);
+
+		expect(branch).toBe("codex/eng-42");
+		expect(calls).not.toContainEqual([
+			"worktree",
+			"add",
+			"/tmp",
+			"codex/eng-42",
+		]);
+	});
+
+	it("refreshes a reused PR worktree from the remote branch", async () => {
+		const calls: string[][] = [];
+		const runCommand = mock(
+			async (_command: string, args: string[]): Promise<CommandResult> => {
+				calls.push(args);
+				if (args[0] === "rev-parse") {
+					return { code: 0, stdout: "true\n", stderr: "" };
+				}
+				if (args[0] === "branch") {
+					return { code: 0, stdout: "codex/eng-42\n", stderr: "" };
+				}
+				return { code: 0, stdout: "", stderr: "" };
+			},
+		);
+
+		const branch = await ensureIssueWorktree(
+			createProjectConfig(),
+			"ENG-42",
+			{
+				branch: "codex/eng-42",
+				title: "ENG-42",
+				url: "https://github.example/pull/42",
+			},
+			"/tmp",
+			{ runCommand, assertCommandOk: assertOk },
+		);
+
+		expect(branch).toBe("codex/eng-42");
+		expect(calls).toContainEqual([
+			"fetch",
+			"origin",
+			"codex/eng-42:refs/remotes/origin/codex/eng-42",
+		]);
+		expect(calls).toContainEqual(["reset", "--hard", "origin/codex/eng-42"]);
+	});
+
+	it("removes an issue worktree and reports dirty retained worktrees", async () => {
+		const config = createProjectConfig();
+		const removed = await removeIssueWorktree(config, "/tmp/worktrees/eng-42", {
+			runCommand: mock(async (): Promise<CommandResult> => {
+				return { code: 0, stdout: "", stderr: "" };
+			}),
+		});
+		const retained = await removeIssueWorktree(
+			config,
+			"/tmp/worktrees/eng-43",
+			{
+				runCommand: mock(async (): Promise<CommandResult> => {
+					return { code: 1, stdout: "", stderr: "contains modified files" };
+				}),
+			},
+		);
+
+		expect(removed).toEqual({ removed: true });
+		expect(retained).toEqual({
+			removed: false,
+			reason: "contains modified files",
+		});
 	});
 });
 

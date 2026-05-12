@@ -32,6 +32,10 @@ export type CodexReasoningEffort = "low" | "medium" | "high" | "xhigh";
 
 export interface WorkflowRuntimeConfig {
 	issueConcurrency: number;
+	isolatedWorktrees?: {
+		enabled: boolean;
+		root?: string;
+	};
 }
 
 export type DeepPartial<T> = {
@@ -365,6 +369,12 @@ export interface RunState {
 	splitTasks?: SplitTaskRef[];
 	codexUsage?: CodexUsageRecord[];
 	lease?: RunLease;
+	executionWorkspace?: {
+		mode: "git-worktree";
+		path: string;
+		branch: string;
+		createdAt: string;
+	};
 	startedAt: string;
 	updatedAt: string;
 	lastError?: string;
@@ -380,4 +390,5 @@ export interface RunOptions {
 	pollIntervalMs?: number;
 	maxPollCycles?: number;
 	exitWhenIdle?: boolean;
+	isolatedWorktrees?: boolean;
 }

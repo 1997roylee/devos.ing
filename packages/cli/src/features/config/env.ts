@@ -155,6 +155,9 @@ export function buildEnvBase(
 		},
 		workflow: {
 			issueConcurrency: Number(env.PIV_ISSUE_CONCURRENCY ?? "1"),
+			isolatedWorktrees: {
+				enabled: env.PIV_ISOLATED_WORKTREES === "1",
+			},
 		},
 		dryRun: env.PIV_DRY_RUN === "1",
 	};

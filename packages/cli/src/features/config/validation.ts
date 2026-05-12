@@ -99,6 +99,14 @@ function validateProject(project: ResolvedProjectConfig): void {
 			`Workflow issue concurrency must be a positive integer for project '${project.id}'`,
 		);
 	}
+	if (
+		project.workflow.isolatedWorktrees?.root !== undefined &&
+		project.workflow.isolatedWorktrees.root.trim() === ""
+	) {
+		throw new Error(
+			`Workflow isolated worktrees root cannot be empty for project '${project.id}'`,
+		);
+	}
 	const requiredStateIds = Object.entries(project.linear.statusMap).filter(
 		([, value]) => !value,
 	);

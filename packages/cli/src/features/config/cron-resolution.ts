@@ -185,6 +185,10 @@ function resolveCronRun(
 			run.exitWhenIdle,
 			`${fieldPath}[${index}].run.exitWhenIdle must be a boolean`,
 		),
+		isolatedWorktrees: normalizeCronRunBoolean(
+			run.isolatedWorktrees,
+			`${fieldPath}[${index}].run.isolatedWorktrees must be a boolean`,
+		),
 	};
 }
 

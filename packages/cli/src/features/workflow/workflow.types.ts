@@ -5,6 +5,7 @@ import type {
 	RunState,
 } from "../../core/types";
 import type { AgentAdapter } from "../../integrations/agent-adapters";
+import type { RemoveWorktreeResult } from "../../integrations/github";
 import type { LinearClient } from "../../integrations/linear";
 
 export interface WorkflowIssue {
@@ -81,6 +82,16 @@ export interface WorkflowRuntime {
 	createLinearClient(config: ResolvedProjectConfig): WorkflowLinearClient;
 	createAgentAdapter(config: ResolvedProjectConfig): AgentAdapter;
 	ensureBaseBranchFresh(config: ResolvedProjectConfig): Promise<void>;
+	ensureIssueWorktree(
+		config: ResolvedProjectConfig,
+		issueKey: string,
+		pullRequest: PullRequestRef | undefined,
+		worktreePath: string,
+	): Promise<string>;
+	removeIssueWorktree(
+		config: ResolvedProjectConfig,
+		worktreePath: string,
+	): Promise<RemoveWorktreeResult>;
 	findOpenPullRequestForIssue(
 		config: ResolvedProjectConfig,
 		issueKey: string,

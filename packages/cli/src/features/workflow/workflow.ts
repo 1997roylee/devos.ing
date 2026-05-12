@@ -38,6 +38,11 @@ import {
 	type WorkflowRuntime,
 	createWorkflowRuntime,
 } from "./workflow-runtime";
+import {
+	cleanupTerminalIsolatedWorktree,
+	prepareIsolatedExecutionConfig,
+	shouldUseIsolatedWorktree,
+} from "./workflow-worktree";
 import type {
 	IssueJobLogFields,
 	IssueProjectRoutingResult,
@@ -344,9 +349,13 @@ async function runProjectCycle(
 		projectLogger.info({ cycle }, "No eligible Linear issues found.");
 	}
 
+	const effectiveConcurrency = resolveEffectiveIssueConcurrency(
+		config,
+		options,
+	);
 	await processIssueQueueBounded(
 		issueQueue,
-		config.workflow.issueConcurrency,
+		effectiveConcurrency,
 		async (issue) =>
 			processIssue(
 				config,
@@ -354,6 +363,7 @@ async function runProjectCycle(
 				linear,
 				issue,
 				options,
+				effectiveConcurrency,
 				polling.staleRunTimeoutMs,
 				buildRunLeaseOwnerId(),
 				runtime,
@@ -737,6 +747,7 @@ async function processIssue(
 	linear: WorkflowLinearClient,
 	issue: WorkflowIssue,
 	options: RunOptions,
+	effectiveConcurrency: number,
 	leaseTimeoutMs: number,
 	leaseOwnerId: string,
 	runtime: WorkflowRuntime,
@@ -819,6 +830,11 @@ async function processIssue(
 	);
 
 	let leaseAcquired = false;
+	const isolatedWorktreesEnabled = shouldUseIsolatedWorktree(
+		config,
+		options,
+		effectiveConcurrency,
+	);
 	const executeIssueWithLease = async () => {
 		leaseAcquired = await tryAcquireRunLease(
 			config.workspacePath,
@@ -833,8 +849,20 @@ async function processIssue(
 			);
 			return;
 		}
+		const executionConfig =
+			isolatedWorktreesEnabled && !config.dryRun && runState.stage !== "done"
+				? await withExecutionPathLock(config.executionPath, async () => {
+						const isolatedConfig = await prepareIsolatedExecutionConfig(
+							config,
+							runState,
+							runtime,
+						);
+						await saveRunState(config.workspacePath, runState);
+						return isolatedConfig;
+					})
+				: config;
 		await executeIssue(
-			config,
+			executionConfig,
 			notifications,
 			linear,
 			runState,
@@ -845,7 +873,9 @@ async function processIssue(
 		);
 	};
 	try {
-		if (options.reviewOnly) {
+		if (isolatedWorktreesEnabled) {
+			await executeIssueWithLease();
+		} else if (options.reviewOnly) {
 			await executeIssueWithLease();
 		} else {
 			await withExecutionPathLock(config.executionPath, executeIssueWithLease);
@@ -892,9 +922,26 @@ async function processIssue(
 		);
 	} finally {
 		if (leaseAcquired) {
+			if (isolatedWorktreesEnabled) {
+				const cleanedUp = await cleanupTerminalIsolatedWorktree(
+					config,
+					runState,
+					runtime,
+				);
+				if (cleanedUp) {
+					await saveRunState(config.workspacePath, runState);
+				}
+			}
 			await releaseRunLease(config.workspacePath, runState, leaseOwnerId);
 		}
 	}
+}
+
+export function resolveEffectiveIssueConcurrency(
+	config: ResolvedProjectConfig,
+	options: RunOptions,
+): number {
+	return options.concurrency ?? config.workflow.issueConcurrency;
 }
 
 export function resolvePollingSettings(
@@ -1194,19 +1241,7 @@ async function handleImplementingStage(
 		"Implementing issue",
 	);
 
-	if (!config.dryRun) {
-		const preparedBranch = await runtime.prepareImplementationBranch(
-			config,
-			state.issue.key,
-			state.pullRequest,
-		);
-		if (!state.pullRequest) {
-			state.pullRequest = {
-				branch: preparedBranch,
-				title: `[codex] ${state.issue.key}: ${state.issue.title}`,
-			};
-		}
-	}
+	await prepareImplementationBranchForStage(config, state, runtime);
 
 	const hasExistingPr = Boolean(state.pullRequest?.url);
 	const fixRound = hasExistingPr && state.bugs.length > 0;
@@ -1290,6 +1325,43 @@ async function handleImplementingStage(
 			? "Implementation feedback pass completed"
 			: "Implementation completed",
 	);
+}
+
+export async function prepareImplementationBranchForStage(
+	config: ResolvedProjectConfig,
+	state: RunState,
+	runtime: WorkflowRuntime,
+): Promise<void> {
+	if (config.dryRun) {
+		return;
+	}
+	if (state.executionWorkspace?.mode === "git-worktree") {
+		const preparedBranch =
+			state.pullRequest?.branch ?? state.executionWorkspace.branch;
+		if (state.executionWorkspace.branch !== preparedBranch) {
+			throw new Error(
+				`Isolated worktree branch '${state.executionWorkspace.branch}' does not match expected branch '${preparedBranch}'`,
+			);
+		}
+		if (!state.pullRequest) {
+			state.pullRequest = {
+				branch: preparedBranch,
+				title: `[codex] ${state.issue.key}: ${state.issue.title}`,
+			};
+		}
+		return;
+	}
+	const preparedBranch = await runtime.prepareImplementationBranch(
+		config,
+		state.issue.key,
+		state.pullRequest,
+	);
+	if (!state.pullRequest) {
+		state.pullRequest = {
+			branch: preparedBranch,
+			title: `[codex] ${state.issue.key}: ${state.issue.title}`,
+		};
+	}
 }
 
 async function handlePrCreatedStage(
