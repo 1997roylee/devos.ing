@@ -19,7 +19,7 @@
 				"name": "next"
 			}
 		],
-		"types": ["node"],
+		"types": ["node", "bun"],
 		"baseUrl": ".",
 		"paths": {
 			"@/*": ["./src/*"]
