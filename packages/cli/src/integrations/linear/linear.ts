@@ -1,9 +1,4 @@
-import {
-	LinearClient as LinearSdkClient,
-	type Issue as LinearSdkIssue,
-	type IssueLabel as LinearSdkIssueLabel,
-	type WorkflowState as LinearSdkWorkflowState,
-} from "@linear/sdk";
+import { createRequire } from "node:module";
 import type {
 	LinearIssue,
 	PlannedSplitTask,
@@ -22,6 +17,78 @@ import type {
 	WorkflowLabelStage,
 	WorkflowLabelUpdate,
 } from "./linear.types";
+
+type LinearSdkWorkflowState = {
+	id: string;
+	name: string;
+	teamId?: string | null;
+};
+
+type LinearSdkIssueLabel = {
+	id: string;
+	name: string;
+	teamId?: string | null;
+};
+
+type LinearSdkIssue = {
+	id: string;
+	identifier: string;
+	title: string;
+	description?: string | null;
+	url: string;
+	teamId?: string | null;
+	priority?: number | null;
+	priorityLabel?: string | null;
+	project: Promise<{ id?: string | null } | null>;
+	state: Promise<{ id: string; name: string } | null>;
+	creator: Promise<{ id?: string | null } | null>;
+	assignee: Promise<{ id?: string | null } | null>;
+	labels: () => Promise<{ nodes: LinearSdkIssueLabel[] }>;
+};
+
+type LinearSdkClientInstance = {
+	viewer: Promise<{
+		assignedIssues: (input: { first: number }) => Promise<{
+			nodes: LinearSdkIssue[];
+		}>;
+	}>;
+	issue: (identifier: string) => Promise<LinearSdkIssue | undefined>;
+	updateIssue: (
+		issueId: string,
+		input: Record<string, unknown>,
+	) => Promise<unknown>;
+	createIssue: (input: Record<string, unknown>) => Promise<{
+		success: boolean;
+		issueId?: string | null;
+		issue?: Promise<LinearSdkIssue | null>;
+	}>;
+	createComment: (input: {
+		issueId: string;
+		body: string;
+	}) => Promise<unknown>;
+	workflowStates: (input: { first: number }) => Promise<{
+		nodes: LinearSdkWorkflowState[];
+	}>;
+	issueLabels: (input: { first: number }) => Promise<{
+		nodes: LinearSdkIssueLabel[];
+	}>;
+	createIssueLabel: (input: {
+		name: string;
+		teamId?: string;
+	}) => Promise<{
+		success: boolean;
+		issueLabelId?: string | null;
+		issueLabel?: Promise<LinearSdkIssueLabel | null>;
+	}>;
+	issueLabel: (id: string) => Promise<LinearSdkIssueLabel | null>;
+};
+
+type LinearSdkClientCtor = new (input: {
+	apiKey: string;
+	apiUrl?: string;
+}) => LinearSdkClientInstance;
+
+const require = createRequire(import.meta.url);
 
 const LINEAR_MAX_REQUESTS_PER_HOUR = 1800;
 const LINEAR_REQUEST_INTERVAL_MS = Math.ceil(
@@ -124,7 +191,7 @@ export function resolveSplitTaskTeamId(
 }
 
 export class LinearClient {
-	private readonly client: LinearSdkClient;
+	private readonly client: LinearSdkClientInstance;
 	private resolvedStatusMap:
 		| ResolvedProjectConfig["linear"]["statusMap"]
 		| null = null;
@@ -138,6 +205,7 @@ export class LinearClient {
 	private issueLabelsCache: LinearLabelRecord[] | null = null;
 
 	constructor(private readonly config: ResolvedProjectConfig) {
+		const LinearSdkClient = resolveLinearSdkClient();
 		this.client = new LinearSdkClient({
 			apiKey: config.linear.apiKey,
 			apiUrl: config.linear.apiUrl,
@@ -727,8 +795,9 @@ export class LinearClient {
 				first: 250,
 			}),
 		);
-		this.workflowStatesCache = workflowStates.nodes;
-		return this.workflowStatesCache;
+		const nodes = workflowStates.nodes;
+		this.workflowStatesCache = nodes;
+		return nodes;
 	}
 
 	private async fetchIssueLabels(): Promise<LinearLabelRecord[]> {
@@ -740,10 +809,11 @@ export class LinearClient {
 				first: 250,
 			}),
 		);
-		this.issueLabelsCache = labelsConnection.nodes.map((label) =>
+		const labels = labelsConnection.nodes.map((label) =>
 			this.mapSdkLabelToRecord(label),
 		);
-		return this.issueLabelsCache;
+		this.issueLabelsCache = labels;
+		return labels;
 	}
 
 	private async isIssueDone(issueId: string): Promise<boolean> {
@@ -832,6 +902,23 @@ export class LinearClient {
 			name: label.name,
 			teamId: label.teamId ?? undefined,
 		};
+	}
+}
+
+function resolveLinearSdkClient(): LinearSdkClientCtor {
+	try {
+		const loaded = require("@linear/sdk") as {
+			LinearClient?: LinearSdkClientCtor;
+		};
+		if (typeof loaded.LinearClient !== "function") {
+			throw new Error("missing LinearClient export");
+		}
+		return loaded.LinearClient;
+	} catch (error) {
+		const detail = error instanceof Error ? error.message : String(error);
+		throw new Error(
+			`Failed to load '@linear/sdk'. Install project dependencies before running Linear-integrated commands. ${detail}`,
+		);
 	}
 }
 
