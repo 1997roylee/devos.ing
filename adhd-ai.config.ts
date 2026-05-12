@@ -2,7 +2,7 @@ import path from "node:path";
 import type {
 	AdhdAiRootConfig,
 	DeepPartial,
-} from "./packages/cli/src/core/types";
+} from "./packages/cli/src/features/types";
 
 const cwd = process.cwd();
 
