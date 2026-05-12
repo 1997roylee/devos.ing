@@ -1,3 +1,4 @@
+import { access } from "node:fs/promises";
 import type {
 	BugRecord,
 	PullRequestRef,
@@ -8,6 +9,7 @@ import type {
 	GithubCommandDeps,
 	PrListEntry,
 	PullRequestMergeStatus,
+	RemoveWorktreeResult,
 } from "./github.types";
 
 const GITHUB_RETRY_ATTEMPTS = 3;
@@ -240,6 +242,104 @@ export async function prepareImplementationBranch(
 	const branch = issueBranchName(issueKey);
 	await checkoutBranch(config, branch, { create: true });
 	return branch;
+}
+
+export async function ensureIssueWorktree(
+	config: ResolvedProjectConfig,
+	issueKey: string,
+	pullRequest: PullRequestRef | undefined,
+	worktreePath: string,
+	deps: GithubCommandDeps = {},
+): Promise<string> {
+	const commandRunner = deps.runCommand ?? runCommand;
+	const assertOk = deps.assertCommandOk ?? assertCommandOk;
+	const branch = pullRequest?.branch ?? issueBranchName(issueKey);
+	await ensureGitRepository(config, {
+		runCommand: commandRunner,
+		assertCommandOk: assertOk,
+	});
+
+	try {
+		await access(worktreePath);
+		const existingWorktreeBranch = await commandRunner(
+			"git",
+			["branch", "--show-current"],
+			{ cwd: worktreePath },
+		);
+		if (existingWorktreeBranch.code === 0) {
+			if (existingWorktreeBranch.stdout.trim() !== branch) {
+				throw new Error(
+					`Isolated worktree '${worktreePath}' is on branch '${existingWorktreeBranch.stdout.trim()}', expected '${branch}'`,
+				);
+			}
+			return branch;
+		}
+	} catch (error) {
+		if (error instanceof Error && error.message.includes("expected")) {
+			throw error;
+		}
+	}
+
+	const localBranch = await commandRunner(
+		"git",
+		["show-ref", "--verify", "--quiet", `refs/heads/${branch}`],
+		{ cwd: config.executionPath },
+	);
+	if (localBranch.code === 0) {
+		const add = await commandRunner(
+			"git",
+			["worktree", "add", worktreePath, branch],
+			{
+				cwd: config.executionPath,
+			},
+		);
+		assertOk("git", ["worktree", "add", worktreePath, branch], add);
+		return branch;
+	}
+
+	let startPoint = `origin/${config.repo.baseBranch}`;
+	if (pullRequest?.branch) {
+		const fetchBranch = await commandRunner(
+			"git",
+			["fetch", "origin", `${branch}:refs/remotes/origin/${branch}`],
+			{ cwd: config.executionPath },
+		);
+		if (fetchBranch.code === 0) {
+			startPoint = `origin/${branch}`;
+		}
+	}
+
+	const add = await commandRunner(
+		"git",
+		["worktree", "add", "-b", branch, worktreePath, startPoint],
+		{ cwd: config.executionPath },
+	);
+	assertOk(
+		"git",
+		["worktree", "add", "-b", branch, worktreePath, startPoint],
+		add,
+	);
+	return branch;
+}
+
+export async function removeIssueWorktree(
+	config: ResolvedProjectConfig,
+	worktreePath: string,
+	deps: GithubCommandDeps = {},
+): Promise<RemoveWorktreeResult> {
+	const commandRunner = deps.runCommand ?? runCommand;
+	const remove = await commandRunner(
+		"git",
+		["worktree", "remove", worktreePath],
+		{ cwd: config.executionPath },
+	);
+	if (remove.code === 0) {
+		return { removed: true };
+	}
+	return {
+		removed: false,
+		reason: remove.stderr.trim() || remove.stdout.trim() || "unknown error",
+	};
 }
 
 export async function ensureCleanWorktree(

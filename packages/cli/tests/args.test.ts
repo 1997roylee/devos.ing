@@ -101,6 +101,24 @@ describe("parseArgs", () => {
 		});
 	});
 
+	it("parses isolated worktrees flag", () => {
+		const parsed = parseArgs(["bun", "adhd-ai", "run", "--isolated-worktrees"]);
+		expect(parsed).toEqual({
+			kind: "run",
+			options: {
+				issueArg: undefined,
+				projectId: undefined,
+				allProjects: false,
+				poll: false,
+				concurrency: undefined,
+				exitWhenIdle: undefined,
+				pollIntervalMs: undefined,
+				maxPollCycles: undefined,
+				isolatedWorktrees: true,
+			},
+		});
+	});
+
 	it("rejects invalid poll-interval-ms", () => {
 		expect(() =>
 			parseArgs(["bun", "adhd-ai", "run", "--poll-interval-ms", "0"]),

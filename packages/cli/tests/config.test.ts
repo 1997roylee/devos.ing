@@ -44,6 +44,7 @@ const envKeys = [
 	"PIV_EXIT_WHEN_IDLE",
 	"PIV_STALE_RUN_TIMEOUT_MS",
 	"PIV_ISSUE_CONCURRENCY",
+	"PIV_ISOLATED_WORKTREES",
 	"RESEND_API_KEY",
 	"RESEND_FROM",
 	"RESEND_TO",
@@ -94,9 +95,11 @@ describe("loadConfig", () => {
 												? "3600000"
 												: key === "PIV_ISSUE_CONCURRENCY"
 													? "1"
-													: key === "AGENT_BACKEND"
-														? ""
-														: key.toLowerCase();
+													: key === "PIV_ISOLATED_WORKTREES"
+														? "0"
+														: key === "AGENT_BACKEND"
+															? ""
+															: key.toLowerCase();
 		}
 	});
 
@@ -154,6 +157,9 @@ describe("loadConfig", () => {
 				maxSelected: 3,
 			});
 			expect(config.projects[0]?.workflow.issueConcurrency).toBe(1);
+			expect(config.projects[0]?.workflow.isolatedWorktrees).toEqual({
+				enabled: false,
+			});
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });
 		}
@@ -423,6 +429,48 @@ describe("loadConfig", () => {
 		expect(config.projects[0]?.workflow.issueConcurrency).toBe(3);
 	});
 
+	it("loads isolated worktrees from env", async () => {
+		process.env.PIV_ISOLATED_WORKTREES = "1";
+		const config = await loadConfig(process.cwd());
+		expect(config.projects[0]?.workflow.isolatedWorktrees?.enabled).toBe(true);
+	});
+
+	it("loads isolated worktree root from config with project override", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			[
+				"export default {",
+				"  workflow: { isolatedWorktrees: { enabled: true, root: '/tmp/root' } },",
+				"  projects: [",
+				"    { id: 'default' },",
+				"    {",
+				"      id: 'api',",
+				"      workflow: { isolatedWorktrees: { root: '/tmp/api-root' } }",
+				"    }",
+				"  ]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.projects[0]?.workflow.isolatedWorktrees).toEqual({
+				enabled: true,
+				root: "/tmp/root",
+			});
+			expect(config.projects[1]?.workflow.isolatedWorktrees).toEqual({
+				enabled: true,
+				root: "/tmp/api-root",
+			});
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
 	it("rejects non-positive stale run timeout", async () => {
 		process.env.PIV_STALE_RUN_TIMEOUT_MS = "0";
 		await expect(loadConfig(process.cwd())).rejects.toThrow(
@@ -435,6 +483,30 @@ describe("loadConfig", () => {
 		await expect(loadConfig(process.cwd())).rejects.toThrow(
 			"Workflow issue concurrency must be a positive integer",
 		);
+	});
+
+	it("rejects empty isolated worktree root", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			[
+				"export default {",
+				"  workflow: { isolatedWorktrees: { enabled: true, root: '   ' } },",
+				"  projects: [{ id: 'default' }]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			await expect(loadConfig(tempDir)).rejects.toThrow(
+				"Workflow isolated worktrees root cannot be empty",
+			);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
 	});
 
 	it("rejects project-level polling overrides", async () => {
@@ -1390,6 +1462,39 @@ describe("loadConfig", () => {
 		try {
 			const config = await loadConfig(tempDir);
 			expect(config.cron.jobs[0]?.run.concurrency).toBe(2);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("loads cron run isolatedWorktrees flag", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			[
+				"export default {",
+				"  cron: {",
+				"    jobs: [",
+				"      {",
+				"        id: 'hourly-isolated',",
+				"        schedule: { frequency: 'hourly' },",
+				"        run: { concurrency: 2, isolatedWorktrees: true }",
+				"      }",
+				"    ]",
+				"  },",
+				"  projects: [",
+				"    { id: 'default' }",
+				"  ]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.cron.jobs[0]?.run.isolatedWorktrees).toBe(true);
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });
 		}

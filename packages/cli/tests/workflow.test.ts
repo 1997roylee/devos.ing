@@ -49,6 +49,13 @@ import {
 	withExecutionPathLock,
 } from "../src/features/workflow/workflow";
 import { processIssueQueueBounded } from "../src/features/workflow/workflow-queue";
+import type { WorkflowRuntime } from "../src/features/workflow/workflow-runtime";
+import {
+	cleanupTerminalIsolatedWorktree,
+	isolatedWorktreePath,
+	prepareIsolatedExecutionConfig,
+	shouldUseIsolatedWorktree,
+} from "../src/features/workflow/workflow-worktree";
 import type { AgentAdapter } from "../src/integrations/agent-adapters";
 
 describe("resolvePollingSettings", () => {
@@ -1498,6 +1505,123 @@ describe("shouldSkipReviewOnlyRunState", () => {
 				{ reviewOnly: false },
 			),
 		).toBe(false);
+	});
+});
+
+describe("isolated worktree workflow helpers", () => {
+	it("enables isolation from CLI option or project config", () => {
+		const config = createProject("default");
+		expect(shouldUseIsolatedWorktree(config, {})).toBe(false);
+		expect(shouldUseIsolatedWorktree(config, { isolatedWorktrees: true })).toBe(
+			true,
+		);
+		config.workflow.isolatedWorktrees = { enabled: true };
+		expect(shouldUseIsolatedWorktree(config, {})).toBe(true);
+	});
+
+	it("resolves deterministic project worktree paths", () => {
+		const config = createProject("default");
+		config.workflow.isolatedWorktrees = { enabled: true };
+		const state = createRunState("ENG-42", "implementing", Date.now());
+		expect(isolatedWorktreePath(config, state)).toBe(
+			"/tmp/workspace/.piv-loop/projects/default/worktrees/eng-42",
+		);
+
+		config.workflow.isolatedWorktrees.root = "/tmp/adhd-worktrees";
+		expect(isolatedWorktreePath(config, state)).toBe(
+			"/tmp/adhd-worktrees/default/eng-42",
+		);
+	});
+
+	it("prepares an issue-scoped execution config while preserving shared state path", async () => {
+		const config = createProject("default");
+		config.workflow.isolatedWorktrees = { enabled: true };
+		const state = createRunState("ENG-42", "implementing", Date.now());
+		const ensureBaseBranchFresh = mock(async () => {});
+		const ensureIssueWorktree = mock(async () => "codex/eng-42");
+		const runtime = {
+			ensureBaseBranchFresh,
+			ensureIssueWorktree,
+		} as unknown as WorkflowRuntime;
+
+		const isolatedConfig = await prepareIsolatedExecutionConfig(
+			config,
+			state,
+			runtime,
+		);
+
+		expect(isolatedConfig.workspacePath).toBe(config.workspacePath);
+		expect(isolatedConfig.executionPath).toBe(
+			"/tmp/workspace/.piv-loop/projects/default/worktrees/eng-42",
+		);
+		expect(state.executionWorkspace).toMatchObject({
+			mode: "git-worktree",
+			path: isolatedConfig.executionPath,
+			branch: "codex/eng-42",
+		});
+		expect(ensureBaseBranchFresh).toHaveBeenCalledWith(config);
+		expect(ensureIssueWorktree).toHaveBeenCalledWith(
+			config,
+			"ENG-42",
+			undefined,
+			isolatedConfig.executionPath,
+		);
+	});
+
+	it("cleans terminal worktrees and keeps dirty retained worktrees in state", async () => {
+		const config = createProject("default");
+		const state = createRunState("ENG-42", "done", Date.now());
+		state.executionWorkspace = {
+			mode: "git-worktree",
+			path: "/tmp/worktrees/eng-42",
+			branch: "codex/eng-42",
+			createdAt: new Date().toISOString(),
+		};
+		const runtime = {
+			removeIssueWorktree: mock(async () => ({ removed: true })),
+		} as unknown as WorkflowRuntime;
+
+		await expect(
+			cleanupTerminalIsolatedWorktree(config, state, runtime),
+		).resolves.toBe(true);
+		expect(state.executionWorkspace).toBeUndefined();
+
+		state.stage = "blocked";
+		state.executionWorkspace = {
+			mode: "git-worktree",
+			path: "/tmp/worktrees/eng-42",
+			branch: "codex/eng-42",
+			createdAt: new Date().toISOString(),
+		};
+		const dirtyRuntime = {
+			removeIssueWorktree: mock(async () => ({
+				removed: false,
+				reason: "contains modified files",
+			})),
+		} as unknown as WorkflowRuntime;
+
+		await expect(
+			cleanupTerminalIsolatedWorktree(config, state, dirtyRuntime),
+		).resolves.toBe(false);
+		expect(state.executionWorkspace?.path).toBe("/tmp/worktrees/eng-42");
+	});
+
+	it("keeps human review worktrees for follow-up", async () => {
+		const config = createProject("default");
+		const state = createRunState("ENG-42", "human_review", Date.now());
+		state.executionWorkspace = {
+			mode: "git-worktree",
+			path: "/tmp/worktrees/eng-42",
+			branch: "codex/eng-42",
+			createdAt: new Date().toISOString(),
+		};
+		const removeIssueWorktree = mock(async () => ({ removed: true }));
+		const runtime = { removeIssueWorktree } as unknown as WorkflowRuntime;
+
+		await expect(
+			cleanupTerminalIsolatedWorktree(config, state, runtime),
+		).resolves.toBe(false);
+		expect(removeIssueWorktree).not.toHaveBeenCalled();
 	});
 });
 

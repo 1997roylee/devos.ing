@@ -143,6 +143,17 @@ function mergeRuntime(
 			...base.workflow,
 			...(rootDefaults.workflow ?? {}),
 			...(project.workflow ?? {}),
+			isolatedWorktrees: {
+				enabled:
+					project.workflow?.isolatedWorktrees?.enabled ??
+					rootDefaults.workflow?.isolatedWorktrees?.enabled ??
+					base.workflow.isolatedWorktrees?.enabled ??
+					false,
+				root:
+					project.workflow?.isolatedWorktrees?.root ??
+					rootDefaults.workflow?.isolatedWorktrees?.root ??
+					base.workflow.isolatedWorktrees?.root,
+			},
 		},
 		dryRun: project.dryRun ?? rootDefaults.dryRun ?? base.dryRun,
 	};

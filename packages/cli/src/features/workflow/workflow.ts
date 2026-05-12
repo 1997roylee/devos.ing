@@ -38,6 +38,11 @@ import {
 	type WorkflowRuntime,
 	createWorkflowRuntime,
 } from "./workflow-runtime";
+import {
+	cleanupTerminalIsolatedWorktree,
+	prepareIsolatedExecutionConfig,
+	shouldUseIsolatedWorktree,
+} from "./workflow-worktree";
 import type {
 	IssueJobLogFields,
 	IssueProjectRoutingResult,
@@ -819,6 +824,7 @@ async function processIssue(
 	);
 
 	let leaseAcquired = false;
+	const isolatedWorktreesEnabled = shouldUseIsolatedWorktree(config, options);
 	const executeIssueWithLease = async () => {
 		leaseAcquired = await tryAcquireRunLease(
 			config.workspacePath,
@@ -833,8 +839,20 @@ async function processIssue(
 			);
 			return;
 		}
+		const executionConfig =
+			isolatedWorktreesEnabled && !config.dryRun && runState.stage !== "done"
+				? await withExecutionPathLock(config.executionPath, async () => {
+						const isolatedConfig = await prepareIsolatedExecutionConfig(
+							config,
+							runState,
+							runtime,
+						);
+						await saveRunState(config.workspacePath, runState);
+						return isolatedConfig;
+					})
+				: config;
 		await executeIssue(
-			config,
+			executionConfig,
 			notifications,
 			linear,
 			runState,
@@ -845,7 +863,9 @@ async function processIssue(
 		);
 	};
 	try {
-		if (options.reviewOnly) {
+		if (isolatedWorktreesEnabled) {
+			await executeIssueWithLease();
+		} else if (options.reviewOnly) {
 			await executeIssueWithLease();
 		} else {
 			await withExecutionPathLock(config.executionPath, executeIssueWithLease);
@@ -892,6 +912,16 @@ async function processIssue(
 		);
 	} finally {
 		if (leaseAcquired) {
+			if (isolatedWorktreesEnabled) {
+				const cleanedUp = await cleanupTerminalIsolatedWorktree(
+					config,
+					runState,
+					runtime,
+				);
+				if (cleanedUp) {
+					await saveRunState(config.workspacePath, runState);
+				}
+			}
 			await releaseRunLease(config.workspacePath, runState, leaseOwnerId);
 		}
 	}

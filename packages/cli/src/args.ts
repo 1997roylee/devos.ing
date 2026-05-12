@@ -57,6 +57,9 @@ export function parseArgs(argv: string[]): CliCommand {
 		const concurrency = readOptionalPositiveInt(args, "--concurrency");
 		const pollIntervalMs = readOptionalPositiveInt(args, "--poll-interval-ms");
 		const maxPollCycles = readOptionalPositiveInt(args, "--max-poll-cycles");
+		const isolatedWorktrees = args.includes("--isolated-worktrees")
+			? true
+			: undefined;
 		if (projectId && allProjects) {
 			throw new Error("run command cannot use --project with --all-projects");
 		}
@@ -71,6 +74,7 @@ export function parseArgs(argv: string[]): CliCommand {
 				exitWhenIdle,
 				pollIntervalMs,
 				maxPollCycles,
+				...(isolatedWorktrees ? { isolatedWorktrees } : {}),
 			},
 		};
 	}
