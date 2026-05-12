@@ -32,6 +32,7 @@ import {
 	parsePlannerComplexityScore,
 	parsePlannerDecision,
 	parsePlannerIssueRefinement,
+	parsePlannerSuccessGoal,
 	prepareImplementationBranchForStage,
 	readyPullRequestAfterPassingReview,
 	resolveEffectiveIssueConcurrency,
@@ -1158,6 +1159,7 @@ describe("parsePlannerDecision", () => {
 	it("defaults to SIMPLE when complexity marker is missing", () => {
 		const result = parsePlannerDecision(
 			[
+				"SUCCESS_GOAL: Preserve the current behavior.",
 				"Scope summary",
 				"- Keep behavior unchanged.",
 				"Implementation steps",
@@ -1168,12 +1170,14 @@ describe("parsePlannerDecision", () => {
 			complexity: "SIMPLE",
 			splitTasks: [],
 			complexityScore: 4,
+			successGoal: "Preserve the current behavior.",
 		});
 	});
 
 	it("parses COMPLEX with valid split task JSON", () => {
 		const result = parsePlannerDecision(
 			[
+				"SUCCESS_GOAL: Ship both split tasks.",
 				"COMPLEXITY: COMPLEX",
 				"COMPLEXITY_SCORE: 4",
 				"SPLIT_TASKS_JSON:",
@@ -1198,6 +1202,7 @@ describe("parsePlannerDecision", () => {
 		);
 
 		expect(result.complexity).toBe("COMPLEX");
+		expect(result.successGoal).toBe("Ship both split tasks.");
 		expect(result.splitTasks).toEqual([
 			{
 				title: "Task A",
@@ -1220,6 +1225,7 @@ describe("parsePlannerDecision", () => {
 			parsePlannerDecision(
 				[
 					"COMPLEXITY: COMPLEX",
+					"SUCCESS_GOAL: Split the task.",
 					"SPLIT_TASKS_JSON: [",
 					'{"title":"Task A"}',
 				].join("\n"),
@@ -1230,7 +1236,11 @@ describe("parsePlannerDecision", () => {
 	it("throws when COMPLEX split task array is empty", () => {
 		expect(() =>
 			parsePlannerDecision(
-				["COMPLEXITY: COMPLEX", "SPLIT_TASKS_JSON: []"].join("\n"),
+				[
+					"SUCCESS_GOAL: Split the task.",
+					"COMPLEXITY: COMPLEX",
+					"SPLIT_TASKS_JSON: []",
+				].join("\n"),
 			),
 		).toThrow("must be a non-empty JSON array");
 	});
@@ -1238,9 +1248,29 @@ describe("parsePlannerDecision", () => {
 	it("throws when COMPLEXITY_SCORE is invalid", () => {
 		expect(() =>
 			parsePlannerDecision(
-				["COMPLEXITY: SIMPLE", "COMPLEXITY_SCORE: hard", "scope"].join("\n"),
+				[
+					"SUCCESS_GOAL: Complete the task.",
+					"COMPLEXITY: SIMPLE",
+					"COMPLEXITY_SCORE: hard",
+					"scope",
+				].join("\n"),
 			),
 		).toThrow("Invalid COMPLEXITY_SCORE");
+	});
+
+	it("parses SUCCESS_GOAL", () => {
+		expect(parsePlannerSuccessGoal("SUCCESS_GOAL: Ship the retry cap.")).toBe(
+			"Ship the retry cap.",
+		);
+	});
+
+	it("throws when SUCCESS_GOAL is missing or empty", () => {
+		expect(() => parsePlannerSuccessGoal("COMPLEXITY: SIMPLE")).toThrow(
+			"SUCCESS_GOAL",
+		);
+		expect(() => parsePlannerSuccessGoal("SUCCESS_GOAL:   ")).toThrow(
+			"SUCCESS_GOAL",
+		);
 	});
 });
 
@@ -1249,6 +1279,7 @@ describe("handlePlanningStage", () => {
 		const config = createProject("default");
 		const state = createRunState("ROY-80", "planning", Date.now());
 		const planSummary = [
+			"SUCCESS_GOAL: Extract the API layer into a follow-up task.",
 			"COMPLEXITY: COMPLEX",
 			"COMPLEXITY_SCORE: 7",
 			"SPLIT_TASKS_JSON:",
@@ -1454,9 +1485,12 @@ describe("applyPlannerIssueRefinement", () => {
 describe("planner routing with missing score", () => {
 	it("routes simple plans without score to bot review mode", () => {
 		const decision = parsePlannerDecision(
-			["COMPLEXITY: SIMPLE", "scope summary", "implementation steps"].join(
-				"\n",
-			),
+			[
+				"SUCCESS_GOAL: Complete the simple task.",
+				"COMPLEXITY: SIMPLE",
+				"scope summary",
+				"implementation steps",
+			].join("\n"),
 		);
 		expect(resolveReviewModeForComplexityScore(decision.complexityScore)).toBe(
 			"bot",

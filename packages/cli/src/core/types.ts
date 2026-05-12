@@ -370,6 +370,8 @@ export interface RunState {
 	implementationSummary?: string;
 	reviewSummary?: string;
 	testingSummary?: string;
+	successGoal?: string;
+	automatedReviewFixPasses?: number;
 	complexityScore?: number;
 	reviewMode?: "bot" | "human";
 	humanReviewNotifiedAt?: string;

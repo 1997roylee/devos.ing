@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import type { BugRecord, IssueRef, PullRequestRef } from "../../core/types";
-import type { PlanPromptOptions } from "./prompt-types";
+import type { PlanPromptOptions, ReviewPromptOptions } from "./prompt-types";
 
 async function loadSkillText(filePath: string): Promise<string> {
 	try {
@@ -58,6 +58,7 @@ export async function buildPlanPrompt(
 		supplementalSection,
 		"",
 		"Include ISSUE_REFINEMENT_JSON with a refined title and description that preserve original user intent and do not invent scope.",
+		"Include SUCCESS_GOAL with the concise acceptance goal that review/testing must use as the success scope.",
 		"When including SPLIT_TASKS_JSON, write action-oriented task titles and clear descriptions that include expected behavior, implementation scope, and tests.",
 		"Create a concrete implementation plan and include risks and tests.",
 	].join("\n");
@@ -90,11 +91,20 @@ export async function buildReviewPrompt(
 	skillPath: string,
 	issue: IssueRef,
 	pr: PullRequestRef | undefined,
+	options?: ReviewPromptOptions,
 ): Promise<string> {
 	const skill = await loadSkillText(skillPath);
 	const prText = pr?.url
 		? `PR: ${pr.url}`
 		: `Branch: ${pr?.branch ?? "unknown"}`;
+	const successGoal = options?.successGoal?.trim();
+	const planSummary = options?.planSummary?.trim();
+	const successScope = successGoal
+		? ["Success goal:", successGoal]
+		: [
+				"Success scope fallback from plan summary:",
+				planSummary || "(No plan summary was captured.)",
+			];
 	return [
 		"You are the review and testing agent in the Agent-Driven Development Hub (ADHD.ai) workflow.",
 		"ADHD.ai already refreshed the repository base branch before launching you; do not run git fetch or git pull.",
@@ -104,6 +114,10 @@ export async function buildReviewPrompt(
 		"",
 		`Linear issue: ${issue.key}`,
 		prText,
+		"",
+		...successScope,
+		"",
+		"Use the success scope above as the acceptance boundary. Verify the implementation satisfies it, and do not widen requirements beyond it.",
 		"",
 		"Review code changes and run `bun test` to verify the workspace is workable. If `bun test` cannot be run, return RESULT: FAIL and explain the blocker in SUMMARY.",
 		"When returning RESULT: FAIL, each BUGS_JSON item body must be a structured repair checklist with: failing command or reproduction step, observed behavior, expected behavior, likely files or code path, concrete fix expectation, and verification command/check.",

@@ -912,6 +912,14 @@ export async function handleReviewTestingStage(
 		saveRunState,
 		safePrComment: (prConfig, runState, body) =>
 			safePrComment(prConfig, runState, body, runtime),
+		safeNotifyHumanReviewRequired: (runState, reason) =>
+			safeNotifyHumanReviewRequired(
+				_notifications,
+				runState,
+				runState.complexityScore ?? DEFAULT_PLANNER_COMPLEXITY_SCORE,
+				reason,
+				runtime,
+			),
 		readyPullRequestAfterPassingReview: (prConfig, pr, passed) =>
 			readyPullRequestAfterPassingReview(prConfig, pr, passed, {
 				markPrReadyForReview: runtime.markPrReadyForReview,
@@ -1048,6 +1056,7 @@ export {
 	parsePlannerComplexityScore,
 	parsePlannerDecision,
 	parsePlannerIssueRefinement,
+	parsePlannerSuccessGoal,
 	parsePlannerSplitTasks,
 	resolveReviewModeForComplexityScore,
 	shouldSquashMergePullRequestForComplexityScore,

@@ -27,10 +27,14 @@ You are the planning agent.
 - Keep output concise and implementation-focused.
 - Include:
   - scope summary
+  - success goal
   - implementation steps
   - test plan
   - known risks
 - Required routing contract for all plans:
+  - `SUCCESS_GOAL: <concise acceptance goal>`
+    - State the exact outcome review/testing should verify.
+    - Keep it scoped to the issue; do not add unrelated acceptance criteria.
   - `COMPLEXITY: SIMPLE|COMPLEX`
   - `COMPLEXITY_SCORE: 0..10` (integer)
     - `< 5`: completed PR can be squash-merged by the review automation

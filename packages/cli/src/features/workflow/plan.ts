@@ -61,6 +61,7 @@ export async function handlePlanningStage(
 	await applyPlannerIssueRefinement(linear, state.issue, state.planSummary);
 
 	const parsedPlan = parsePlannerDecision(state.planSummary);
+	state.successGoal = parsedPlan.successGoal;
 	state.complexityScore = parsedPlan.complexityScore;
 	state.reviewMode = resolveReviewModeForComplexityScore(
 		parsedPlan.complexityScore,
@@ -108,16 +109,31 @@ export async function handlePlanningStage(
 }
 
 export function parsePlannerDecision(planSummary: string): PlannerDecision {
+	const successGoal = parsePlannerSuccessGoal(planSummary);
 	const complexity = parsePlannerComplexity(planSummary);
 	const complexityScore = parsePlannerComplexityScore(planSummary);
 	if (complexity === "SIMPLE") {
-		return { complexity, splitTasks: [], complexityScore };
+		return { complexity, splitTasks: [], complexityScore, successGoal };
 	}
 	return {
 		complexity,
 		splitTasks: parsePlannerSplitTasks(planSummary),
 		complexityScore,
+		successGoal,
 	};
+}
+
+export function parsePlannerSuccessGoal(planSummary: string): string {
+	const match = planSummary.match(
+		/(?:^|\n)\s*SUCCESS_GOAL\s*:\s*([^\n]+)\s*(?:\n|$)/i,
+	);
+	const successGoal = match?.[1]?.trim();
+	if (!successGoal) {
+		throw new Error(
+			"Planner output must include SUCCESS_GOAL with a concise acceptance goal.",
+		);
+	}
+	return successGoal;
 }
 
 export function parsePlannerComplexity(

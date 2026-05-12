@@ -11,9 +11,12 @@ const now = "2026-05-11T00:00:00.000Z";
 export const passReview = "RESULT: PASS\nSUMMARY: clean\nBUGS_JSON: []";
 export const failReview =
 	'RESULT: FAIL\nSUMMARY: broken\nBUGS_JSON: [{"title":"Bug","body":"Fix it"}]';
-export const simplePlan = "COMPLEXITY: SIMPLE\nCOMPLEXITY_SCORE: 3\nShip it.";
-export const humanPlan = "COMPLEXITY: SIMPLE\nCOMPLEXITY_SCORE: 8\nNeeds eyes.";
+export const simplePlan =
+	"SUCCESS_GOAL: Ship the simple task.\nCOMPLEXITY: SIMPLE\nCOMPLEXITY_SCORE: 3\nShip it.";
+export const humanPlan =
+	"SUCCESS_GOAL: Complete the task with human approval.\nCOMPLEXITY: SIMPLE\nCOMPLEXITY_SCORE: 8\nNeeds eyes.";
 export const complexPlan = [
+	"SUCCESS_GOAL: Split the complex task into smaller issues.",
 	"COMPLEXITY: COMPLEX",
 	"COMPLEXITY_SCORE: 6",
 	'SPLIT_TASKS_JSON: [{"title":"Part A"},{"title":"Part B"}]',

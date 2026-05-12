@@ -1,5 +1,4 @@
 import type {
-	CodexUsageRecord,
 	ResolvedNotificationConfig,
 	ResolvedProjectConfig,
 	RunState,
@@ -12,82 +11,26 @@ import {
 import { buildGithubCommentPrompt, buildReviewPrompt } from "../skills/prompts";
 import { parseReviewOutcome } from "./review";
 import {
+	MAX_AUTOMATED_REVIEW_FIX_PASSES,
+	incrementAutomatedReviewFixPasses,
 	normalizeFailedReviewBugs,
 	readyPullRequestAfterPassingReview,
 	resolveReviewFailureStage,
+	reviewFailureHumanReason,
 } from "./review-stage-helpers";
+import type {
+	FinalizeReviewMergeDeps,
+	HandleReviewTestingStageDeps,
+	ReviewLinearClient,
+} from "./review-stage.types";
 export {
+	MAX_AUTOMATED_REVIEW_FIX_PASSES,
+	incrementAutomatedReviewFixPasses,
 	normalizeFailedReviewBugs,
 	readyPullRequestAfterPassingReview,
+	reviewFailureHumanReason,
 	resolveReviewFailureStage,
 } from "./review-stage-helpers";
-
-interface HandleReviewTestingStageDeps {
-	runAgentWithChatLog: (input: {
-		workspacePath: string;
-		projectId: string;
-		issue: RunState["issue"];
-		agentRole: "review-testing" | "github-comment";
-		skillPath: string;
-		prompt: string;
-		invoke: () => Promise<{
-			finalMessage: string;
-			stdout: string;
-			sessionId?: string;
-			usage?: {
-				inputTokens?: number;
-				outputTokens?: number;
-				totalTokens?: number;
-			};
-		}>;
-	}) => Promise<{
-		finalMessage: string;
-		stdout: string;
-		sessionId?: string;
-		usage?: {
-			inputTokens?: number;
-			outputTokens?: number;
-			totalTokens?: number;
-		};
-	}>;
-	appendCodexUsage: (
-		state: RunState,
-		stage: CodexUsageRecord["stage"],
-		usage:
-			| { inputTokens?: number; outputTokens?: number; totalTokens?: number }
-			| undefined,
-	) => void;
-	transitionStage: (state: RunState, to: RunState["stage"]) => RunState;
-	saveRunState: (cwd: string, state: RunState) => Promise<void>;
-	safePrComment: (
-		config: ResolvedProjectConfig,
-		state: RunState,
-		body: string,
-	) => Promise<void>;
-	readyPullRequestAfterPassingReview?: typeof readyPullRequestAfterPassingReview;
-	loggerInfo: (fields: Record<string, unknown>, message: string) => void;
-	buildIssueJobLogFields: (
-		state: RunState,
-		stage: string,
-		options?: { resumed?: boolean },
-	) => Record<string, unknown>;
-}
-interface FinalizeReviewMergeDeps {
-	saveRunState: (cwd: string, state: RunState) => Promise<void>;
-	safeNotifyTaskOutcome: (
-		notifications: ResolvedNotificationConfig,
-		state: RunState,
-		outcome: "done" | "blocked",
-		errorMessage?: string,
-	) => Promise<void>;
-}
-
-interface ReviewLinearClient {
-	markStage(issueId: string, stage: string): Promise<void>;
-	applyStageLabel(issueId: string, stage: string): Promise<void>;
-	clearWorkflowStageLabels(issueId: string): Promise<void>;
-	comment(issueId: string, body: string): Promise<void>;
-}
 export async function handleReviewTestingStage(
 	config: ResolvedProjectConfig,
 	agent: AgentAdapter,
@@ -108,6 +51,7 @@ export async function handleReviewTestingStage(
 		config.skills.reviewTest,
 		state.issue,
 		state.pullRequest,
+		{ planSummary: state.planSummary, successGoal: state.successGoal },
 	);
 	const review = await deps.runAgentWithChatLog({
 		workspacePath: config.workspacePath,
@@ -193,21 +137,34 @@ export async function handleReviewTestingStage(
 		await linear.comment(state.issue.id, implementationFeedbackComment);
 
 		const nextStage = resolveReviewFailureStage(state);
+		const humanReason = reviewFailureHumanReason(state);
 		Object.assign(state, deps.transitionStage(state, nextStage));
+		if (nextStage === "implementing") {
+			incrementAutomatedReviewFixPasses(state);
+		}
 		await deps.saveRunState(config.workspacePath, state);
 		if (nextStage === "implementing") {
 			await linear.markStage(state.issue.id, nextStage);
 			await linear.comment(
 				state.issue.id,
-				"Review/testing failed. Feedback was sent back to implementation for another pass.",
+				`Review/testing failed. Feedback was sent back to implementation for automated fix pass ${state.automatedReviewFixPasses}/${MAX_AUTOMATED_REVIEW_FIX_PASSES}.`,
 			);
 		} else {
+			const humanComment =
+				state.codexSessionId && state.automatedReviewFixPasses
+					? `${humanReason} Parked for human review and PR updates.`
+					: "Review/testing failed, but no resumable implementation session is available. Parked for manual review and PR updates.";
 			await linear.markStage(state.issue.id, "reviewing");
 			await linear.applyStageLabel(state.issue.id, "reviewing");
-			await linear.comment(
-				state.issue.id,
-				"Review/testing failed, but no resumable implementation session is available. Parked for manual review and PR updates.",
-			);
+			await linear.comment(state.issue.id, humanComment);
+			if (!config.dryRun && state.pullRequest && state.codexSessionId) {
+				await deps.safePrComment(config, state, humanComment);
+			}
+			if (!state.humanReviewNotifiedAt && deps.safeNotifyHumanReviewRequired) {
+				await deps.safeNotifyHumanReviewRequired(state, humanReason);
+				state.humanReviewNotifiedAt = new Date().toISOString();
+				await deps.saveRunState(config.workspacePath, state);
+			}
 		}
 		return;
 	}

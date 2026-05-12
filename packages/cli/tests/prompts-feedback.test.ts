@@ -63,9 +63,16 @@ describe("buildReviewPrompt", () => {
 			"/tmp/missing-skill-file.md",
 			issue,
 			pr,
+			{
+				planSummary: "Plan the retry cap.",
+				successGoal: "Review/testing stops after three fix passes.",
+			},
 		);
 
 		expect(prompt).toContain("run `bun test`");
+		expect(prompt).toContain("Success goal:");
+		expect(prompt).toContain("Review/testing stops after three fix passes.");
+		expect(prompt).toContain("acceptance boundary");
 		expect(prompt).toContain("do not run git fetch or git pull");
 		expect(prompt).toContain("If `bun test` cannot be run");
 		expect(prompt).toContain("RESULT: FAIL");
@@ -75,6 +82,18 @@ describe("buildReviewPrompt", () => {
 		expect(prompt).toContain("expected behavior");
 		expect(prompt).toContain("likely files or code path");
 		expect(prompt).toContain("verification command/check");
+	});
+
+	it("falls back to plan summary when success goal is absent", async () => {
+		const prompt = await buildReviewPrompt(
+			"/tmp/missing-skill-file.md",
+			issue,
+			pr,
+			{ planSummary: "Plan summary as scope." },
+		);
+
+		expect(prompt).toContain("Success scope fallback from plan summary:");
+		expect(prompt).toContain("Plan summary as scope.");
 	});
 
 	it("includes review guidelines from the repo review skill", async () => {

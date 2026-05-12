@@ -93,6 +93,7 @@ describe("buildPlanPrompt", () => {
 			expect(prompt).toContain("COMPLEXITY: SIMPLE|COMPLEX");
 			expect(prompt).toContain("COMPLEXITY_SCORE: 0..10");
 			expect(prompt).toContain("SPLIT_TASKS_JSON: [...]");
+			expect(prompt).toContain("SUCCESS_GOAL");
 			expect(prompt).toContain("ISSUE_REFINEMENT_JSON");
 			expect(prompt).toContain("do not run git fetch or git pull");
 			expect(prompt).toContain(
