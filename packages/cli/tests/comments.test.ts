@@ -116,6 +116,10 @@ describe("buildImplementationFeedbackComment", () => {
 		expect(comment).toContain("ADHD.ai implementation feedback for ENG-1");
 		expect(comment).toContain("Review/testing summary:");
 		expect(comment).toContain("Tests failed after the retry path regressed.");
+		expect(comment).toContain("Fix instructions for the implementation agent:");
+		expect(comment).toContain(
+			"Address every item below, use each body as the repair checklist",
+		);
 		expect(comment).toContain("Bugs to fix:");
 		expect(comment).toContain("1. Retry path regressed");
 		expect(comment).toContain("The retry branch no longer saves run state.");

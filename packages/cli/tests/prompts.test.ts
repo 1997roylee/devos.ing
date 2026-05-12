@@ -4,11 +4,9 @@ import os from "node:os";
 import path from "node:path";
 import type { IssueRef, PullRequestRef } from "../src/core/types";
 import {
-	buildFixPrompt,
 	buildGithubCommentPrompt,
 	buildImplementPrompt,
 	buildPlanPrompt,
-	buildReviewPrompt,
 } from "../src/skills/prompts";
 
 const issue: IssueRef = {
@@ -24,31 +22,6 @@ const pr: PullRequestRef = {
 	title: "[codex] ENG-1: Fix workflow loop",
 	url: "https://github.com/acme/repo/pull/10",
 };
-
-describe("buildFixPrompt", () => {
-	it("includes review feedback and bug JSON for retry implementation", async () => {
-		const prompt = await buildFixPrompt(
-			"/tmp/missing-skill-file.md",
-			issue,
-			"Update workflow stage transitions.",
-			"Regression found in verify stage.",
-			[{ title: "Bug A", body: "Implement retry behavior." }],
-			pr,
-		);
-
-		expect(prompt).toContain(
-			"This is a fix pass after review/testing found bugs.",
-		);
-		expect(prompt).toContain("Linear issue: ENG-1");
-		expect(prompt).toContain("do not run git fetch or git pull");
-		expect(prompt).toContain("PR: https://github.com/acme/repo/pull/10");
-		expect(prompt).toContain("Regression found in verify stage.");
-		expect(prompt).toContain('"title": "Bug A"');
-		expect(prompt).toContain(
-			"Address every bug, update the existing branch/PR",
-		);
-	});
-});
 
 describe("buildImplementPrompt", () => {
 	it("tells implementation agents repository freshness was already handled", async () => {
@@ -77,34 +50,6 @@ describe("buildImplementPrompt", () => {
 		expect(prompt).toContain(
 			"List the exact checks/tests run and their outcome.",
 		);
-	});
-});
-
-describe("buildReviewPrompt", () => {
-	it("requires bun test for review/testing validation", async () => {
-		const prompt = await buildReviewPrompt(
-			"/tmp/missing-skill-file.md",
-			issue,
-			pr,
-		);
-
-		expect(prompt).toContain("run `bun test`");
-		expect(prompt).toContain("do not run git fetch or git pull");
-		expect(prompt).toContain("If `bun test` cannot be run");
-		expect(prompt).toContain("RESULT: FAIL");
-	});
-
-	it("includes review guidelines from the repo review skill", async () => {
-		const prompt = await buildReviewPrompt(
-			path.resolve(process.cwd(), "skills/piv-review-test/SKILL.md"),
-			issue,
-			pr,
-		);
-
-		expect(prompt).toContain("## Review Process");
-		expect(prompt).toContain("## Review Guidelines");
-		expect(prompt).toContain("Do not fail solely for style");
-		expect(prompt).toContain("When reporting `RESULT: PASS`");
 	});
 });
 

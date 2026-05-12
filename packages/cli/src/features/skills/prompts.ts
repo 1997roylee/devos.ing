@@ -106,11 +106,12 @@ export async function buildReviewPrompt(
 		prText,
 		"",
 		"Review code changes and run `bun test` to verify the workspace is workable. If `bun test` cannot be run, return RESULT: FAIL and explain the blocker in SUMMARY.",
+		"When returning RESULT: FAIL, each BUGS_JSON item body must be a structured repair checklist with: failing command or reproduction step, observed behavior, expected behavior, likely files or code path, concrete fix expectation, and verification command/check.",
 		"Return your final section in this exact format:",
 		"RESULT: PASS or FAIL",
 		"SUMMARY: <one-paragraph summary>",
 		"BUGS_JSON:",
-		'[{"title":"short bug title","body":"technical details"}]',
+		'[{"title":"short bug title","body":"Failing command/repro: ...\\nObserved: ...\\nExpected: ...\\nLikely files/code path: ...\\nFix expectation: ...\\nVerification: ..."}]',
 	].join("\n");
 }
 
@@ -149,7 +150,12 @@ export async function buildFixPrompt(
 		"Bugs to fix (BUGS_JSON):",
 		bugJson,
 		"",
-		"Address every bug, update the existing branch/PR, run relevant tests, and end with a concise summary.",
+		"Fix-pass instructions:",
+		"- Address every bug in BUGS_JSON; treat each body as the repair checklist from review/testing.",
+		"- Preserve unrelated user changes and avoid broad refactors outside the failing behavior.",
+		"- Add or update regression tests when the fix changes behavior or guards a reported failure.",
+		"- Run each listed verification command/check plus relevant repository checks for the touched code.",
+		"- End with a concise summary that names the bugs fixed and the checks that passed.",
 	].join("\n");
 }
 

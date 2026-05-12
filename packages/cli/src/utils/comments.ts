@@ -121,6 +121,9 @@ export function buildImplementationFeedbackComment(input: {
 		"Review/testing summary:",
 		input.summary.trim() || "(No review/testing summary provided.)",
 		"",
+		"Fix instructions for the implementation agent:",
+		"Address every item below, use each body as the repair checklist, and rerun the listed verification checks.",
+		"",
 		"Bugs to fix:",
 		...bugLines,
 	]

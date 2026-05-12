@@ -5,6 +5,7 @@
 			"node_modules",
 			"dist",
 			"packages/*/dist",
+			"packages/web/.next",
 			".piv-loop",
 			"bun.lock",
 			"adhd-ai.local.config.ts"
