@@ -1,0 +1,64 @@
+import { Database } from "bun:sqlite";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+export interface TestDatabase {
+	path: string;
+	cleanup(): Promise<void>;
+}
+
+export async function createServerTestDatabase(): Promise<TestDatabase> {
+	const tempDir = await mkdtemp(path.join(os.tmpdir(), "adhd-server-db-"));
+	const dbPath = path.join(tempDir, "server.sqlite");
+	const db = new Database(dbPath, { create: true });
+	try {
+		db.run(
+			"CREATE TABLE token_usage (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, stage TEXT NOT NULL, input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL, total_tokens INTEGER NOT NULL, recorded_at TEXT NOT NULL)",
+		);
+		db.run(
+			"CREATE TABLE jobs (id TEXT PRIMARY KEY, project_id TEXT NOT NULL, issue_key TEXT NOT NULL, stage TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL)",
+		);
+		db.run(
+			"CREATE TABLE agents (id TEXT PRIMARY KEY, name TEXT NOT NULL, backend TEXT NOT NULL, model TEXT NOT NULL, created_at TEXT NOT NULL)",
+		);
+		db.run(
+			"CREATE TABLE skills (id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL, source TEXT NOT NULL, updated_at TEXT NOT NULL)",
+		);
+		db.run(
+			"CREATE TABLE command_history (id TEXT PRIMARY KEY, command TEXT NOT NULL, exit_code INTEGER NOT NULL, executed_at TEXT NOT NULL)",
+		);
+	} finally {
+		db.close(false);
+	}
+
+	return {
+		path: dbPath,
+		async cleanup() {
+			await rm(tempDir, { recursive: true, force: true });
+		},
+	};
+}
+
+export function seedServerTestDatabase(dbPath: string): void {
+	const db = new Database(dbPath);
+	try {
+		db.run(
+			"INSERT INTO token_usage (id, run_id, stage, input_tokens, output_tokens, total_tokens, recorded_at) VALUES ('tu-1', 'run-1', 'planning', 10, 5, 15, '2026-05-12T00:00:00.000Z')",
+		);
+		db.run(
+			"INSERT INTO jobs (id, project_id, issue_key, stage, status, created_at) VALUES ('job-1', 'default', 'ROY-129', 'implementing', 'in_progress', '2026-05-12T00:01:00.000Z')",
+		);
+		db.run(
+			"INSERT INTO agents (id, name, backend, model, created_at) VALUES ('agent-1', 'codex-main', 'codex', 'gpt-5', '2026-05-12T00:02:00.000Z')",
+		);
+		db.run(
+			"INSERT INTO skills (id, name, description, source, updated_at) VALUES ('skill-1', 'backend-standard', 'Backend implementation guidance', 'folder', '2026-05-12T00:03:00.000Z')",
+		);
+		db.run(
+			"INSERT INTO command_history (id, command, exit_code, executed_at) VALUES ('cmd-1', 'bun test', 0, '2026-05-12T00:04:00.000Z')",
+		);
+	} finally {
+		db.close(false);
+	}
+}
