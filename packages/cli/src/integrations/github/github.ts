@@ -272,6 +272,24 @@ export async function ensureIssueWorktree(
 					`Isolated worktree '${worktreePath}' is on branch '${existingWorktreeBranch.stdout.trim()}', expected '${branch}'`,
 				);
 			}
+			if (pullRequest?.branch) {
+				const fetchBranch = await commandRunner(
+					"git",
+					["fetch", "origin", `${branch}:refs/remotes/origin/${branch}`],
+					{ cwd: worktreePath },
+				);
+				assertOk(
+					"git",
+					["fetch", "origin", `${branch}:refs/remotes/origin/${branch}`],
+					fetchBranch,
+				);
+				const reset = await commandRunner(
+					"git",
+					["reset", "--hard", `origin/${branch}`],
+					{ cwd: worktreePath },
+				);
+				assertOk("git", ["reset", "--hard", `origin/${branch}`], reset);
+			}
 			return branch;
 		}
 	} catch (error) {

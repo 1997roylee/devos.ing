@@ -32,7 +32,9 @@ import {
 	parsePlannerComplexityScore,
 	parsePlannerDecision,
 	parsePlannerIssueRefinement,
+	prepareImplementationBranchForStage,
 	readyPullRequestAfterPassingReview,
+	resolveEffectiveIssueConcurrency,
 	resolvePollingSettings,
 	resolveReviewFailureStage,
 	resolveReviewModeForComplexityScore,
@@ -121,6 +123,18 @@ describe("processIssueQueueBounded", () => {
 		});
 
 		expect(maxWorkersSeen.value).toBe(2);
+	});
+});
+
+describe("resolveEffectiveIssueConcurrency", () => {
+	it("uses run options before project defaults", () => {
+		const config = createProject("default");
+		config.workflow.issueConcurrency = 1;
+
+		expect(resolveEffectiveIssueConcurrency(config, {})).toBe(1);
+		expect(resolveEffectiveIssueConcurrency(config, { concurrency: 3 })).toBe(
+			3,
+		);
 	});
 });
 
@@ -1511,12 +1525,18 @@ describe("shouldSkipReviewOnlyRunState", () => {
 describe("isolated worktree workflow helpers", () => {
 	it("enables isolation from CLI option or project config", () => {
 		const config = createProject("default");
-		expect(shouldUseIsolatedWorktree(config, {})).toBe(false);
-		expect(shouldUseIsolatedWorktree(config, { isolatedWorktrees: true })).toBe(
-			true,
-		);
+		expect(shouldUseIsolatedWorktree(config, {}, 1)).toBe(false);
+		expect(
+			shouldUseIsolatedWorktree(config, { isolatedWorktrees: true }, 1),
+		).toBe(true);
 		config.workflow.isolatedWorktrees = { enabled: true };
-		expect(shouldUseIsolatedWorktree(config, {})).toBe(true);
+		expect(shouldUseIsolatedWorktree(config, {}, 1)).toBe(true);
+	});
+
+	it("automatically enables isolation for parallel issue execution", () => {
+		const config = createProject("default");
+
+		expect(shouldUseIsolatedWorktree(config, {}, 2)).toBe(true);
 	});
 
 	it("resolves deterministic project worktree paths", () => {
@@ -1622,6 +1642,54 @@ describe("isolated worktree workflow helpers", () => {
 			cleanupTerminalIsolatedWorktree(config, state, runtime),
 		).resolves.toBe(false);
 		expect(removeIssueWorktree).not.toHaveBeenCalled();
+	});
+});
+
+describe("prepareImplementationBranchForStage", () => {
+	it("does not prepare a branch again inside an isolated worktree", async () => {
+		const config = createProject("default");
+		const state = createRunState("ENG-42", "implementing", Date.now());
+		state.executionWorkspace = {
+			mode: "git-worktree",
+			path: "/tmp/worktrees/eng-42",
+			branch: "codex/eng-42",
+			createdAt: new Date().toISOString(),
+		};
+		const prepareImplementationBranch = mock(async () => "codex/eng-42");
+		const runtime = {
+			prepareImplementationBranch,
+		} as unknown as WorkflowRuntime;
+
+		await prepareImplementationBranchForStage(config, state, runtime);
+
+		expect(prepareImplementationBranch).not.toHaveBeenCalled();
+		expect(state.pullRequest).toMatchObject({
+			branch: "codex/eng-42",
+			title: "[codex] ENG-42: ENG-42",
+		});
+	});
+
+	it("rejects an isolated worktree on a different PR branch", async () => {
+		const config = createProject("default");
+		const state = createRunState("ENG-42", "implementing", Date.now());
+		state.pullRequest = {
+			branch: "codex/eng-42-fix",
+			title: "ENG-42",
+			url: "https://github.com/acme/repo/pull/42",
+		};
+		state.executionWorkspace = {
+			mode: "git-worktree",
+			path: "/tmp/worktrees/eng-42",
+			branch: "codex/eng-42",
+			createdAt: new Date().toISOString(),
+		};
+		const runtime = {
+			prepareImplementationBranch: mock(async () => "codex/eng-42-fix"),
+		} as unknown as WorkflowRuntime;
+
+		await expect(
+			prepareImplementationBranchForStage(config, state, runtime),
+		).rejects.toThrow("does not match expected branch");
 	});
 });
 

@@ -30,7 +30,6 @@
 	},
 	"dependencies": {
 		"@linear/sdk": "^83.0.0",
-		"dayjs": "^1.11.18",
 		"pino": "^10.3.1",
 		"pino-pretty": "^13.1.3"
 	}

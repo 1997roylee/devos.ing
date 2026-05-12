@@ -11,11 +11,12 @@ import type { WorkflowRuntime } from "./workflow-runtime";
 export function shouldUseIsolatedWorktree(
 	config: ResolvedProjectConfig,
 	options: RunOptions,
+	effectiveConcurrency: number,
 ): boolean {
 	return (
-		options.isolatedWorktrees ??
-		config.workflow.isolatedWorktrees?.enabled ??
-		false
+		options.isolatedWorktrees === true ||
+		config.workflow.isolatedWorktrees?.enabled === true ||
+		effectiveConcurrency > 1
 	);
 }
 
