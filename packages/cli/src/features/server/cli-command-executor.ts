@@ -45,6 +45,8 @@ export class CliCommandExecutor {
 				{
 					cwd: this.options.cwd,
 					env: this.options.env,
+					streamStdout: true,
+					streamStderr: true,
 				},
 			);
 			const status = commandResult.code === 0 ? "succeeded" : "failed";

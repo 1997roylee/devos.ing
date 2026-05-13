@@ -202,6 +202,42 @@ describe("CliCommandExecutor", () => {
 		]);
 	});
 
+	it("passes stream flags to runCommand for server observability", async () => {
+		const calls: Array<{
+			command: string;
+			args: string[];
+			options: {
+				cwd: string;
+				env?: NodeJS.ProcessEnv;
+				stdinMode?: "pipe" | "ignore" | "inherit";
+				streamStdout?: boolean;
+				streamStderr?: boolean;
+			};
+		}> = [];
+		const runCommandFn: RunCommandFn = async (command, args, options) => {
+			calls.push({ command, args, options });
+			return { code: 0, stdout: "ok", stderr: "" };
+		};
+		const executor = new CliCommandExecutor({
+			cwd: "/tmp/work",
+			command: "bun",
+			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			env: { PIV_ENV: "test" },
+			runCommandFn,
+		});
+
+		const result = await executor.execute({ action: "projects" });
+
+		expect(result.status).toBe("succeeded");
+		expect(calls).toHaveLength(1);
+		expect(calls[0]?.options).toEqual({
+			cwd: "/tmp/work",
+			env: { PIV_ENV: "test" },
+			streamStdout: true,
+			streamStderr: true,
+		});
+	});
+
 	it("rejects malformed setup requests without execution", async () => {
 		let callCount = 0;
 		const runCommandFn: RunCommandFn = async () => {
