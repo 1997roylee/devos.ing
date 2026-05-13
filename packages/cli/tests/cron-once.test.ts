@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import type { LoadedConfig } from "../src/core/config";
-import type { CronJobConfig } from "../src/core/types";
+import type { LoadedConfig } from "../src/features/config";
+import type { CronJobConfig } from "../src/features/types";
 import { runCronJobOnce } from "../src/integrations/cron";
 
 describe("runCronJobOnce", () => {
@@ -149,6 +149,11 @@ function createLoadedConfig(jobs: CronJobConfig[]): LoadedConfig {
 					autoCreateLabels: true,
 				},
 				github: { useGhCli: true, defaultBugLabel: "bug" },
+				server: {
+					database: {
+						databasePath: "/tmp/ws/.piv-loop/config/server-db",
+					},
+				},
 				codex: { binary: "codex", streamLogs: false },
 				skills: {
 					root: "/tmp/skills",

@@ -3,8 +3,12 @@ import type {
 	PollingConfig,
 	ProjectRuntimeConfig,
 	ResolvedNotificationConfig,
-} from "../../core/types";
-import { AUTO_SELECT_SKILLS_DB_FILE, SQLITE_ENV_DIR } from "./constants";
+} from "../../features/types";
+import {
+	AUTO_SELECT_SKILLS_DB_FILE,
+	SERVER_DB_DIR,
+	SQLITE_ENV_DIR,
+} from "./constants";
 import {
 	normalizeAgentBackend,
 	normalizeBooleanEnvValue,
@@ -74,6 +78,13 @@ export function buildEnvBase(
 		github: {
 			useGhCli: true,
 			defaultBugLabel: env.GITHUB_BUG_LABEL ?? "bug",
+		},
+		server: {
+			database: {
+				databasePath:
+					normalizeOptionalValue(env.PIV_SERVER_DATABASE_PATH) ??
+					path.join(cwd, SQLITE_ENV_DIR, SERVER_DB_DIR),
+			},
 		},
 		codex: {
 			binary: env.CODEX_BINARY ?? "codex",

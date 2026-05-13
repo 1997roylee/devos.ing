@@ -3,7 +3,7 @@ import type {
 	ResolvedNotificationConfig,
 	ResolvedProjectConfig,
 	RunState,
-} from "../src/core/types";
+} from "../src/features/types";
 import {
 	safeLinearComment,
 	safeLinearMoveToCanceled,
@@ -73,6 +73,11 @@ function createConfig(): ResolvedProjectConfig {
 			autoCreateLabels: true,
 		},
 		github: { useGhCli: true, defaultBugLabel: "bug" },
+		server: {
+			database: {
+				databasePath: "/tmp/work/.piv-loop/config/server-db",
+			},
+		},
 		codex: {
 			binary: "codex",
 			streamLogs: false,

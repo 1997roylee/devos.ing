@@ -9,13 +9,15 @@ single workspace.
 1. Before executing agent workflow work, pull the latest code from `main` so runs
    start from current repository state. Fetch `origin/main`, update the local
    `main` with a fast-forward-only pull, and do not proceed from stale code.
-2. Do not construct raw shell command strings in workflow logic; use helper
+2. Use Bun for all package management, scripts, workspace filters, and tests.
+   Do not add npm, Yarn, or pnpm lockfiles or package-manager-specific config.
+3. Do not construct raw shell command strings in workflow logic; use helper
    modules that pass command arguments as structured arrays.
-3. Keep TypeScript files under 250 lines; split files before they grow beyond
+4. Keep TypeScript files under 250 lines; split files before they grow beyond
    that limit.
-4. Keep TypeScript interfaces/type aliases in dedicated `*.types.ts` modules
+5. Keep TypeScript interfaces/type aliases in dedicated `*.types.ts` modules
    separate from runtime implementation when adding or changing contracts.
-5. Keep review parsing contract stable:
+6. Keep review parsing contract stable:
    - `RESULT: PASS|FAIL`
    - `SUMMARY: ...`
    - `BUGS_JSON: [...]`

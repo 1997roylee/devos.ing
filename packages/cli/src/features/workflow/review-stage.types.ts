@@ -3,7 +3,7 @@ import type {
 	ResolvedNotificationConfig,
 	ResolvedProjectConfig,
 	RunState,
-} from "../../core/types";
+} from "../types";
 import type { readyPullRequestAfterPassingReview } from "./review-stage-helpers";
 
 export interface HandleReviewTestingStageDeps {

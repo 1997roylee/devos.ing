@@ -7,7 +7,7 @@ import type {
 	PollingConfig,
 	ResolvedProjectConfig,
 	RunState,
-} from "../src/core/types";
+} from "../src/features/types";
 import { handlePlanningStage } from "../src/features/workflow/plan";
 import {
 	agentChatLogPath,
@@ -1775,6 +1775,11 @@ function createProject(
 		github: {
 			useGhCli: true,
 			defaultBugLabel: "bug",
+		},
+		server: {
+			database: {
+				databasePath: "/tmp/workspace/.piv-loop/config/server-db",
+			},
 		},
 		codex: {
 			binary: "codex",

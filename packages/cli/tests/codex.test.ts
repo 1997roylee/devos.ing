@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { ResolvedProjectConfig } from "../src/core/types";
+import type { ResolvedProjectConfig } from "../src/features/types";
 import {
 	CodexAdapter,
 	extractSessionId,
@@ -36,6 +36,11 @@ const config: ResolvedProjectConfig = {
 		autoCreateLabels: true,
 	},
 	github: { useGhCli: true, defaultBugLabel: "bug" },
+	server: {
+		database: {
+			databasePath: "/tmp/work/.piv-loop/config/server-db",
+		},
+	},
 	codex: {
 		binary: "codex",
 		streamLogs: false,

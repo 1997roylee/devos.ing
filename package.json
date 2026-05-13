@@ -2,8 +2,13 @@
 	"name": "show-me-ur-agents",
 	"private": true,
 	"type": "module",
+	"packageManager": "bun@1.3.8",
+	"engines": {
+		"bun": ">=1.3.0"
+	},
 	"workspaces": ["packages/*"],
 	"scripts": {
+		"preinstall": "bun run ./scripts/enforce-bun.ts",
 		"build": "bun run --filter adhdai build",
 		"build:server": "bun -e \"console.log('No server workspace package is present yet. Add the ROY-120 server package, then wire this script to its build command.')\"",
 		"build:web": "bun run --filter web build",
@@ -16,15 +21,15 @@
 		"review:hourly": "bun run ./packages/cli/src/index.ts cron --job hourly-pr-review",
 		"test": "bun test packages/cli/tests",
 		"typecheck": "bun run --filter adhdai typecheck && bun run --filter web typecheck",
-		"format": "biome format --write .",
-		"lint": "biome lint .",
-		"check": "biome check .",
-		"check:write": "biome check --write .",
+		"format": "bun run biome format --write .",
+		"lint": "bun run biome lint .",
+		"check": "bun run biome check .",
+		"check:write": "bun run biome check --write .",
 		"cron:once": "bun run ./packages/cli/src/index.ts cron --once",
 		"review:hourly:once": "bun run ./packages/cli/src/index.ts cron --once --job hourly-pr-review",
 		"prepare:publish": "bun run --filter adhdai prepare:publish",
 		"changeset": "changeset",
-		"prepare": "husky"
+		"prepare": "bun run ./scripts/prepare.ts"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "1.9.4",

@@ -8,6 +8,7 @@ import {
 	type NewTokenUsageRow,
 	agentsTable,
 	commandHistoryTable,
+	initializeServerDatabase,
 	jobsTable,
 	skillsTable,
 	tokenUsageTable,
@@ -101,5 +102,11 @@ describe("server drizzle schema", () => {
 		expect(agentRow).toEqual(agent);
 		expect(skillRow).toEqual(skill);
 		expect(commandHistoryRow).toEqual(commandHistory);
+	});
+
+	it("initializes the same database path twice without startup errors", async () => {
+		testDatabase = await createDrizzleServerTestDatabase();
+		const reopened = await initializeServerDatabase(testDatabase.path);
+		await reopened.close();
 	});
 });

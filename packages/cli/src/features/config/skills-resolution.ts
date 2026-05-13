@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { DeepPartial, ProjectRuntimeConfig } from "../../core/types";
+import type { DeepPartial, ProjectRuntimeConfig } from "../types";
 
 type SkillConfig = ProjectRuntimeConfig["skills"];
 

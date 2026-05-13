@@ -2,10 +2,10 @@ import { describe, expect, it } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { ResolvedProjectConfig } from "../src/core/types";
 import { parseTaskIntakeDecision } from "../src/features/task-intake/parser";
 import { buildTaskIntakePrompt } from "../src/features/task-intake/prompts";
 import { runTaskIntake } from "../src/features/task-intake/run";
+import type { ResolvedProjectConfig } from "../src/features/types";
 
 describe("parseTaskIntakeDecision", () => {
 	it("parses clear task output", () => {
@@ -211,6 +211,7 @@ function project(): ResolvedProjectConfig {
 			autoCreateLabels: false,
 		},
 		github: { useGhCli: false, defaultBugLabel: "bug" },
+		server: { database: { databasePath: "/tmp/adhdai.sqlite" } },
 		codex: { binary: "codex", streamLogs: false },
 		agent: { backend: "codex" },
 		workflow: { issueConcurrency: 1 },

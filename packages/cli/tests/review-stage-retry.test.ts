@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { ResolvedProjectConfig, RunState } from "../src/core/types";
+import type { ResolvedProjectConfig, RunState } from "../src/features/types";
 import {
 	MAX_AUTOMATED_REVIEW_FIX_PASSES,
 	handleReviewTestingStage,
@@ -31,6 +31,7 @@ function createConfig(): ResolvedProjectConfig {
 			autoCreateLabels: true,
 		},
 		github: { useGhCli: true, defaultBugLabel: "bug" },
+		server: { database: { databasePath: "/tmp/adhdai.sqlite" } },
 		codex: { binary: "codex", streamLogs: false },
 		agent: {},
 		workflow: { issueConcurrency: 1 },

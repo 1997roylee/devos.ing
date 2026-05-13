@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.bun-cache/
 .piv-loop/
 *.log
 .npm-cache/
@@ -11,3 +12,5 @@ adhd-ai.local.config.ts
 # Local dev docs (not for sync)
 HANDOFF.md
 adhd-ai.local.config.ts
+
+.tmp

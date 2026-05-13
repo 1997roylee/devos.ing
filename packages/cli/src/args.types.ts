@@ -1,4 +1,4 @@
-import type { RunOptions } from "./core/types";
+import type { RunOptions } from "./features/types";
 
 export type SkillsCommand =
 	| { action: "list"; projectId?: string }

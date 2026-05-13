@@ -4,7 +4,7 @@ import type {
 	ResolvedProjectConfig,
 	RunState,
 	WorkflowStage,
-} from "../src/core/types";
+} from "../src/features/types";
 
 const now = "2026-05-11T00:00:00.000Z";
 
@@ -87,6 +87,11 @@ export function project(
 			autoCreateLabels: false,
 		},
 		github: { useGhCli: false, defaultBugLabel: "bug" },
+		server: {
+			database: {
+				databasePath: ".piv-loop/config/server-db",
+			},
+		},
 		codex: { binary: "codex", streamLogs: false },
 		skills: {
 			root: "skills",

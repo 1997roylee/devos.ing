@@ -3,8 +3,8 @@ import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { handleCommand } from "../src/commands/handlers";
-import type { LoadedConfig } from "../src/core/config";
-import type { ResolvedProjectConfig, RunState } from "../src/core/types";
+import type { LoadedConfig } from "../src/features/config";
+import type { ResolvedProjectConfig, RunState } from "../src/features/types";
 import { saveRunState } from "../src/features/workflow/state";
 
 const originalStdoutWrite = process.stdout.write.bind(process.stdout);
@@ -109,6 +109,11 @@ function createProject(
 		github: {
 			useGhCli: true,
 			defaultBugLabel: "bug",
+		},
+		server: {
+			database: {
+				databasePath: "/tmp/workspace/.piv-loop/config/server-db",
+			},
 		},
 		codex: {
 			binary: "codex",

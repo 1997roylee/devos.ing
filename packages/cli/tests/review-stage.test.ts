@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { ResolvedProjectConfig, RunState } from "../src/core/types";
+import type { ResolvedProjectConfig, RunState } from "../src/features/types";
 import { handleReviewTestingStage } from "../src/features/workflow/review-stage";
 
 function createConfig(): ResolvedProjectConfig {
@@ -28,6 +28,11 @@ function createConfig(): ResolvedProjectConfig {
 			autoCreateLabels: true,
 		},
 		github: { useGhCli: true, defaultBugLabel: "bug" },
+		server: {
+			database: {
+				databasePath: "/tmp/work/.piv-loop/config/server-db",
+			},
+		},
 		codex: { binary: "codex", streamLogs: false },
 		agent: {},
 		workflow: { issueConcurrency: 1 },

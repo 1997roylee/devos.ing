@@ -2,7 +2,11 @@ import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { loadConfig, saveSqliteEnv, sqliteEnvDbPath } from "../src/core/config";
+import {
+	loadConfig,
+	saveSqliteEnv,
+	sqliteEnvDbPath,
+} from "../src/features/config";
 
 const envKeys = [
 	"LINEAR_API_KEY",
@@ -55,6 +59,7 @@ const envKeys = [
 	"CLAUDE_CODE_MODEL",
 	"CLAUDE_CODE_MAX_TURNS",
 	"CLAUDE_CODE_ALLOWED_TOOLS",
+	"PIV_SERVER_DATABASE_PATH",
 ] as const;
 
 const previousEnv: Record<string, string | undefined> = {};
@@ -85,7 +90,8 @@ describe("loadConfig", () => {
 								key === "CODEX_DOCKER_EXECUTION_PATH" ||
 								key === "CODEX_DOCKER_CODEX_HOME_PATH" ||
 								key === "CLAUDE_CODE_MODEL" ||
-								key === "CLAUDE_CODE_ALLOWED_TOOLS"
+								key === "CLAUDE_CODE_ALLOWED_TOOLS" ||
+								key === "PIV_SERVER_DATABASE_PATH"
 							? ""
 							: key === "PIV_POLL_INTERVAL_MS"
 								? "30000"
@@ -171,6 +177,48 @@ describe("loadConfig", () => {
 			expect(config.projects[0]?.workflow.isolatedWorktrees).toEqual({
 				enabled: false,
 			});
+			expect(config.projects[0]?.server.database.databasePath).toBe(
+				path.join(tempDir, ".piv-loop", "config", "server-db"),
+			);
+		} finally {
+			await rm(tempDir, { recursive: true, force: true });
+		}
+	});
+
+	it("supports server database path from env and root/project overrides", async () => {
+		const tempDir = await mkdtemp(
+			path.join(process.cwd(), ".tmp-config-test-"),
+		);
+		process.env.PIV_SERVER_DATABASE_PATH = "./from-env/server-db";
+		await writeFile(
+			path.join(tempDir, "adhd-ai.config.ts"),
+			[
+				"export default {",
+				"  server: {",
+				"    database: {",
+				"      databasePath: './root/server-db'",
+				"    }",
+				"  },",
+				"  projects: [",
+				"    {",
+				"      id: 'default',",
+				"      server: {",
+				"        database: {",
+				"          databasePath: './project/server-db'",
+				"        }",
+				"      }",
+				"    }",
+				"  ]",
+				"};",
+				"",
+			].join("\n"),
+		);
+
+		try {
+			const config = await loadConfig(tempDir);
+			expect(config.projects[0]?.server.database.databasePath).toBe(
+				path.resolve(tempDir, "./project/server-db"),
+			);
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });
 		}

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { LinearIssue } from "../src/core/types";
-import type { ResolvedProjectConfig } from "../src/core/types";
+import type { LinearIssue, ResolvedProjectConfig } from "../src/features/types";
 import {
 	LinearClient,
 	buildBacklogTaskIssueInput,
@@ -308,11 +307,7 @@ describe("LinearClient.createBacklogTask", () => {
 		const capturedInputs: Array<Record<string, unknown>> = [];
 		const client = new LinearClient(createLinearProject());
 		disableLinearRequestThrottle(client);
-		(
-			client as unknown as {
-				getClient: () => Promise<unknown>;
-			}
-		).getClient = async () => ({
+		replaceLinearSdkClient(client, {
 			workflowStates: async () => ({
 				nodes: [
 					{ id: "state_backlog", name: "Backlog", teamId: "team_123" },
@@ -361,11 +356,8 @@ describe("LinearClient.createBacklogTask", () => {
 			linear: { ...createLinearProject().linear, teamId: undefined },
 		});
 		disableLinearRequestThrottle(client);
-		(
-			client as unknown as {
-				getClient: () => Promise<unknown>;
-			}
-		).getClient = async () =>
+		replaceLinearSdkClient(
+			client,
 			createBacklogFakeClient({
 				capturedInputs,
 				projectTeams: [{ id: "team_project" }],
@@ -377,7 +369,8 @@ describe("LinearClient.createBacklogTask", () => {
 						teamId: "team_project",
 					},
 				],
-			});
+			}),
+		);
 
 		await client.createBacklogTask({
 			title: "Create task intake CLI",
@@ -402,11 +395,8 @@ describe("LinearClient.createBacklogTask", () => {
 			},
 		});
 		disableLinearRequestThrottle(client);
-		(
-			client as unknown as {
-				getClient: () => Promise<unknown>;
-			}
-		).getClient = async () =>
+		replaceLinearSdkClient(
+			client,
 			createBacklogFakeClient({
 				capturedInputs,
 				workflowStates: [
@@ -416,7 +406,8 @@ describe("LinearClient.createBacklogTask", () => {
 						teamId: "team_unique",
 					},
 				],
-			});
+			}),
+		);
 
 		await client.createBacklogTask({
 			title: "Create task intake CLI",
@@ -436,17 +427,15 @@ describe("LinearClient.createBacklogTask", () => {
 			linear: { ...createLinearProject().linear, teamId: undefined },
 		});
 		disableLinearRequestThrottle(client);
-		(
-			client as unknown as {
-				getClient: () => Promise<unknown>;
-			}
-		).getClient = async () =>
+		replaceLinearSdkClient(
+			client,
 			createBacklogFakeClient({
 				projectTeams: [{ id: "team_a" }, { id: "team_b" }],
 				workflowStates: [
 					{ id: "state_backlog_a", name: "Backlog", teamId: "team_a" },
 				],
-			});
+			}),
+		);
 
 		await expect(
 			client.createBacklogTask({ title: "Title", description: "Description" }),
@@ -463,17 +452,15 @@ describe("LinearClient.createBacklogTask", () => {
 			},
 		});
 		disableLinearRequestThrottle(client);
-		(
-			client as unknown as {
-				getClient: () => Promise<unknown>;
-			}
-		).getClient = async () =>
+		replaceLinearSdkClient(
+			client,
 			createBacklogFakeClient({
 				workflowStates: [
 					{ id: "state_backlog_a", name: "Backlog", teamId: "team_a" },
 					{ id: "state_backlog_b", name: "Backlog", teamId: "team_b" },
 				],
-			});
+			}),
+		);
 
 		await expect(
 			client.createBacklogTask({ title: "Title", description: "Description" }),
@@ -611,6 +598,13 @@ function disableLinearRequestThrottle(client: LinearClient): void {
 	).linearRequest = async (operation) => operation();
 }
 
+function replaceLinearSdkClient(
+	client: LinearClient,
+	sdkClient: unknown,
+): void {
+	(client as unknown as { client: unknown }).client = sdkClient;
+}
+
 function createBacklogFakeClient(input: {
 	capturedInputs?: Array<Record<string, unknown>>;
 	projectTeams?: Array<{ id: string }>;
@@ -669,6 +663,7 @@ function createLinearProject(): ResolvedProjectConfig {
 			autoCreateLabels: false,
 		},
 		github: { useGhCli: false, defaultBugLabel: "bug" },
+		server: { database: { databasePath: "/tmp/adhdai.sqlite" } },
 		codex: { binary: "codex", streamLogs: false },
 		skills: {
 			root: "skills",

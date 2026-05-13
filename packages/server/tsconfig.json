@@ -8,7 +8,12 @@
 		"noEmit": true,
 		"forceConsistentCasingInFileNames": true,
 		"skipLibCheck": true,
-		"types": ["bun"]
+		"types": ["bun"],
+		"baseUrl": ".",
+		"paths": {
+			"@/*": ["./src/*"],
+			"adhdai/*": ["../cli/src/*"]
+		}
 	},
 	"include": ["src", "tests"]
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { ResolvedProjectConfig } from "../src/core/types";
+import type { ResolvedProjectConfig } from "../src/features/types";
 import {
 	buildBugIssueBody,
 	commentOnPr,
@@ -802,6 +802,11 @@ function createProjectConfig(): ResolvedProjectConfig {
 		github: {
 			useGhCli: true,
 			defaultBugLabel: "bug",
+		},
+		server: {
+			database: {
+				databasePath: "/tmp/workspace/.piv-loop/config/server-db",
+			},
 		},
 		codex: {
 			binary: "codex",

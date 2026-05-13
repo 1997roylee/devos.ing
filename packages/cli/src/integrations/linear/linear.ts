@@ -1,10 +1,10 @@
-import { createRequire } from "node:module";
+import { LinearClient as LinearSdkClient } from "@linear/sdk";
 import type {
 	LinearIssue,
 	PlannedSplitTask,
 	ResolvedProjectConfig,
 	WorkflowStage,
-} from "../../core/types";
+} from "../../features/types";
 import { normalizeIssueKey } from "../../features/workflow/state";
 import type {
 	BacklogTaskInput,
@@ -71,7 +71,7 @@ type LinearSdkClientInstance = {
 		issueId: string,
 		input: Record<string, unknown>,
 	) => Promise<unknown>;
-	createIssue: (input: Record<string, unknown>) => Promise<{
+	createIssue: (input: unknown) => Promise<{
 		success: boolean;
 		issueId?: string | null;
 		issue?: Promise<LinearSdkIssue | null>;
@@ -96,13 +96,6 @@ type LinearSdkClientInstance = {
 	}>;
 	issueLabel: (id: string) => Promise<LinearSdkIssueLabel | null>;
 };
-
-type LinearSdkClientCtor = new (input: {
-	apiKey: string;
-	apiUrl?: string;
-}) => LinearSdkClientInstance;
-
-const require = createRequire(import.meta.url);
 
 const LINEAR_MAX_REQUESTS_PER_HOUR = 1800;
 const LINEAR_REQUEST_INTERVAL_MS = Math.ceil(
@@ -235,7 +228,12 @@ export class LinearClient {
 	private workflowStatesCache: LinearSdkWorkflowState[] | null = null;
 	private issueLabelsCache: LinearLabelRecord[] | null = null;
 
-	constructor(private readonly config: ResolvedProjectConfig) {}
+	constructor(private readonly config: ResolvedProjectConfig) {
+		this.client = new LinearSdkClient({
+			apiKey: config.linear.apiKey,
+			apiUrl: config.linear.apiUrl,
+		}) as unknown as LinearSdkClientInstance;
+	}
 
 	async fetchWork(issueArg?: string): Promise<LinearIssue[]> {
 		await this.ensureResolvedStatusMap();
@@ -253,9 +251,7 @@ export class LinearClient {
 				: [];
 		}
 
-		const viewer = await this.linearRequest(
-			async () => (await this.getClient()).viewer,
-		);
+		const viewer = await this.linearRequest(() => this.client.viewer);
 		const assignedIssues = await this.linearRequest(() =>
 			viewer.assignedIssues({
 				first: this.config.linear.pollLimit,
@@ -297,9 +293,7 @@ export class LinearClient {
 
 	async fetchReviewOnlyWork(): Promise<LinearIssue[]> {
 		await this.ensureResolvedStatusMap();
-		const viewer = await this.linearRequest(
-			async () => (await this.getClient()).viewer,
-		);
+		const viewer = await this.linearRequest(() => this.client.viewer);
 		const assignedIssues = await this.linearRequest(() =>
 			viewer.assignedIssues({
 				first: this.config.linear.pollLimit,
@@ -356,8 +350,8 @@ export class LinearClient {
 			return;
 		}
 		const stateId = statusMap[stage];
-		await this.linearRequest(async () =>
-			(await this.getClient()).updateIssue(issueId, { stateId }),
+		await this.linearRequest(() =>
+			this.client.updateIssue(issueId, { stateId }),
 		);
 	}
 
@@ -370,8 +364,8 @@ export class LinearClient {
 			return;
 		}
 		const stateId = await this.resolveCanceledStateId();
-		await this.linearRequest(async () =>
-			(await this.getClient()).updateIssue(issueId, { stateId }),
+		await this.linearRequest(() =>
+			this.client.updateIssue(issueId, { stateId }),
 		);
 	}
 
@@ -383,8 +377,8 @@ export class LinearClient {
 		if (this.config.dryRun) {
 			return;
 		}
-		await this.linearRequest(async () =>
-			(await this.getClient()).updateIssue(issueId, {
+		await this.linearRequest(() =>
+			this.client.updateIssue(issueId, {
 				title,
 				description,
 			}),
@@ -417,8 +411,8 @@ export class LinearClient {
 			};
 		}
 
-		const payload = await this.linearRequest(async () =>
-			(await this.getClient()).createIssue(createInput),
+		const payload = await this.linearRequest(() =>
+			this.client.createIssue(createInput),
 		);
 		if (!payload.success) {
 			throw new Error(`Failed to create Linear backlog task '${input.title}'.`);
@@ -426,8 +420,8 @@ export class LinearClient {
 		const createdIssue =
 			(await this.linearRequest(() => payload.issue)) ??
 			(payload.issueId
-				? await this.linearRequest(async () =>
-						(await this.getClient()).issue(payload.issueId as string),
+				? await this.linearRequest(() =>
+						this.client.issue(payload.issueId as string),
 					)
 				: undefined);
 		if (!createdIssue?.id || !createdIssue.identifier || !createdIssue.url) {
@@ -468,8 +462,8 @@ export class LinearClient {
 			};
 		}
 
-		const payload = await this.linearRequest(async () =>
-			(await this.getClient()).createIssue(createInput as never),
+		const payload = await this.linearRequest(() =>
+			this.client.createIssue(createInput as never),
 		);
 		if (!payload.success) {
 			throw new Error(
@@ -481,9 +475,7 @@ export class LinearClient {
 		const createdIssue =
 			(await this.linearRequest(() => payload.issue)) ??
 			(createdIssueId
-				? await this.linearRequest(async () =>
-						(await this.getClient()).issue(createdIssueId),
-					)
+				? await this.linearRequest(() => this.client.issue(createdIssueId))
 				: undefined);
 		if (!createdIssue?.id || !createdIssue.identifier || !createdIssue.url) {
 			throw new Error(
@@ -493,8 +485,8 @@ export class LinearClient {
 
 		const labelIds = await this.resolveSplitTaskLabelIds(task.labels);
 		if (labelIds.length > 0) {
-			await this.linearRequest(async () =>
-				(await this.getClient()).updateIssue(createdIssue.id, {
+			await this.linearRequest(() =>
+				this.client.updateIssue(createdIssue.id, {
 					addedLabelIds: labelIds,
 				}),
 			);
@@ -529,8 +521,8 @@ export class LinearClient {
 			return;
 		}
 
-		await this.linearRequest(async () =>
-			(await this.getClient()).updateIssue(issueId, {
+		await this.linearRequest(() =>
+			this.client.updateIssue(issueId, {
 				addedLabelIds,
 				removedLabelIds,
 			}),
@@ -552,8 +544,8 @@ export class LinearClient {
 			return;
 		}
 
-		await this.linearRequest(async () =>
-			(await this.getClient()).updateIssue(issueId, {
+		await this.linearRequest(() =>
+			this.client.updateIssue(issueId, {
 				removedLabelIds,
 			}),
 		);
@@ -563,8 +555,8 @@ export class LinearClient {
 		if (this.config.dryRun) {
 			return;
 		}
-		await this.linearRequest(async () =>
-			(await this.getClient()).createComment({ issueId, body }),
+		await this.linearRequest(() =>
+			this.client.createComment({ issueId, body }),
 		);
 	}
 
@@ -573,9 +565,7 @@ export class LinearClient {
 	): Promise<LinearIssue | null> {
 		let issue: LinearSdkIssue | undefined;
 		try {
-			issue = await this.linearRequest(async () =>
-				(await this.getClient()).issue(identifier),
-			);
+			issue = await this.linearRequest(() => this.client.issue(identifier));
 		} catch (error) {
 			const message =
 				error instanceof Error ? error.message.toLowerCase() : String(error);
@@ -632,8 +622,8 @@ export class LinearClient {
 		if (!projectId) {
 			return undefined;
 		}
-		const project = await this.linearRequest(async () =>
-			(await this.getClient()).project(projectId),
+		const project = await this.linearRequest(() =>
+			this.client.project(projectId),
 		);
 		const teams = project
 			? (await this.linearRequest(() => project.teams())).nodes
@@ -870,8 +860,8 @@ export class LinearClient {
 	private async createIssueLabel(
 		labelName: string,
 	): Promise<LinearLabelRecord> {
-		const payload = await this.linearRequest(async () =>
-			(await this.getClient()).createIssueLabel({
+		const payload = await this.linearRequest(() =>
+			this.client.createIssueLabel({
 				name: labelName,
 				teamId: this.config.linear.teamId,
 			}),
@@ -884,9 +874,7 @@ export class LinearClient {
 		const issueLabel =
 			(await this.linearRequest(() => payload.issueLabel)) ??
 			(issueLabelId
-				? await this.linearRequest(async () =>
-						(await this.getClient()).issueLabel(issueLabelId),
-					)
+				? await this.linearRequest(() => this.client.issueLabel(issueLabelId))
 				: undefined);
 		if (!issueLabel?.id) {
 			throw new Error(`Linear label '${labelName}' was created without an id.`);
@@ -956,8 +944,8 @@ export class LinearClient {
 		if (this.workflowStatesCache) {
 			return this.workflowStatesCache;
 		}
-		const workflowStates = await this.linearRequest(async () =>
-			(await this.getClient()).workflowStates({
+		const workflowStates = await this.linearRequest(() =>
+			this.client.workflowStates({
 				first: 250,
 			}),
 		);
@@ -970,8 +958,8 @@ export class LinearClient {
 		if (this.issueLabelsCache) {
 			return this.issueLabelsCache;
 		}
-		const labelsConnection = await this.linearRequest(async () =>
-			(await this.getClient()).issueLabels({
+		const labelsConnection = await this.linearRequest(() =>
+			this.client.issueLabels({
 				first: 250,
 			}),
 		);
@@ -1035,9 +1023,7 @@ export class LinearClient {
 	}
 
 	private async fetchIssueLabelIds(issueId: string): Promise<string[]> {
-		const issue = await this.linearRequest(async () =>
-			(await this.getClient()).issue(issueId),
-		);
+		const issue = await this.linearRequest(() => this.client.issue(issueId));
 		if (!issue) {
 			return [];
 		}
@@ -1050,9 +1036,7 @@ export class LinearClient {
 	private async fetchIssueStateId(
 		issueId: string,
 	): Promise<string | undefined> {
-		const issue = await this.linearRequest(async () =>
-			(await this.getClient()).issue(issueId),
-		);
+		const issue = await this.linearRequest(() => this.client.issue(issueId));
 		if (!issue) {
 			return undefined;
 		}
@@ -1066,75 +1050,12 @@ export class LinearClient {
 		return runLinearRequest(operation);
 	}
 
-	private async getClient(): Promise<{
-		viewer: PromiseLike<{
-			assignedIssues(input: { first: number }): PromiseLike<{
-				nodes: LinearSdkIssue[];
-			}>;
-		}>;
-		updateIssue(issueId: string, input: unknown): PromiseLike<unknown>;
-		project(projectId: string): PromiseLike<LinearSdkProject | undefined>;
-		createIssue(input: unknown): PromiseLike<{
-			success: boolean;
-			issueId?: string;
-			issue?: PromiseLike<LinearSdkIssue | undefined>;
-		}>;
-		issue(issueId: string): PromiseLike<LinearSdkIssue | undefined>;
-		createIssueLabel(input: {
-			name: string;
-			teamId?: string;
-		}): PromiseLike<{
-			success: boolean;
-			issueLabelId?: string;
-			issueLabel?: PromiseLike<LinearSdkIssueLabel | undefined>;
-		}>;
-		issueLabel(
-			issueLabelId: string,
-		): PromiseLike<LinearSdkIssueLabel | undefined>;
-		createComment(input: {
-			issueId: string;
-			body: string;
-		}): PromiseLike<unknown>;
-		workflowStates(input: { first: number }): PromiseLike<{
-			nodes: LinearSdkWorkflowState[];
-		}>;
-		issueLabels(input: { first: number }): PromiseLike<{
-			nodes: LinearSdkIssueLabel[];
-		}>;
-	}> {
-		if (!this.client) {
-			const LinearSdkClient = resolveLinearSdkClient();
-			this.client = new LinearSdkClient({
-				apiKey: this.config.linear.apiKey,
-				apiUrl: this.config.linear.apiUrl,
-			});
-		}
-		return this.client as Awaited<ReturnType<LinearClient["getClient"]>>;
-	}
-
 	private mapSdkLabelToRecord(label: LinearSdkIssueLabel): LinearLabelRecord {
 		return {
 			id: label.id,
 			name: label.name,
 			teamId: label.teamId ?? undefined,
 		};
-	}
-}
-
-function resolveLinearSdkClient(): LinearSdkClientCtor {
-	try {
-		const loaded = require("@linear/sdk") as {
-			LinearClient?: LinearSdkClientCtor;
-		};
-		if (typeof loaded.LinearClient !== "function") {
-			throw new Error("missing LinearClient export");
-		}
-		return loaded.LinearClient;
-	} catch (error) {
-		const detail = error instanceof Error ? error.message : String(error);
-		throw new Error(
-			`Failed to load '@linear/sdk'. Install project dependencies before running Linear-integrated commands. ${detail}`,
-		);
 	}
 }
 
