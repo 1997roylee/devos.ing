@@ -15,7 +15,7 @@
 
 ## Parallel Processing Safety Model
 
-ADHD.ai combines queue behavior, per-issue leases, and execution-path locking to reduce duplicate work and checkout conflicts.
+devos.ing combines queue behavior, per-issue leases, and execution-path locking to reduce duplicate work and checkout conflicts.
 
 ### 1) Queue Processing Behavior
 
@@ -39,16 +39,16 @@ ADHD.ai combines queue behavior, per-issue leases, and execution-path locking to
 
 ### 4) Execution-Path Locking
 
-1. Issue execution is serialized by `executionPath` inside the running ADHD.ai process.
+1. Issue execution is serialized by `executionPath` inside the running devos.ing process.
 2. This avoids concurrent checkout/branch mutation in the same execution directory when multiple workers are active.
-3. The lock is process-local and in-memory; it is not a distributed lock across separate ADHD.ai processes.
+3. The lock is process-local and in-memory; it is not a distributed lock across separate devos.ing processes.
 4. When isolated worktrees are enabled, only worktree preparation briefly uses the base execution-path lock; issue execution runs in the per-issue worktree.
 
 ### 5) Safety Envelope Summary
 
 1. Per-issue leases protect against duplicate processing of the same issue key.
 2. Execution-path locking reduces repository mutation conflicts for implement/review loops in one process.
-3. Multiple independent ADHD.ai processes should use isolated worktrees or distinct execution paths to avoid checkout conflicts.
+3. Multiple independent devos.ing processes should use isolated worktrees or distinct execution paths to avoid checkout conflicts.
 
 ## Polling and Recovery
 
@@ -72,7 +72,7 @@ Planning output can optionally include:
 - `COMPLEXITY: SIMPLE|COMPLEX`
 - `SPLIT_TASKS_JSON: [...]` (required only when complexity is `COMPLEX`)
 
-When `COMPLEXITY: COMPLEX` is returned, ADHD.ai creates child Linear tasks from `SPLIT_TASKS_JSON` and completes the parent issue without entering implementation/review stages.
+When `COMPLEXITY: COMPLEX` is returned, devos.ing creates child Linear tasks from `SPLIT_TASKS_JSON` and completes the parent issue without entering implementation/review stages.
 
 ## Docker Isolated Codex Execution
 
@@ -80,7 +80,7 @@ Docker-backed Codex execution is not implemented in this branch yet. Isolation w
 
 Current behavior:
 
-1. ADHD.ai runs Codex directly on the host using `codex.binary`.
+1. devos.ing runs Codex directly on the host using `codex.binary`.
 2. `CODEX_HOME` (or `codex.codexHome`) is passed to the host Codex process when configured.
 3. No `codex.docker.*` config block or `CODEX_DOCKER_*` env variable is currently read by the runtime config loader.
 
@@ -89,6 +89,6 @@ Planned Docker execution expectations (ROY-95 scope):
 1. Host execution remains the default unless Docker mode is explicitly enabled.
 2. Docker image should include the configured Codex binary (default: `codex`) and required workflow tooling (`git`, `gh`, `bun`, project dependencies).
 3. Mount/path behavior should preserve workspace and execution path correctness and support `CODEX_HOME` mapping when provided.
-4. Container user permissions must allow read/write access for repository paths and ADHD.ai state/output files.
+4. Container user permissions must allow read/write access for repository paths and devos.ing state/output files.
 
 For security caveats around mounted paths, permissions, and credential exposure, see [docs/SECURITY.md](SECURITY.md).

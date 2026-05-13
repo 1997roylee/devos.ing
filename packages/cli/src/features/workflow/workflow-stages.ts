@@ -47,7 +47,7 @@ export async function handleReceivedStage(
 	},
 ): Promise<void> {
 	await linear.markStage(state.issue.id, "planning");
-	await linear.comment(state.issue.id, "ADHD.ai started planning.");
+	await linear.comment(state.issue.id, "devos.ing started planning.");
 	Object.assign(state, deps.transitionStage(state, "planning"));
 	await deps.saveRunState(config.workspacePath, state);
 }

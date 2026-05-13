@@ -57,7 +57,7 @@ describe("deterministic workflow smoke flow", () => {
 			"Review/testing failed",
 		);
 		expect(h.linear("default").comments.join("\n")).toContain(
-			"ADHD.ai implementation feedback for ENG-2",
+			"devos.ing implementation feedback for ENG-2",
 		);
 		expect(h.linear("default").comments.join("\n")).toContain("Fix it");
 	});

@@ -232,7 +232,7 @@ describe("loadConfig", () => {
 			LINEAR_API_KEY: "lin_sqlite_key",
 			PIV_POLL_INTERVAL_MS: "45000",
 			RESEND_API_KEY: "re_sqlite",
-			RESEND_FROM: "ADHD.ai <ops@example.com>",
+			RESEND_FROM: "devos.ing <ops@example.com>",
 			RESEND_TO: "a@example.com,b@example.com",
 		});
 		process.env.LINEAR_API_KEY = undefined;

@@ -71,7 +71,7 @@ export function buildTaskOutcomeEmailPayload(
 	errorMessage?: string,
 ): NotificationEmailPayload {
 	const statusText = outcome === "done" ? "DONE" : "BLOCKED";
-	const subject = `[ADHD.ai][${state.projectName}] ${state.issue.key} ${statusText}`;
+	const subject = `[devos.ing][${state.projectName}] ${state.issue.key} ${statusText}`;
 	const lines = [
 		`Project: ${state.projectName} (${state.projectId})`,
 		`Issue: ${state.issue.key} - ${state.issue.title}`,
@@ -109,7 +109,7 @@ export function buildHumanReviewRequiredEmailPayload(
 	complexityScore: number,
 	reason: string,
 ): NotificationEmailPayload {
-	const subject = `[ADHD.ai][${state.projectName}] ${state.issue.key} HUMAN REVIEW REQUIRED`;
+	const subject = `[devos.ing][${state.projectName}] ${state.issue.key} HUMAN REVIEW REQUIRED`;
 	const lines = [
 		`Project: ${state.projectName} (${state.projectId})`,
 		`Issue: ${state.issue.key} - ${state.issue.title}`,

@@ -1,8 +1,8 @@
-# Agentic Development Hub & Daemon (ADHD.ai)
+# devos.ing
 
 Talk is cheap, show me your agent system.
 
-ADHD.ai turns Linear issues into an agent-driven engineering workflow: plan -> implement -> review/test. It can run one issue at a time or poll for new work across projects.
+devos.ing is ADHD (Agentic Development Hub & Daemon): an all-in-one workflow for managing agentic development, reducing human involvement while keeping operators in control. It turns Linear issues into an agent-driven engineering workflow: plan -> implement -> review/test. It can run one issue at a time or poll for new work across projects.
 
 For non-technical operators, start with [docs/NON_TECHNICAL_GUIDE.md](docs/NON_TECHNICAL_GUIDE.md).
 
@@ -67,9 +67,9 @@ After linking/installing the package bin, you can also use `adhd-ai ...` directl
 ## Workflow Summary
 
 1. Create or assign a Linear issue.
-2. ADHD.ai plans the task.
-3. ADHD.ai implements code changes and updates PR context.
-4. ADHD.ai runs review/testing and loops on failures until `done` or `blocked`.
+2. devos.ing plans the task.
+3. devos.ing implements code changes and updates PR context.
+4. devos.ing runs review/testing and loops on failures until `done` or `blocked`.
 5. Completed runs with `COMPLEXITY_SCORE < 5` can be squash-merged by automation; scores `>= 5` trigger a human approval email.
 
 ## Configuration Notes

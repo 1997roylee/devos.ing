@@ -146,7 +146,7 @@ export async function createDraftPrFromWorktree(
 	const prBody = [
 		`Linear issue: ${issueKey}`,
 		"",
-		"This PR was created by the Agentic Development Hub & Daemon (ADHD.ai) workflow.",
+		"This PR was created by the devos.ing ADHD (Agentic Development Hub & Daemon) workflow.",
 		"",
 		"Includes:",
 		"- plan + implement session output",
@@ -369,7 +369,7 @@ export async function ensureCleanWorktree(
 	assertCommandOk("git", ["status", "--porcelain"], status);
 	if (status.stdout.trim()) {
 		throw new Error(
-			"Working tree is not clean before implementation. Commit/stash existing changes before running ADHD.ai.",
+			"Working tree is not clean before implementation. Commit/stash existing changes before running devos.ing.",
 		);
 	}
 }
@@ -497,7 +497,7 @@ export async function markPrReadyForReview(
 export async function squashMergePullRequest(
 	config: ResolvedProjectConfig,
 	pr: PullRequestRef,
-	body = "ADHD.ai review/testing passed; squash merging this PR.",
+	body = "devos.ing review/testing passed; squash merging this PR.",
 	deps?: {
 		runCommand?: typeof runCommand;
 		assertCommandOk?: typeof assertCommandOk;

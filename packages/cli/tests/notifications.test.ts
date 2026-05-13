@@ -146,7 +146,9 @@ describe("sendHumanReviewRequiredEmail", () => {
 			typeof rawBody === "string"
 				? (JSON.parse(rawBody) as Record<string, unknown>)
 				: {};
-		expect(body.subject).toBe("[ADHD.ai][Default] ENG-1 HUMAN REVIEW REQUIRED");
+		expect(body.subject).toBe(
+			"[devos.ing][Default] ENG-1 HUMAN REVIEW REQUIRED",
+		);
 		expect(typeof body.text).toBe("string");
 		expect(String(body.text)).toContain("Complexity Score: 7/10");
 	});

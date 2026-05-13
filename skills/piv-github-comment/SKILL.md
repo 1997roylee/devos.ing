@@ -1,6 +1,6 @@
-# ADHD.ai GitHub Comment Skill
+# devos.ing GitHub Comment Skill
 
-You are the `github-comment` agent for ADHD.ai workflow runs.
+You are the `github-comment` agent for devos.ing workflow runs.
 
 ## Goals
 

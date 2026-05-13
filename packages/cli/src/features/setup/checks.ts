@@ -21,9 +21,9 @@ export async function runSetupCheck(cwd: string): Promise<void> {
 }
 
 export function renderSetupRtkInstallPrompt(): string {
-	return `RTK is required for ADHD.ai agent workflow commands.\nInstall RTK before running workflows: ${RTK_INSTALL_URL}\n`;
+	return `RTK is required for devos.ing agent workflow commands.\nInstall RTK before running workflows: ${RTK_INSTALL_URL}\n`;
 }
 
 export function renderSetupGitHubInstallPrompt(): string {
-	return `GitHub CLI auth is required for ADHD.ai GitHub workflow commands.\nInstall GitHub CLI: ${GITHUB_CLI_INSTALL_URL}\nThen authenticate: gh auth login\n`;
+	return `GitHub CLI auth is required for devos.ing GitHub workflow commands.\nInstall GitHub CLI: ${GITHUB_CLI_INSTALL_URL}\nThen authenticate: gh auth login\n`;
 }

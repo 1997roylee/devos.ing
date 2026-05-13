@@ -1,6 +1,6 @@
 # Design
 
-ADHD.ai design goals:
+devos.ing design goals:
 
 1. Keep stage behavior legible and deterministic.
 2. Favor narrow ownership boundaries per module.

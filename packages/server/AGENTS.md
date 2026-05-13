@@ -1,4 +1,4 @@
-# ADHD.ai Server Agent Instructions
+# devos.ing Server Agent Instructions
 
 The server package owns the HTTP/API runtime for operator-facing services. Keep
 server code focused on request handling, API process concerns, and explicit

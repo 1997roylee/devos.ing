@@ -1,6 +1,6 @@
 # Product Specs Index
 
-ADHD.ai turns Linear issues into staged agent execution with planning, implementation, and verification loops.
+devos.ing turns Linear issues into staged agent execution with planning, implementation, and verification loops.
 
 ## Current Specs
 
@@ -10,7 +10,7 @@ ADHD.ai turns Linear issues into staged agent execution with planning, implement
 ## Product Workflow Summary
 
 1. Operator creates or assigns work in Linear.
-2. ADHD.ai fetches eligible issues by project routing rules.
+2. devos.ing fetches eligible issues by project routing rules.
 3. Planning agent produces implementation strategy.
 4. Implementation agent updates code and PR context.
 5. Review/testing agent validates and returns structured pass/fail output.

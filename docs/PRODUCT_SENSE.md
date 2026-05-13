@@ -1,6 +1,6 @@
 # Product Sense
 
-ADHD.ai exists to convert issue-tracker intent into reliable engineering progress across one or many projects.
+devos.ing exists to convert issue-tracker intent into reliable engineering progress across one or many projects.
 
 ## Primary User Value
 

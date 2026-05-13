@@ -170,7 +170,7 @@ describe("handleReviewTestingStage", () => {
 			},
 		);
 
-		expect(prComments[0]).toContain("ADHD.ai review for ENG-1");
+		expect(prComments[0]).toContain("devos.ing review for ENG-1");
 	});
 
 	it("posts implementation feedback to Linear and PR when review fails", async () => {
@@ -221,7 +221,7 @@ describe("handleReviewTestingStage", () => {
 			},
 		);
 
-		const feedback = "ADHD.ai implementation feedback for ENG-1";
+		const feedback = "devos.ing implementation feedback for ENG-1";
 		expect(linearComments.join("\n")).toContain(feedback);
 		expect(linearComments.join("\n")).toContain("Broken retry");
 		expect(linearComments.join("\n")).toContain("The retry test is failing.");

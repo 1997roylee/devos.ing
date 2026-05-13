@@ -195,7 +195,7 @@ export async function handleCommand(
 export function printHelp(): void {
 	process.stdout.write(
 		`${[
-			"adhd-ai - Agentic Development Hub & Daemon (ADHD.ai) CLI orchestration workflow",
+			"adhd-ai - devos.ing ADHD (Agentic Development Hub & Daemon) CLI orchestration workflow",
 			"",
 			"Commands:",
 			"  adhd-ai run [--project <PROJECT_ID>] [--issue <LINEAR_KEY_OR_URL>] [--poll] [--no-exit-when-idle] [--poll-interval-ms <MS>] [--max-poll-cycles <N>] [--isolated-worktrees]",

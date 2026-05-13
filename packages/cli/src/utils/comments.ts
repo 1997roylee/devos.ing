@@ -34,7 +34,7 @@ export function buildPlanComment(
 			: normalized;
 
 	return [
-		`ADHD.ai plan for ${issueKey}`,
+		`devos.ing plan for ${issueKey}`,
 		"",
 		"Planning completed; implementation started.",
 		"",
@@ -66,7 +66,7 @@ export function buildPlanSplitComment(
 			: ["- (No split tasks were created.)"];
 
 	return [
-		`ADHD.ai plan for ${issueKey}`,
+		`devos.ing plan for ${issueKey}`,
 		"",
 		"Planning marked this task as too complex for a single implementation pass.",
 		"Created split tasks in Todo and moved the parent issue to Backlog.",
@@ -116,7 +116,7 @@ export function buildImplementationFeedbackComment(input: {
 			: ["(No structured bugs were provided.)"];
 
 	return [
-		`ADHD.ai implementation feedback for ${input.issueKey}`,
+		`devos.ing implementation feedback for ${input.issueKey}`,
 		"",
 		"Review/testing summary:",
 		input.summary.trim() || "(No review/testing summary provided.)",
@@ -139,7 +139,7 @@ export function buildReviewComment(input: {
 	bugs: BugRecord[];
 }): string {
 	return [
-		`ADHD.ai review for ${input.issueKey}`,
+		`devos.ing review for ${input.issueKey}`,
 		"",
 		`Result: ${input.passed ? "PASS ✅" : "FAIL ❌"}`,
 		"",

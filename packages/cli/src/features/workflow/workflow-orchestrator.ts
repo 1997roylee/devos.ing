@@ -671,7 +671,7 @@ async function processIssue(
 		await safeLinearComment(
 			linear,
 			runState.issue.id,
-			`ADHD.ai failed and moved issue to Canceled.\n\nError:\n${message}`,
+			`devos.ing failed and moved issue to Canceled.\n\nError:\n${message}`,
 		);
 		issueLogger.error(
 			{

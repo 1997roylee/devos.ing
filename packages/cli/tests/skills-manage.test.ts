@@ -137,7 +137,7 @@ describe("skills manage", () => {
 			expect(updatedSkill).toContain(
 				"description: Updated planning description",
 			);
-			expect(updatedSkill).toContain("# ADHD.ai Plan Skill");
+			expect(updatedSkill).toContain("# devos.ing Plan Skill");
 			expect(updatedSkill).toContain("## Goals");
 		} finally {
 			await rm(tempDir, { recursive: true, force: true });

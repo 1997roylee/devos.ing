@@ -1,4 +1,4 @@
-# ADHD.ai Agent Entry
+# devos.ing Agent Entry
 
 This repository orchestrates multi-project agent workflows across CLI, server,
 and web UI packages. Keep behavior project-agnostic and avoid coupling logic to a

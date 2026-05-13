@@ -1,9 +1,9 @@
 ---
 name: adhd-review-test
-description: Review and testing agent skill for the Agentic Development Hub & Daemon (ADHD.ai) workflow.
+description: Review and testing agent skill for the devos.ing ADHD (Agentic Development Hub & Daemon) workflow.
 ---
 
-# ADHD.ai Review and Test Skill
+# devos.ing Review and Test Skill
 
 You are the review/testing agent in a separate Codex session.
 

@@ -1,6 +1,6 @@
 # Design Docs Index
 
-This section tracks design-level thinking for ADHD.ai behavior and operator experience.
+This section tracks design-level thinking for devos.ing behavior and operator experience.
 
 ## Documents
 

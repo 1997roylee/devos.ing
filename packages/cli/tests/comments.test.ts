@@ -14,7 +14,7 @@ describe("buildPlanComment", () => {
 			inputTokens: 12,
 			outputTokens: 8,
 		});
-		expect(comment).toContain("ADHD.ai plan for ENG-1");
+		expect(comment).toContain("devos.ing plan for ENG-1");
 		expect(comment).toContain("Planning completed; implementation started.");
 		expect(comment).toContain("Token usage 🧮: input 12, output 8, total 20");
 		expect(comment).toContain("1. Do A");
@@ -113,7 +113,7 @@ describe("buildImplementationFeedbackComment", () => {
 			],
 		});
 
-		expect(comment).toContain("ADHD.ai implementation feedback for ENG-1");
+		expect(comment).toContain("devos.ing implementation feedback for ENG-1");
 		expect(comment).toContain("Review/testing summary:");
 		expect(comment).toContain("Tests failed after the retry path regressed.");
 		expect(comment).toContain("Fix instructions for the implementation agent:");
@@ -154,7 +154,7 @@ describe("buildReviewComment", () => {
 			usage: { inputTokens: 1, outputTokens: 2 },
 			bugs: [],
 		});
-		expect(comment).toContain("ADHD.ai review for ENG-1");
+		expect(comment).toContain("devos.ing review for ENG-1");
 		expect(comment).toContain("Result: PASS ✅");
 		expect(comment).toContain("No bugs found. ✅");
 	});

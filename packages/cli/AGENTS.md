@@ -1,4 +1,4 @@
-# ADHD.ai CLI Agent Instructions
+# devos.ing CLI Agent Instructions
 
 The CLI package owns command parsing, runtime configuration, workflow
 orchestration, agent integrations, and local run state. Keep CLI behavior

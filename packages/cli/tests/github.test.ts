@@ -203,7 +203,7 @@ describe("squashMergePullRequest", () => {
 				branch: "codex/eng-42",
 				title: "ENG-42",
 			},
-			"Merged by ADHD.ai.",
+			"Merged by devos.ing.",
 			{
 				runCommand,
 				assertCommandOk: assertOk,
@@ -222,7 +222,7 @@ describe("squashMergePullRequest", () => {
 				"--subject",
 				"ENG-42",
 				"--body",
-				"Merged by ADHD.ai.",
+				"Merged by devos.ing.",
 			],
 		]);
 	});

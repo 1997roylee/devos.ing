@@ -6,8 +6,8 @@ import { AppProviders } from "@/components/providers/app-providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-	title: "Agentic Development Hub & Daemon",
-	description: "Talk is cheap, show me your agent system.",
+	title: "devos.ing",
+	description: "ADHD (Agentic Development Hub & Daemon) for agentic workflows.",
 };
 
 type Props = {

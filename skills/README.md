@@ -1,6 +1,6 @@
 # Skills Directory
 
-This directory is the default skill pack root for ADHD.ai.
+This directory is the default skill pack root for devos.ing.
 
 ## Default layout
 

@@ -2,7 +2,7 @@
 
 ## System Purpose
 
-ADHD.ai is a multi-project orchestration hub that pulls eligible Linear issues and executes a staged agent loop: planning, implementation, and review/testing.
+devos.ing is a multi-project orchestration hub that pulls eligible Linear issues and executes a staged agent loop: planning, implementation, and review/testing.
 
 ## Ownership Boundaries
 

@@ -1,9 +1,9 @@
 openapi: 3.1.0
 info:
-  title: ADHD.ai CLI-Backed Server API
+  title: devos.ing CLI-Backed Server API
   version: 0.1.0
   description: >
-    OpenAPI contract for ADHD.ai server endpoints that execute CLI workflows and
+    OpenAPI contract for devos.ing server endpoints that execute CLI workflows and
     expose read-only workflow history and telemetry tables.
 servers:
   - url: http://localhost:3001

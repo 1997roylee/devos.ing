@@ -1,4 +1,4 @@
-# ADHD.ai Web Agent Instructions
+# devos.ing Web Agent Instructions
 
 The web package owns the Next.js operator UI. Build useful monitoring and
 control surfaces directly, and keep UI behavior aligned with the repository's
