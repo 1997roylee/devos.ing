@@ -11,6 +11,11 @@ Planning output should remain concise and implementation-focused, including:
 3. test plan
 4. known risks
 
+## Coverage Audits
+
+1. CLI-to-server workflow coverage:
+   [docs/cli-server-workflow-coverage.md](/Users/roy/Desktop/SourceCode/agentic/show-me-ur-agents/.piv-loop/projects/adhd-47ea7f022b5d/worktrees/roy-146/docs/cli-server-workflow-coverage.md)
+
 ## Operating Commands
 
 1. `bun run packages/cli/src/index.ts run --project default`

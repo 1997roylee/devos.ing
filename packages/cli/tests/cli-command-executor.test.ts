@@ -152,4 +152,399 @@ describe("CliCommandExecutor", () => {
 		expect(history[0]?.status).toBe("failed");
 		expect(history[0]?.error).toBe("spawn EACCES");
 	});
+
+	it("executes cron action with structured argv", async () => {
+		const calls: Array<{ command: string; args: string[] }> = [];
+		const runCommandFn: RunCommandFn = async (command, args) => {
+			calls.push({ command, args });
+			return { code: 0, stdout: "ok", stderr: "" };
+		};
+		const executor = new CliCommandExecutor({
+			cwd: "/tmp/work",
+			command: "bun",
+			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			runCommandFn,
+		});
+
+		const result = await executor.execute({
+			action: "cron",
+			once: true,
+			jobId: "weekday",
+		});
+
+		expect(result.status).toBe("succeeded");
+		expect(calls).toEqual([
+			{
+				command: "bun",
+				args: [
+					"run",
+					"./packages/cli/src/index.ts",
+					"cron",
+					"--once",
+					"--job",
+					"weekday",
+				],
+			},
+		]);
+	});
+
+	it("executes setup action with structured argv", async () => {
+		const calls: Array<{ command: string; args: string[] }> = [];
+		const runCommandFn: RunCommandFn = async (command, args) => {
+			calls.push({ command, args });
+			return { code: 0, stdout: "ok", stderr: "" };
+		};
+		const executor = new CliCommandExecutor({
+			cwd: "/tmp/work",
+			command: "bun",
+			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			runCommandFn,
+		});
+
+		const result = await executor.execute({
+			action: "setup",
+			check: true,
+		});
+
+		expect(result.status).toBe("succeeded");
+		expect(calls).toEqual([
+			{
+				command: "bun",
+				args: ["run", "./packages/cli/src/index.ts", "setup", "--check"],
+			},
+		]);
+	});
+
+	it("rejects malformed cron and setup requests without execution", async () => {
+		let callCount = 0;
+		const runCommandFn: RunCommandFn = async () => {
+			callCount += 1;
+			return { code: 0, stdout: "", stderr: "" };
+		};
+		const executor = new CliCommandExecutor({
+			cwd: "/tmp/work",
+			command: "bun",
+			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			runCommandFn,
+		});
+
+		const malformedCronJobId = await executor.execute({
+			action: "cron",
+			jobId: ["bad"],
+		} as unknown as { action: string });
+		const malformedCronOnce = await executor.execute({
+			action: "cron",
+			once: "yes",
+		} as unknown as { action: string });
+		const malformedSetupCheck = await executor.execute({
+			action: "setup",
+			check: "false",
+		} as unknown as { action: string });
+
+		expect(malformedCronJobId.status).toBe("rejected");
+		expect(malformedCronJobId.error).toContain(
+			"jobId must be a non-empty string",
+		);
+		expect(malformedCronOnce.status).toBe("rejected");
+		expect(malformedCronOnce.error).toContain("once must be a boolean");
+		expect(malformedSetupCheck.status).toBe("rejected");
+		expect(malformedSetupCheck.error).toContain("check must be a boolean");
+		expect(callCount).toBe(0);
+	});
+
+	it("executes task create action with structured argv", async () => {
+		const calls: Array<{ command: string; args: string[] }> = [];
+		const runCommandFn: RunCommandFn = async (command, args) => {
+			calls.push({ command, args });
+			return { code: 0, stdout: "ok", stderr: "" };
+		};
+		const executor = new CliCommandExecutor({
+			cwd: "/tmp/work",
+			command: "bun",
+			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			runCommandFn,
+		});
+
+		const result = await executor.execute({
+			action: "task",
+			taskAction: "create",
+			request: "Build a better setup flow",
+			projectId: "default",
+		});
+
+		expect(result.status).toBe("succeeded");
+		expect(calls).toEqual([
+			{
+				command: "bun",
+				args: [
+					"run",
+					"./packages/cli/src/index.ts",
+					"task",
+					"create",
+					"--request",
+					"Build a better setup flow",
+					"--project",
+					"default",
+				],
+			},
+		]);
+	});
+
+	it("executes skills list action with structured argv", async () => {
+		const calls: Array<{ command: string; args: string[] }> = [];
+		const runCommandFn: RunCommandFn = async (command, args) => {
+			calls.push({ command, args });
+			return { code: 0, stdout: "ok", stderr: "" };
+		};
+		const executor = new CliCommandExecutor({
+			cwd: "/tmp/work",
+			command: "bun",
+			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			runCommandFn,
+		});
+
+		const result = await executor.execute({
+			action: "skills",
+			skillsAction: "list",
+			projectId: "api",
+		});
+
+		expect(result.status).toBe("succeeded");
+		expect(calls).toEqual([
+			{
+				command: "bun",
+				args: [
+					"run",
+					"./packages/cli/src/index.ts",
+					"skills",
+					"list",
+					"--project",
+					"api",
+				],
+			},
+		]);
+	});
+
+	it("executes skills add action with structured argv", async () => {
+		const calls: Array<{ command: string; args: string[] }> = [];
+		const runCommandFn: RunCommandFn = async (command, args) => {
+			calls.push({ command, args });
+			return { code: 0, stdout: "ok", stderr: "" };
+		};
+		const executor = new CliCommandExecutor({
+			cwd: "/tmp/work",
+			command: "bun",
+			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			runCommandFn,
+		});
+
+		const result = await executor.execute({
+			action: "skills",
+			skillsAction: "add",
+			title: "Backend Standard",
+			description: "Rules",
+			content: "Use consistent module boundaries.",
+			projectId: "api",
+		});
+
+		expect(result.status).toBe("succeeded");
+		expect(calls).toEqual([
+			{
+				command: "bun",
+				args: [
+					"run",
+					"./packages/cli/src/index.ts",
+					"skills",
+					"add",
+					"--title",
+					"Backend Standard",
+					"--description",
+					"Rules",
+					"--content",
+					"Use consistent module boundaries.",
+					"--project",
+					"api",
+				],
+			},
+		]);
+	});
+
+	it("executes skills update action with structured argv", async () => {
+		const calls: Array<{ command: string; args: string[] }> = [];
+		const runCommandFn: RunCommandFn = async (command, args) => {
+			calls.push({ command, args });
+			return { code: 0, stdout: "ok", stderr: "" };
+		};
+		const executor = new CliCommandExecutor({
+			cwd: "/tmp/work",
+			command: "bun",
+			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			runCommandFn,
+		});
+
+		const result = await executor.execute({
+			action: "skills",
+			skillsAction: "update",
+			name: "backend-standard",
+			description: "Updated description",
+		});
+
+		expect(result.status).toBe("succeeded");
+		expect(calls).toEqual([
+			{
+				command: "bun",
+				args: [
+					"run",
+					"./packages/cli/src/index.ts",
+					"skills",
+					"update",
+					"backend-standard",
+					"--description",
+					"Updated description",
+				],
+			},
+		]);
+	});
+
+	it("executes skills remove action with structured argv", async () => {
+		const calls: Array<{ command: string; args: string[] }> = [];
+		const runCommandFn: RunCommandFn = async (command, args) => {
+			calls.push({ command, args });
+			return { code: 0, stdout: "ok", stderr: "" };
+		};
+		const executor = new CliCommandExecutor({
+			cwd: "/tmp/work",
+			command: "bun",
+			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			runCommandFn,
+		});
+
+		const result = await executor.execute({
+			action: "skills",
+			skillsAction: "remove",
+			name: "backend-standard",
+			projectId: "default",
+		});
+
+		expect(result.status).toBe("succeeded");
+		expect(calls).toEqual([
+			{
+				command: "bun",
+				args: [
+					"run",
+					"./packages/cli/src/index.ts",
+					"skills",
+					"remove",
+					"backend-standard",
+					"--project",
+					"default",
+				],
+			},
+		]);
+	});
+
+	it("rejects malformed skills and task requests without execution", async () => {
+		let callCount = 0;
+		const runCommandFn: RunCommandFn = async () => {
+			callCount += 1;
+			return { code: 0, stdout: "", stderr: "" };
+		};
+		const executor = new CliCommandExecutor({
+			cwd: "/tmp/work",
+			command: "bun",
+			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			runCommandFn,
+		});
+
+		const malformedSkillsAction = await executor.execute({
+			action: "skills",
+		} as unknown as { action: string });
+		const malformedSkillsAdd = await executor.execute({
+			action: "skills",
+			skillsAction: "add",
+			description: "Rules",
+			content: "Use consistent module boundaries.",
+		} as unknown as { action: string });
+		const malformedSkillsUpdate = await executor.execute({
+			action: "skills",
+			skillsAction: "update",
+			name: "backend-standard",
+		} as unknown as { action: string });
+		const unsupportedSkillsAction = await executor.execute({
+			action: "skills",
+			skillsAction: "ship-it",
+		} as unknown as { action: string });
+		const malformedTaskAction = await executor.execute({
+			action: "task",
+		} as unknown as { action: string });
+		const unsupportedTaskAction = await executor.execute({
+			action: "task",
+			taskAction: "archive",
+		} as unknown as { action: string });
+		const malformedTaskCreate = await executor.execute({
+			action: "task",
+			taskAction: "create",
+			request: "   ",
+		} as unknown as { action: string });
+		const malformedSkillsListProject = await executor.execute({
+			action: "skills",
+			skillsAction: "list",
+			projectId: 42,
+		} as unknown as { action: string });
+		const malformedSkillsUpdateOptional = await executor.execute({
+			action: "skills",
+			skillsAction: "update",
+			name: "backend-standard",
+			description: "Updated description",
+			projectId: "",
+		} as unknown as { action: string });
+		const malformedTaskProject = await executor.execute({
+			action: "task",
+			taskAction: "create",
+			request: "Build a better setup flow",
+			projectId: 42,
+		} as unknown as { action: string });
+		const malformedRunFields = await executor.execute({
+			action: "run",
+			projectId: ["bad"],
+			poll: "yes",
+			concurrency: 0,
+		} as unknown as { action: string });
+
+		expect(malformedSkillsAction.status).toBe("rejected");
+		expect(malformedSkillsAction.error).toContain("skillsAction is required");
+		expect(malformedSkillsAdd.status).toBe("rejected");
+		expect(malformedSkillsAdd.error).toContain("title is required");
+		expect(malformedSkillsUpdate.status).toBe("rejected");
+		expect(malformedSkillsUpdate.error).toContain(
+			"at least one of title, description, or content is required",
+		);
+		expect(unsupportedSkillsAction.status).toBe("rejected");
+		expect(unsupportedSkillsAction.error).toContain(
+			"Unsupported skills action",
+		);
+		expect(malformedTaskAction.status).toBe("rejected");
+		expect(malformedTaskAction.error).toContain("taskAction is required");
+		expect(unsupportedTaskAction.status).toBe("rejected");
+		expect(unsupportedTaskAction.error).toContain("Unsupported task action");
+		expect(malformedTaskCreate.status).toBe("rejected");
+		expect(malformedTaskCreate.error).toContain("request is required");
+		expect(malformedSkillsListProject.status).toBe("rejected");
+		expect(malformedSkillsListProject.error).toContain(
+			"projectId must be a non-empty string",
+		);
+		expect(malformedSkillsUpdateOptional.status).toBe("rejected");
+		expect(malformedSkillsUpdateOptional.error).toContain(
+			"projectId must be a non-empty string",
+		);
+		expect(malformedTaskProject.status).toBe("rejected");
+		expect(malformedTaskProject.error).toContain(
+			"projectId must be a non-empty string",
+		);
+		expect(malformedRunFields.status).toBe("rejected");
+		expect(malformedRunFields.error).toContain(
+			"projectId must be a non-empty string",
+		);
+		expect(callCount).toBe(0);
+	});
 });

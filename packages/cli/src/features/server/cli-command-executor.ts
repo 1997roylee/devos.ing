@@ -104,6 +104,78 @@ function resolveInvocation(
 	| { status: "ok"; invocation: CliCommandInvocation }
 	| { status: "error"; error: string } {
 	if (request.action === "run") {
+		const projectIdValidation = validateOptionalStringField(
+			request.projectId,
+			"run",
+			"projectId",
+		);
+		if (projectIdValidation.status !== "ok") {
+			return projectIdValidation;
+		}
+		const issueKeyValidation = validateOptionalStringField(
+			request.issueKey,
+			"run",
+			"issueKey",
+		);
+		if (issueKeyValidation.status !== "ok") {
+			return issueKeyValidation;
+		}
+		const allProjectsValidation = validateOptionalBooleanField(
+			request.allProjects,
+			"run",
+			"allProjects",
+		);
+		if (allProjectsValidation.status !== "ok") {
+			return allProjectsValidation;
+		}
+		const pollValidation = validateOptionalBooleanField(
+			request.poll,
+			"run",
+			"poll",
+		);
+		if (pollValidation.status !== "ok") {
+			return pollValidation;
+		}
+		const noExitWhenIdleValidation = validateOptionalBooleanField(
+			request.noExitWhenIdle,
+			"run",
+			"noExitWhenIdle",
+		);
+		if (noExitWhenIdleValidation.status !== "ok") {
+			return noExitWhenIdleValidation;
+		}
+		const isolatedWorktreesValidation = validateOptionalBooleanField(
+			request.isolatedWorktrees,
+			"run",
+			"isolatedWorktrees",
+		);
+		if (isolatedWorktreesValidation.status !== "ok") {
+			return isolatedWorktreesValidation;
+		}
+		const concurrencyValidation = validateOptionalPositiveIntegerField(
+			request.concurrency,
+			"run",
+			"concurrency",
+		);
+		if (concurrencyValidation.status !== "ok") {
+			return concurrencyValidation;
+		}
+		const pollIntervalValidation = validateOptionalPositiveIntegerField(
+			request.pollIntervalMs,
+			"run",
+			"pollIntervalMs",
+		);
+		if (pollIntervalValidation.status !== "ok") {
+			return pollIntervalValidation;
+		}
+		const maxPollCyclesValidation = validateOptionalPositiveIntegerField(
+			request.maxPollCycles,
+			"run",
+			"maxPollCycles",
+		);
+		if (maxPollCyclesValidation.status !== "ok") {
+			return maxPollCyclesValidation;
+		}
 		const runRequest = request as Extract<
 			SupportedCliCommandRequest,
 			{ action: "run" }
@@ -112,7 +184,21 @@ function resolveInvocation(
 			status: "ok",
 			invocation: {
 				command,
-				args: [...baseArgs, ...buildRunArgs(runRequest)],
+				args: [
+					...baseArgs,
+					...buildRunArgs({
+						...runRequest,
+						projectId: projectIdValidation.value,
+						issueKey: issueKeyValidation.value,
+						allProjects: allProjectsValidation.value,
+						poll: pollValidation.value,
+						noExitWhenIdle: noExitWhenIdleValidation.value,
+						isolatedWorktrees: isolatedWorktreesValidation.value,
+						concurrency: concurrencyValidation.value,
+						pollIntervalMs: pollIntervalValidation.value,
+						maxPollCycles: maxPollCyclesValidation.value,
+					}),
+				],
 			},
 		};
 	}
@@ -153,6 +239,78 @@ function resolveInvocation(
 			},
 		};
 	}
+	if (request.action === "cron") {
+		if (request.once !== undefined && typeof request.once !== "boolean") {
+			return {
+				status: "error",
+				error: "Malformed cron request: once must be a boolean",
+			};
+		}
+		if (request.jobId !== undefined && !isNonEmptyString(request.jobId)) {
+			return {
+				status: "error",
+				error: "Malformed cron request: jobId must be a non-empty string",
+			};
+		}
+		return {
+			status: "ok",
+			invocation: {
+				command,
+				args: [
+					...baseArgs,
+					...buildCronArgs({
+						once: request.once,
+						jobId: request.jobId,
+					}),
+				],
+			},
+		};
+	}
+	if (request.action === "setup") {
+		if (request.check !== undefined && typeof request.check !== "boolean") {
+			return {
+				status: "error",
+				error: "Malformed setup request: check must be a boolean",
+			};
+		}
+		return {
+			status: "ok",
+			invocation: {
+				command,
+				args: [...baseArgs, ...buildSetupArgs({ check: request.check })],
+			},
+		};
+	}
+	if (request.action === "skills") {
+		const skillsResolution = resolveSkillsArgs(
+			request as unknown as Record<string, unknown>,
+		);
+		if (skillsResolution.status !== "ok") {
+			return skillsResolution;
+		}
+		return {
+			status: "ok",
+			invocation: {
+				command,
+				args: [...baseArgs, ...skillsResolution.args],
+			},
+		};
+	}
+	if (request.action === "task") {
+		const taskResolution = resolveTaskArgs(
+			request as unknown as Record<string, unknown>,
+		);
+		if (taskResolution.status !== "ok") {
+			return taskResolution;
+		}
+		return {
+			status: "ok",
+			invocation: {
+				command,
+				args: [...baseArgs, ...taskResolution.args],
+			},
+		};
+	}
 	return {
 		status: "error",
 		error: `Unsupported CLI action: ${request.action}`,
@@ -189,6 +347,202 @@ function buildStatusArgs(
 	];
 }
 
+function buildCronArgs(request: { once?: boolean; jobId?: string }): string[] {
+	const args = ["cron"];
+	appendBooleanFlag(args, "--once", request.once);
+	appendFlag(args, "--job", request.jobId);
+	return args;
+}
+
+function buildSetupArgs(request: { check?: boolean }): string[] {
+	const args = ["setup"];
+	appendBooleanFlag(args, "--check", request.check);
+	return args;
+}
+
+function resolveSkillsArgs(
+	request: Record<string, unknown>,
+): { status: "ok"; args: string[] } | { status: "error"; error: string } {
+	if (!isNonEmptyString(request.skillsAction)) {
+		return {
+			status: "error",
+			error: "Malformed skills request: skillsAction is required",
+		};
+	}
+
+	if (request.skillsAction === "list") {
+		const projectIdValidation = validateOptionalStringField(
+			request.projectId,
+			"skills list",
+			"projectId",
+		);
+		if (projectIdValidation.status !== "ok") {
+			return projectIdValidation;
+		}
+		const args = ["skills", "list"];
+		appendFlag(args, "--project", projectIdValidation.value);
+		return { status: "ok", args };
+	}
+
+	if (request.skillsAction === "add") {
+		if (!isNonEmptyString(request.title)) {
+			return {
+				status: "error",
+				error: "Malformed skills add request: title is required",
+			};
+		}
+		if (!isNonEmptyString(request.description)) {
+			return {
+				status: "error",
+				error: "Malformed skills add request: description is required",
+			};
+		}
+		if (!isNonEmptyString(request.content)) {
+			return {
+				status: "error",
+				error: "Malformed skills add request: content is required",
+			};
+		}
+		const args = [
+			"skills",
+			"add",
+			"--title",
+			request.title,
+			"--description",
+			request.description,
+			"--content",
+			request.content,
+		];
+		const projectIdValidation = validateOptionalStringField(
+			request.projectId,
+			"skills add",
+			"projectId",
+		);
+		if (projectIdValidation.status !== "ok") {
+			return projectIdValidation;
+		}
+		appendFlag(args, "--project", projectIdValidation.value);
+		return { status: "ok", args };
+	}
+
+	if (request.skillsAction === "update") {
+		if (!isNonEmptyString(request.name)) {
+			return {
+				status: "error",
+				error: "Malformed skills update request: name is required",
+			};
+		}
+		const titleValidation = validateOptionalStringField(
+			request.title,
+			"skills update",
+			"title",
+		);
+		if (titleValidation.status !== "ok") {
+			return titleValidation;
+		}
+		const descriptionValidation = validateOptionalStringField(
+			request.description,
+			"skills update",
+			"description",
+		);
+		if (descriptionValidation.status !== "ok") {
+			return descriptionValidation;
+		}
+		const contentValidation = validateOptionalStringField(
+			request.content,
+			"skills update",
+			"content",
+		);
+		if (contentValidation.status !== "ok") {
+			return contentValidation;
+		}
+		const projectIdValidation = validateOptionalStringField(
+			request.projectId,
+			"skills update",
+			"projectId",
+		);
+		if (projectIdValidation.status !== "ok") {
+			return projectIdValidation;
+		}
+		const args = ["skills", "update", request.name];
+		appendFlag(args, "--title", titleValidation.value);
+		appendFlag(args, "--description", descriptionValidation.value);
+		appendFlag(args, "--content", contentValidation.value);
+		appendFlag(args, "--project", projectIdValidation.value);
+		if (
+			!args.includes("--title") &&
+			!args.includes("--description") &&
+			!args.includes("--content")
+		) {
+			return {
+				status: "error",
+				error:
+					"Malformed skills update request: at least one of title, description, or content is required",
+			};
+		}
+		return { status: "ok", args };
+	}
+
+	if (request.skillsAction === "remove") {
+		if (!isNonEmptyString(request.name)) {
+			return {
+				status: "error",
+				error: "Malformed skills remove request: name is required",
+			};
+		}
+		const projectIdValidation = validateOptionalStringField(
+			request.projectId,
+			"skills remove",
+			"projectId",
+		);
+		if (projectIdValidation.status !== "ok") {
+			return projectIdValidation;
+		}
+		const args = ["skills", "remove", request.name];
+		appendFlag(args, "--project", projectIdValidation.value);
+		return { status: "ok", args };
+	}
+
+	return {
+		status: "error",
+		error: `Unsupported skills action: ${String(request.skillsAction)}`,
+	};
+}
+
+function resolveTaskArgs(
+	request: Record<string, unknown>,
+): { status: "ok"; args: string[] } | { status: "error"; error: string } {
+	if (!isNonEmptyString(request.taskAction)) {
+		return {
+			status: "error",
+			error: "Malformed task request: taskAction is required",
+		};
+	}
+	if (request.taskAction !== "create") {
+		return {
+			status: "error",
+			error: `Unsupported task action: ${String(request.taskAction)}`,
+		};
+	}
+	if (!isNonEmptyString(request.request)) {
+		return {
+			status: "error",
+			error: "Malformed task create request: request is required",
+		};
+	}
+	const projectIdValidation = validateOptionalStringField(
+		request.projectId,
+		"task create",
+		"projectId",
+	);
+	if (projectIdValidation.status !== "ok") {
+		return projectIdValidation;
+	}
+	const args = ["task", "create", "--request", request.request];
+	appendFlag(args, "--project", projectIdValidation.value);
+	return { status: "ok", args };
+}
+
 function appendBooleanFlag(
 	args: string[],
 	name: string,
@@ -221,4 +575,61 @@ function appendNumericFlag(
 
 function isNonEmptyString(value: unknown): value is string {
 	return typeof value === "string" && value.trim().length > 0;
+}
+
+function validateOptionalStringField(
+	value: unknown,
+	actionLabel: string,
+	fieldName: string,
+):
+	| { status: "ok"; value: string | undefined }
+	| { status: "error"; error: string } {
+	if (value === undefined) {
+		return { status: "ok", value: undefined };
+	}
+	if (!isNonEmptyString(value)) {
+		return {
+			status: "error",
+			error: `Malformed ${actionLabel} request: ${fieldName} must be a non-empty string`,
+		};
+	}
+	return { status: "ok", value };
+}
+
+function validateOptionalBooleanField(
+	value: unknown,
+	actionLabel: string,
+	fieldName: string,
+):
+	| { status: "ok"; value: boolean | undefined }
+	| { status: "error"; error: string } {
+	if (value === undefined) {
+		return { status: "ok", value: undefined };
+	}
+	if (typeof value !== "boolean") {
+		return {
+			status: "error",
+			error: `Malformed ${actionLabel} request: ${fieldName} must be a boolean`,
+		};
+	}
+	return { status: "ok", value };
+}
+
+function validateOptionalPositiveIntegerField(
+	value: unknown,
+	actionLabel: string,
+	fieldName: string,
+):
+	| { status: "ok"; value: number | undefined }
+	| { status: "error"; error: string } {
+	if (value === undefined) {
+		return { status: "ok", value: undefined };
+	}
+	if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+		return {
+			status: "error",
+			error: `Malformed ${actionLabel} request: ${fieldName} must be a positive integer`,
+		};
+	}
+	return { status: "ok", value };
 }
