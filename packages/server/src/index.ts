@@ -10,6 +10,9 @@ export const startServer = (port = 3000): Bun.Server<undefined> =>
 				command: "bun",
 				baseArgs: ["run", "./packages/cli/src/index.ts"],
 			}),
+			repository: {
+				database: null,
+			},
 		}),
 	});
 

@@ -1,48 +1,64 @@
 import type { AppDeps, RouteHandler } from "./app.types";
+import { ensureMethod, matchesPath, parseJsonBody } from "./http/request";
+import {
+	jsonError,
+	jsonSuccess,
+	methodNotAllowedResponse,
+	notFoundResponse,
+} from "./http/response";
+import {
+	validateObjectBody,
+	validateRequiredNonEmptyString,
+} from "./http/validation";
 
 const UNSAFE_RAW_COMMAND_FIELDS = ["command", "cmd", "args", "argv", "shell"];
 
 export function createHandleRequest(deps: AppDeps): RouteHandler {
 	return async (request) => {
-		const { pathname } = new URL(request.url);
-
-		if (pathname === "/health" && request.method === "GET") {
-			return Response.json({ status: "ok" });
-		}
-
-		if (pathname === "/api/cli/history") {
-			if (request.method !== "GET") {
-				return Response.json({ error: "Method Not Allowed" }, { status: 405 });
+		if (matchesPath(request, "/health")) {
+			const methodResult = ensureMethod(request, "GET");
+			if (methodResult.status === "error") {
+				return methodResult.response;
 			}
-			return Response.json(deps.cliExecutor.getHistory());
+			return jsonSuccess({ status: "ok" });
 		}
 
-		if (pathname === "/api/cli/dispatch") {
-			if (request.method !== "POST") {
-				return Response.json({ error: "Method Not Allowed" }, { status: 405 });
+		if (matchesPath(request, "/api/cli/history")) {
+			const methodResult = ensureMethod(request, "GET");
+			if (methodResult.status === "error") {
+				return methodResult.response;
+			}
+			return jsonSuccess(deps.cliExecutor.getHistory());
+		}
+
+		if (matchesPath(request, "/api/cli/dispatch")) {
+			const methodResult = ensureMethod(request, "POST");
+			if (methodResult.status === "error") {
+				return methodResult.response;
 			}
 			const parsed = await parseDispatchRequest(request);
 			if (parsed.status === "error") {
-				return Response.json({ error: parsed.error }, { status: 400 });
+				return jsonError(parsed.error, { status: 400 });
 			}
 			const result = await deps.cliExecutor.execute(parsed.request);
-			return Response.json(result, {
+			return jsonSuccess(result, {
 				status: result.status === "rejected" ? 400 : 200,
 			});
 		}
 
-		return new Response("Not Found", { status: 404 });
+		return notFoundResponse();
 	};
 }
 
 export const handleRequest: RouteHandler = (request) => {
-	const { pathname } = new URL(request.url);
-
-	if (pathname === "/health" && request.method === "GET") {
-		return Response.json({ status: "ok" });
+	if (matchesPath(request, "/health")) {
+		if (request.method !== "GET") {
+			return methodNotAllowedResponse();
+		}
+		return jsonSuccess({ status: "ok" });
 	}
 
-	return new Response("Not Found", { status: 404 });
+	return notFoundResponse();
 };
 
 async function parseDispatchRequest(
@@ -51,27 +67,29 @@ async function parseDispatchRequest(
 	| { status: "ok"; request: Record<string, unknown> & { action: string } }
 	| { status: "error"; error: string }
 > {
-	let body: unknown;
-	try {
-		body = await request.json();
-	} catch {
-		return { status: "error", error: "Malformed JSON body" };
+	const bodyResult = await parseJsonBody(request);
+	if (bodyResult.status === "error") {
+		return bodyResult;
 	}
 
-	if (!isRecord(body)) {
-		return {
-			status: "error",
-			error: "Malformed dispatch request: expected object body",
-		};
+	const objectBody = validateObjectBody(
+		bodyResult.value,
+		"Malformed dispatch request: expected object body",
+	);
+	if (objectBody.status === "error") {
+		return objectBody;
 	}
-	if (typeof body.action !== "string" || body.action.trim().length === 0) {
-		return {
-			status: "error",
-			error: "Malformed dispatch request: action must be a non-empty string",
-		};
+
+	const actionValidation = validateRequiredNonEmptyString(
+		objectBody.value.action,
+		"Malformed dispatch request: action must be a non-empty string",
+	);
+	if (actionValidation.status === "error") {
+		return actionValidation;
 	}
+
 	for (const field of UNSAFE_RAW_COMMAND_FIELDS) {
-		if (field in body) {
+		if (field in objectBody.value) {
 			return {
 				status: "error",
 				error: `Unsafe dispatch request: raw command field '${field}' is not allowed`,
@@ -81,10 +99,6 @@ async function parseDispatchRequest(
 
 	return {
 		status: "ok",
-		request: body as Record<string, unknown> & { action: string },
+		request: objectBody.value as Record<string, unknown> & { action: string },
 	};
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
