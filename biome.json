@@ -3,6 +3,7 @@
 	"files": {
 		"ignore": [
 			"node_modules",
+			".bun-cache",
 			"dist",
 			"packages/*/dist",
 			"packages/web/.next",
