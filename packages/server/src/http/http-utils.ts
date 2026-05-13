@@ -92,10 +92,7 @@ export function optionalInteger(
 }
 
 export function isForeignKeyError(error: unknown): boolean {
-	if (!(error instanceof Error)) {
-		return false;
-	}
-	const message = error.message.toLowerCase();
+	const message = collectErrorText(error).toLowerCase();
 	return (
 		message.includes("foreign key") ||
 		message.includes("violates") ||
@@ -105,4 +102,20 @@ export function isForeignKeyError(error: unknown): boolean {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function collectErrorText(error: unknown): string {
+	if (error instanceof Error) {
+		const causeText = collectErrorText(
+			(error as Error & { cause?: unknown }).cause,
+		);
+		return `${error.message} ${causeText}`.trim();
+	}
+	if (typeof error === "string") {
+		return error;
+	}
+	if (error && typeof error === "object") {
+		return JSON.stringify(error);
+	}
+	return String(error ?? "");
 }

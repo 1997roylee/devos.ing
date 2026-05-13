@@ -70,6 +70,9 @@ export async function handleTasksRoute(
 		}
 		return methodNotAllowed();
 	}
+	if (pathname === "/api/tasks/") {
+		return notFound("Task not found");
+	}
 
 	const id = readPathId(pathname, "/api/tasks/");
 	if (!id) {
@@ -120,11 +123,17 @@ export async function handleTasksRoute(
 	}
 
 	if (request.method === "DELETE") {
-		const [deleted] = await db
-			.delete(boardTasksTable)
-			.where(eq(boardTasksTable.id, id))
-			.returning();
-		return deleted ? Response.json(deleted) : notFound("Task not found");
+		try {
+			const [deleted] = await db
+				.delete(boardTasksTable)
+				.where(eq(boardTasksTable.id, id))
+				.returning();
+			return deleted ? Response.json(deleted) : notFound("Task not found");
+		} catch (error) {
+			return isForeignKeyError(error)
+				? badRequest("Foreign key constraint failed")
+				: badRequest("Invalid task delete payload");
+		}
 	}
 
 	return methodNotAllowed();

@@ -65,6 +65,9 @@ export async function handleProjectsRoute(
 		}
 		return methodNotAllowed();
 	}
+	if (pathname === "/api/projects/") {
+		return notFound("Project not found");
+	}
 
 	const id = readPathId(pathname, "/api/projects/");
 	if (!id) {
@@ -115,11 +118,17 @@ export async function handleProjectsRoute(
 	}
 
 	if (request.method === "DELETE") {
-		const [deleted] = await db
-			.delete(boardProjectsTable)
-			.where(eq(boardProjectsTable.id, id))
-			.returning();
-		return deleted ? Response.json(deleted) : notFound("Project not found");
+		try {
+			const [deleted] = await db
+				.delete(boardProjectsTable)
+				.where(eq(boardProjectsTable.id, id))
+				.returning();
+			return deleted ? Response.json(deleted) : notFound("Project not found");
+		} catch (error) {
+			return isForeignKeyError(error)
+				? badRequest("Foreign key constraint failed")
+				: badRequest("Invalid project delete payload");
+		}
 	}
 
 	return methodNotAllowed();

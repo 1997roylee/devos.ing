@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { createHandleRequest } from "../src/app";
-import { type ServerDatabase, projectBoardsTable } from "../src/db";
+import {
+	type ServerDatabase,
+	boardProjectsTable,
+	boardTasksTable,
+	projectBoardsTable,
+} from "../src/db";
 import {
 	type DrizzleServerTestDatabase,
 	createDrizzleServerTestDatabase,
@@ -132,6 +137,63 @@ describe("project routes", () => {
 			}),
 		);
 		expect(notFoundDelete.status).toBe(404);
+	});
+
+	it("returns JSON not-found errors for missing IDs and FK-protected deletes", async () => {
+		testDatabase = await createDrizzleServerTestDatabase();
+		const app = createApp(testDatabase.db);
+		await seedBoard(testDatabase.db, "board-1");
+
+		const [project] = await testDatabase.db
+			.insert(boardProjectsTable)
+			.values({
+				id: "project-1",
+				boardId: "board-1",
+				externalProjectId: null,
+				name: "Project",
+				description: null,
+				ownerId: "owner-1",
+				createdAt: "2026-05-13T00:00:00.000Z",
+				updatedAt: "2026-05-13T00:00:00.000Z",
+			})
+			.returning();
+		await testDatabase.db.insert(boardTasksTable).values({
+			id: "task-1",
+			projectId: project.id,
+			title: "Task",
+			content: "Body",
+			priority: 1,
+			status: "open",
+			creatorId: "owner-1",
+			dueDate: null,
+			linkedPr: null,
+			createdAt: "2026-05-13T00:00:00.000Z",
+			updatedAt: "2026-05-13T00:00:00.000Z",
+		});
+
+		for (const method of ["GET", "PATCH", "DELETE"] as const) {
+			const response = await app(
+				new Request("http://localhost/api/projects/", {
+					method,
+					headers: { "content-type": "application/json" },
+					body: method === "PATCH" ? JSON.stringify({ name: "x" }) : undefined,
+				}),
+			);
+			expect(response.status).toBe(404);
+			expect((await response.json()) as { error: string }).toEqual({
+				error: "Project not found",
+			});
+		}
+
+		const fkDelete = await app(
+			new Request(`http://localhost/api/projects/${project.id}`, {
+				method: "DELETE",
+			}),
+		);
+		expect(fkDelete.status).toBe(400);
+		expect((await fkDelete.json()) as { error: string }).toEqual({
+			error: "Foreign key constraint failed",
+		});
 	});
 });
 

@@ -3,7 +3,9 @@ import { createHandleRequest } from "../src/app";
 import {
 	type ServerDatabase,
 	boardProjectsTable,
+	boardTasksTable,
 	projectBoardsTable,
+	taskTagsTable,
 } from "../src/db";
 import {
 	type DrizzleServerTestDatabase,
@@ -154,6 +156,61 @@ describe("task routes", () => {
 			new Request("http://localhost/api/tasks/missing", { method: "DELETE" }),
 		);
 		expect(notFoundDelete.status).toBe(404);
+	});
+
+	it("returns JSON not-found errors for missing IDs and FK-protected deletes", async () => {
+		testDatabase = await createDrizzleServerTestDatabase();
+		const app = createApp(testDatabase.db);
+		await seedProject(testDatabase.db, "project-1");
+
+		const [task] = await testDatabase.db
+			.insert(boardTasksTable)
+			.values({
+				id: "task-1",
+				projectId: "project-1",
+				title: "Task 1",
+				content: "Body",
+				priority: 1,
+				status: "open",
+				creatorId: "owner-1",
+				dueDate: null,
+				linkedPr: null,
+				createdAt: "2026-05-13T00:00:00.000Z",
+				updatedAt: "2026-05-13T00:00:00.000Z",
+			})
+			.returning();
+		await testDatabase.db.insert(taskTagsTable).values({
+			id: "tag-1",
+			taskId: task.id,
+			tag: "bug",
+		});
+
+		for (const method of ["GET", "PATCH", "DELETE"] as const) {
+			const response = await app(
+				new Request("http://localhost/api/tasks/", {
+					method,
+					headers: { "content-type": "application/json" },
+					body:
+						method === "PATCH"
+							? JSON.stringify({ status: "done", priority: 2 })
+							: undefined,
+				}),
+			);
+			expect(response.status).toBe(404);
+			expect((await response.json()) as { error: string }).toEqual({
+				error: "Task not found",
+			});
+		}
+
+		const fkDelete = await app(
+			new Request(`http://localhost/api/tasks/${task.id}`, {
+				method: "DELETE",
+			}),
+		);
+		expect(fkDelete.status).toBe(400);
+		expect((await fkDelete.json()) as { error: string }).toEqual({
+			error: "Foreign key constraint failed",
+		});
 	});
 });
 
