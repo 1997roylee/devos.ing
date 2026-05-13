@@ -1,8 +1,8 @@
 import { type UseQueryResult, useQuery } from "@tanstack/react-query";
 
-import { type HealthResponse, createApiClient } from "@/lib/api";
+import { type HealthResponse, createWebApiClient } from "@/lib/api";
 
-const apiClient = createApiClient();
+const apiClient = createWebApiClient();
 
 export const agentMonitorQueryKey = ["agent-monitor", "health"] as const;
 

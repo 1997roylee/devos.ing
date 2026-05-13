@@ -1,4 +1,5 @@
 export { createApiClient } from "./client";
+export { createWebApiClient } from "./web-client";
 export type {
 	ApiClient,
 	ApiClientOptions,
