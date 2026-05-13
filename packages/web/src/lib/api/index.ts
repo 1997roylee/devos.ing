@@ -1,12 +1,5 @@
 export { createApiClient } from "./client";
-export {
-	serverStateQueryKeys,
-	useAgentsQuery,
-	useCommandHistoryQuery,
-	useJobsQuery,
-	useSkillsQuery,
-	useTokenUsageQuery,
-} from "./queries";
+export { createWebApiClient } from "./web-client";
 export type {
 	AgentRecord,
 	ApiClient,
