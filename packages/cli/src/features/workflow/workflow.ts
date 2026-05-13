@@ -851,6 +851,7 @@ async function processIssue(
 			);
 			return;
 		}
+		issueLogger.info({ leaseOwnerId }, "Issue lease acquired");
 		const executionConfig =
 			isolatedWorktreesEnabled && !config.dryRun && runState.stage !== "done"
 				? await withExecutionPathLock(config.executionPath, async () => {
@@ -860,6 +861,10 @@ async function processIssue(
 							runtime,
 						);
 						await saveRunState(config.workspacePath, runState);
+						issueLogger.info(
+							{ executionPath: isolatedConfig.executionPath },
+							"Isolated issue worktree prepared",
+						);
 						return isolatedConfig;
 					})
 				: config;

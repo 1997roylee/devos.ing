@@ -1,3 +1,4 @@
+import { runPrepCommandWithRetry } from "../../utils/prep-command-retry";
 import { runCommand } from "../../utils/shell";
 import type { GithubCommandDeps } from "./github.types";
 
@@ -8,21 +9,27 @@ export async function prepareWorktreeDependencies(
 	deps: GithubCommandDeps = {},
 ): Promise<void> {
 	const commandRunner = deps.runCommand ?? runCommand;
-	const result = await commandRunner("bun", [...INSTALL_ARGS], {
-		cwd: worktreePath,
-	});
-	if (result.code === 0) {
+	try {
+		await runPrepCommandWithRetry(
+			"bun install isolated worktree dependencies",
+			"bun",
+			[...INSTALL_ARGS],
+			{
+				cwd: worktreePath,
+			},
+			commandRunner,
+		);
 		return;
+	} catch (error) {
+		const output = error instanceof Error ? error.message : String(error);
+		throw new Error(
+			[
+				`Failed to prepare isolated worktree dependencies at '${worktreePath}'.`,
+				`Command: bun ${INSTALL_ARGS.join(" ")}`,
+				"Output:",
+				output.trim() || "No output",
+				"Ensure this environment has network access or a populated Bun dependency cache / node_modules matching bun.lock.",
+			].join("\n"),
+		);
 	}
-
-	const output = (result.stderr || result.stdout || "No output").trim();
-	throw new Error(
-		[
-			`Failed to prepare isolated worktree dependencies at '${worktreePath}'.`,
-			`Command: bun ${INSTALL_ARGS.join(" ")}`,
-			"Output:",
-			output,
-			"Ensure this environment has network access or a populated Bun dependency cache / node_modules matching bun.lock.",
-		].join("\n"),
-	);
 }
