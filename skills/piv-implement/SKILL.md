@@ -1,6 +1,6 @@
 ---
 name: adhd-implement
-description: Implementation agent skill for the Agent-Driven Development Hub (ADHD.ai) workflow.
+description: Implementation agent skill for the Agentic Development Hub & Daemon (ADHD.ai) workflow.
 ---
 
 # ADHD.ai Implement Skill

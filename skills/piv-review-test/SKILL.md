@@ -1,6 +1,6 @@
 ---
 name: adhd-review-test
-description: Review and testing agent skill for the Agent-Driven Development Hub (ADHD.ai) workflow.
+description: Review and testing agent skill for the Agentic Development Hub & Daemon (ADHD.ai) workflow.
 ---
 
 # ADHD.ai Review and Test Skill

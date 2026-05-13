@@ -1,4 +1,6 @@
-# Agent-Driven Development Hub (ADHD.ai)
+# Agentic Development Hub & Daemon (ADHD.ai)
+
+Talk is cheap, show me your agent system.
 
 ADHD.ai turns Linear issues into an agent-driven engineering workflow: plan -> implement -> review/test. It can run one issue at a time or poll for new work across projects.
 

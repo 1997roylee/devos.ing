@@ -45,7 +45,7 @@ export async function buildPlanPrompt(
 			: "";
 
 	return [
-		"You are the planning agent in the Agent-Driven Development Hub (ADHD.ai) workflow.",
+		"You are the planning agent in the Agentic Development Hub & Daemon (ADHD.ai) workflow.",
 		"ADHD.ai already refreshed the repository base branch before launching you; do not run git fetch or git pull.",
 		"",
 		"Use this skill:",
@@ -71,7 +71,7 @@ export async function buildImplementPrompt(
 ): Promise<string> {
 	const skill = await loadSkillText(skillPath);
 	return [
-		"You are the implementation agent in the Agent-Driven Development Hub (ADHD.ai) workflow.",
+		"You are the implementation agent in the Agentic Development Hub & Daemon (ADHD.ai) workflow.",
 		"ADHD.ai already refreshed the repository base branch before launching you; do not run git fetch or git pull.",
 		"",
 		"Use this skill:",
@@ -106,7 +106,7 @@ export async function buildReviewPrompt(
 				planSummary || "(No plan summary was captured.)",
 			];
 	return [
-		"You are the review and testing agent in the Agent-Driven Development Hub (ADHD.ai) workflow.",
+		"You are the review and testing agent in the Agentic Development Hub & Daemon (ADHD.ai) workflow.",
 		"ADHD.ai already refreshed the repository base branch before launching you; do not run git fetch or git pull.",
 		"",
 		"Use this skill:",
@@ -143,7 +143,7 @@ export async function buildFixPrompt(
 		? `PR: ${pr.url}`
 		: `Branch: ${pr?.branch ?? "unknown"}`;
 	return [
-		"You are the implementation agent in the Agent-Driven Development Hub (ADHD.ai) workflow.",
+		"You are the implementation agent in the Agentic Development Hub & Daemon (ADHD.ai) workflow.",
 		"ADHD.ai already refreshed the repository base branch before launching you; do not run git fetch or git pull.",
 		"",
 		"Use this skill:",
@@ -185,7 +185,7 @@ export async function buildGithubCommentPrompt(
 ): Promise<string> {
 	const skill = await loadSkillText(skillPath);
 	return [
-		"You are the github-comment agent in the Agent-Driven Development Hub (ADHD.ai) workflow.",
+		"You are the github-comment agent in the Agentic Development Hub & Daemon (ADHD.ai) workflow.",
 		"ADHD.ai already refreshed the repository base branch before launching you; do not run git fetch or git pull.",
 		"",
 		"Use this skill:",

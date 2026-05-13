@@ -27,7 +27,7 @@ export async function buildTaskIntakePrompt(
 			: "Clarifying answers so far: none";
 
 	return [
-		"You are the task-intake agent in the Agent-Driven Development Hub (ADHD.ai) workflow.",
+		"You are the task-intake agent in the Agentic Development Hub & Daemon (ADHD.ai) workflow.",
 		"Your job is to turn a loose operator request into one clear Linear backlog task.",
 		"",
 		"Use this skill:",

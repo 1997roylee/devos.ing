@@ -5,8 +5,7 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		"./cron": "./src/cron/index.ts",
-		"./db": "./src/db/index.ts"
+		"./cron": "./src/cron/index.ts"
 	},
 	"scripts": {
 		"build": "vite build",
@@ -25,8 +24,6 @@
 		"vite": "^7.3.1"
 	},
 	"dependencies": {
-		"@electric-sql/pglite": "^0.3.14",
-		"adhdai": "workspace:*",
-		"drizzle-orm": "^0.44.7"
+		"adhdai": "workspace:*"
 	}
 }

@@ -146,7 +146,7 @@ export async function createDraftPrFromWorktree(
 	const prBody = [
 		`Linear issue: ${issueKey}`,
 		"",
-		"This PR was created by the Agent-Driven Development Hub (ADHD.ai) workflow.",
+		"This PR was created by the Agentic Development Hub & Daemon (ADHD.ai) workflow.",
 		"",
 		"Includes:",
 		"- plan + implement session output",

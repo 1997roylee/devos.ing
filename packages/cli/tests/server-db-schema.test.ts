@@ -12,7 +12,7 @@ import {
 	jobsTable,
 	skillsTable,
 	tokenUsageTable,
-} from "../src/db";
+} from "../src/features/server/db";
 import {
 	type DrizzleServerTestDatabase,
 	createDrizzleServerTestDatabase,

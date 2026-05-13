@@ -6,8 +6,8 @@ import { AppProviders } from "@/components/providers/app-providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-	title: "ADHD.ai Monitoring UI",
-	description: "Monitoring workspace for ADHD.ai agent runs",
+	title: "Agentic Development Hub & Daemon",
+	description: "Talk is cheap, show me your agent system.",
 };
 
 type Props = {

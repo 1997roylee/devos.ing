@@ -1,6 +1,6 @@
 ---
 name: adhd-plan
-description: Planning agent skill for the Agent-Driven Development Hub (ADHD.ai) workflow.
+description: Planning agent skill for the Agentic Development Hub & Daemon (ADHD.ai) workflow.
 ---
 
 # ADHD.ai Plan Skill
