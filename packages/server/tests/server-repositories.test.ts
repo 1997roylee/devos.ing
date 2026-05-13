@@ -20,11 +20,14 @@ describe("read repositories", () => {
 		testDatabase = await createServerTestDatabase();
 		const repositories = createReadRepositories(testDatabase.database);
 
-		expect(await repositories.listTokenUsage()).toEqual([]);
-		expect(await repositories.listJobs()).toEqual([]);
-		expect(await repositories.listAgents()).toEqual([]);
-		expect(await repositories.listSkills()).toEqual([]);
-		expect(await repositories.listCommandHistory()).toEqual([]);
+		expect(repositories.listTokenUsage()).toEqual([]);
+		expect(repositories.listJobs()).toEqual([]);
+		expect(repositories.listAgents()).toEqual([]);
+		expect(repositories.listSkills()).toEqual([]);
+		expect(repositories.listCommandHistory()).toEqual([]);
+		expect(repositories.listProjectBoards()).toEqual([]);
+		expect(repositories.listBoardProjects()).toEqual([]);
+		expect(repositories.listBoardTasks()).toEqual([]);
 	});
 
 	it("returns seeded rows with expected mapping", async () => {
@@ -77,6 +80,43 @@ describe("read repositories", () => {
 				command: "bun test",
 				exitCode: 0,
 				executedAt: "2026-05-12T00:04:00.000Z",
+			},
+		]);
+		expect(repositories.listProjectBoards()).toEqual([
+			{
+				id: "board-1",
+				name: "Workspace Board",
+				description: "Primary board for workspace planning",
+				ownerId: "owner-1",
+				createdAt: "2026-05-12T00:05:00.000Z",
+				updatedAt: "2026-05-12T00:05:00.000Z",
+			},
+		]);
+		expect(repositories.listBoardProjects()).toEqual([
+			{
+				id: "project-1",
+				boardId: "board-1",
+				externalProjectId: "ext-project-42",
+				name: "API Hardening",
+				description: "Contract and route updates",
+				ownerId: "owner-1",
+				createdAt: "2026-05-12T00:06:00.000Z",
+				updatedAt: "2026-05-12T00:06:00.000Z",
+			},
+		]);
+		expect(repositories.listBoardTasks()).toEqual([
+			{
+				id: "task-1",
+				projectId: "project-1",
+				title: "Document board APIs",
+				content: "Update OpenAPI and tests for board endpoints",
+				priority: 2,
+				status: "todo",
+				dueDate: null,
+				creatorId: "owner-1",
+				linkedPr: null,
+				createdAt: "2026-05-12T00:07:00.000Z",
+				updatedAt: "2026-05-12T00:07:00.000Z",
 			},
 		]);
 	});

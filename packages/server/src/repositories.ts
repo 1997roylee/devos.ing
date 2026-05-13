@@ -1,8 +1,11 @@
 import type { ServerDatabase } from "./db";
 import type {
 	AgentRecord,
+	BoardProjectRecord,
+	BoardTaskRecord,
 	CommandHistoryRecord,
 	JobRecord,
+	ProjectBoardRecord,
 	ReadRepositories,
 	SkillRecord,
 	TokenUsageRecord,
@@ -112,6 +115,63 @@ export function createReadRepositories(
 					command: String(row.command),
 					exitCode: Number(row.exit_code),
 					executedAt: normalizeTimestamp(row.executed_at),
+				}),
+			),
+		listProjectBoards: () =>
+			readRows(
+				dbPath,
+				`SELECT id, name, description, owner_id, created_at, updated_at
+				 FROM project_boards
+				 ORDER BY id ASC`,
+				(row): ProjectBoardRecord => ({
+					id: String(row.id),
+					name: String(row.name),
+					description:
+						row.description === null ? null : String(row.description),
+					ownerId: String(row.owner_id),
+					createdAt: String(row.created_at),
+					updatedAt: String(row.updated_at),
+				}),
+			),
+		listBoardProjects: () =>
+			readRows(
+				dbPath,
+				`SELECT id, board_id, external_project_id, name, description, owner_id, created_at, updated_at
+				 FROM board_projects
+				 ORDER BY id ASC`,
+				(row): BoardProjectRecord => ({
+					id: String(row.id),
+					boardId: String(row.board_id),
+					externalProjectId:
+						row.external_project_id === null
+							? null
+							: String(row.external_project_id),
+					name: String(row.name),
+					description:
+						row.description === null ? null : String(row.description),
+					ownerId: String(row.owner_id),
+					createdAt: String(row.created_at),
+					updatedAt: String(row.updated_at),
+				}),
+			),
+		listBoardTasks: () =>
+			readRows(
+				dbPath,
+				`SELECT id, project_id, title, content, priority, status, due_date, creator_id, linked_pr, created_at, updated_at
+				 FROM board_tasks
+				 ORDER BY id ASC`,
+				(row): BoardTaskRecord => ({
+					id: String(row.id),
+					projectId: String(row.project_id),
+					title: String(row.title),
+					content: String(row.content),
+					priority: Number(row.priority),
+					status: String(row.status),
+					dueDate: row.due_date === null ? null : String(row.due_date),
+					creatorId: String(row.creator_id),
+					linkedPr: row.linked_pr === null ? null : String(row.linked_pr),
+					createdAt: String(row.created_at),
+					updatedAt: String(row.updated_at),
 				}),
 			),
 	};

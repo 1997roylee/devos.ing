@@ -40,10 +40,47 @@ export interface CommandHistoryRecord {
 	executedAt: string;
 }
 
+export interface ProjectBoardRecord {
+	id: string;
+	name: string;
+	description: string | null;
+	ownerId: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface BoardProjectRecord {
+	id: string;
+	boardId: string;
+	externalProjectId: string | null;
+	name: string;
+	description: string | null;
+	ownerId: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+export interface BoardTaskRecord {
+	id: string;
+	projectId: string;
+	title: string;
+	content: string;
+	priority: number;
+	status: string;
+	dueDate: string | null;
+	creatorId: string;
+	linkedPr: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
 export interface ReadRepositories {
-	listTokenUsage(): Promise<TokenUsageRecord[]>;
-	listJobs(): Promise<JobRecord[]>;
-	listAgents(): Promise<AgentRecord[]>;
-	listSkills(): Promise<SkillRecord[]>;
-	listCommandHistory(): Promise<CommandHistoryRecord[]>;
+	listTokenUsage(): TokenUsageRecord[];
+	listJobs(): JobRecord[];
+	listAgents(): AgentRecord[];
+	listSkills(): SkillRecord[];
+	listCommandHistory(): CommandHistoryRecord[];
+	listProjectBoards(): ProjectBoardRecord[];
+	listBoardProjects(): BoardProjectRecord[];
+	listBoardTasks(): BoardTaskRecord[];
 }

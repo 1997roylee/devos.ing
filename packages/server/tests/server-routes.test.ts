@@ -68,6 +68,61 @@ describe("server routes", () => {
 				createdAt: "2026-05-12T00:01:00.000Z",
 			},
 		]);
+
+		const projectBoardsResponse = await handleServerRequest(
+			new Request("http://localhost/api/project-boards"),
+			{ repositories },
+		);
+		expect(projectBoardsResponse.status).toBe(200);
+		expect(await projectBoardsResponse.json()).toEqual([
+			{
+				id: "board-1",
+				name: "Workspace Board",
+				description: "Primary board for workspace planning",
+				ownerId: "owner-1",
+				createdAt: "2026-05-12T00:05:00.000Z",
+				updatedAt: "2026-05-12T00:05:00.000Z",
+			},
+		]);
+
+		const boardProjectsResponse = await handleServerRequest(
+			new Request("http://localhost/api/board-projects"),
+			{ repositories },
+		);
+		expect(boardProjectsResponse.status).toBe(200);
+		expect(await boardProjectsResponse.json()).toEqual([
+			{
+				id: "project-1",
+				boardId: "board-1",
+				externalProjectId: "ext-project-42",
+				name: "API Hardening",
+				description: "Contract and route updates",
+				ownerId: "owner-1",
+				createdAt: "2026-05-12T00:06:00.000Z",
+				updatedAt: "2026-05-12T00:06:00.000Z",
+			},
+		]);
+
+		const boardTasksResponse = await handleServerRequest(
+			new Request("http://localhost/api/board-tasks"),
+			{ repositories },
+		);
+		expect(boardTasksResponse.status).toBe(200);
+		expect(await boardTasksResponse.json()).toEqual([
+			{
+				id: "task-1",
+				projectId: "project-1",
+				title: "Document board APIs",
+				content: "Update OpenAPI and tests for board endpoints",
+				priority: 2,
+				status: "todo",
+				dueDate: null,
+				creatorId: "owner-1",
+				linkedPr: null,
+				createdAt: "2026-05-12T00:07:00.000Z",
+				updatedAt: "2026-05-12T00:07:00.000Z",
+			},
+		]);
 	});
 
 	it("returns not found and method not allowed when appropriate", async () => {

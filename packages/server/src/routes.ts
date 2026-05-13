@@ -14,6 +14,9 @@ export const READ_ONLY_SERVER_PATHS = [
 	"/api/agents",
 	"/api/skills",
 	"/api/command-history",
+	"/api/project-boards",
+	"/api/board-projects",
+	"/api/board-tasks",
 ] as const;
 
 const routes: Record<string, RouteHandler> = {
@@ -22,6 +25,9 @@ const routes: Record<string, RouteHandler> = {
 	"/api/agents": (deps) => deps.repositories.listAgents(),
 	"/api/skills": (deps) => deps.repositories.listSkills(),
 	"/api/command-history": (deps) => deps.repositories.listCommandHistory(),
+	"/api/project-boards": (deps) => deps.repositories.listProjectBoards(),
+	"/api/board-projects": (deps) => deps.repositories.listBoardProjects(),
+	"/api/board-tasks": (deps) => deps.repositories.listBoardTasks(),
 };
 
 export async function handleServerRequest(
