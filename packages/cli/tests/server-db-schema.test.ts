@@ -2,15 +2,33 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { eq } from "drizzle-orm";
 import {
 	type NewAgentRow,
+	type NewBoardProjectRow,
+	type NewBoardTaskRow,
 	type NewCommandHistoryRow,
 	type NewJobRow,
+	type NewProjectBoardRow,
 	type NewSkillRow,
+	type NewTaskAssigneeRow,
+	type NewTaskCommentRow,
+	type NewTaskExecutionLogRow,
+	type NewTaskExecutionStepRow,
+	type NewTaskPullRequestRow,
+	type NewTaskTagRow,
 	type NewTokenUsageRow,
 	agentsTable,
+	boardProjectsTable,
+	boardTasksTable,
 	commandHistoryTable,
 	initializeServerDatabase,
 	jobsTable,
+	projectBoardsTable,
 	skillsTable,
+	taskAssigneesTable,
+	taskCommentsTable,
+	taskExecutionLogsTable,
+	taskExecutionStepsTable,
+	taskPullRequestsTable,
+	taskTagsTable,
 	tokenUsageTable,
 } from "../src/features/server/db";
 import {
@@ -28,13 +46,15 @@ afterEach(async () => {
 });
 
 describe("server drizzle schema", () => {
-	it("inserts and reads representative records for all tables", async () => {
+	it("inserts and reads representative records for operational tables", async () => {
 		testDatabase = await createDrizzleServerTestDatabase();
 		const { db } = testDatabase;
 
 		const tokenUsage: NewTokenUsageRow = {
 			id: "tu-1",
 			runId: "run-1",
+			taskId: null,
+			taskExecutionLogId: null,
 			stage: "planning",
 			inputTokens: 10,
 			outputTokens: 5,
@@ -97,11 +117,215 @@ describe("server drizzle schema", () => {
 			.from(commandHistoryTable)
 			.where(eq(commandHistoryTable.id, commandHistory.id));
 
-		expect(tokenUsageRow).toEqual(tokenUsage);
+		expect(tokenUsageRow?.id).toBe(tokenUsage.id);
+		expect(tokenUsageRow?.runId).toBe(tokenUsage.runId);
+		expect(tokenUsageRow?.taskId).toBeNull();
+		expect(tokenUsageRow?.taskExecutionLogId).toBeNull();
+		expect(tokenUsageRow?.stage).toBe(tokenUsage.stage);
+		expect(tokenUsageRow?.inputTokens).toBe(tokenUsage.inputTokens);
+		expect(tokenUsageRow?.outputTokens).toBe(tokenUsage.outputTokens);
+		expect(tokenUsageRow?.totalTokens).toBe(tokenUsage.totalTokens);
+		expect(tokenUsageRow?.recordedAt).toBe(tokenUsage.recordedAt);
 		expect(jobRow).toEqual(job);
 		expect(agentRow).toEqual(agent);
 		expect(skillRow).toEqual(skill);
 		expect(commandHistoryRow).toEqual(commandHistory);
+	});
+
+	it("supports project board workflow relationships", async () => {
+		testDatabase = await createDrizzleServerTestDatabase();
+		const { db } = testDatabase;
+
+		const board: NewProjectBoardRow = {
+			id: "board-1",
+			name: "Core Platform Board",
+			description: "Tracks platform workflow execution",
+			ownerId: "user-1",
+			createdAt: "2026-05-12 01:00:00",
+			updatedAt: "2026-05-12 01:00:00",
+		};
+		const project: NewBoardProjectRow = {
+			id: "project-1",
+			boardId: board.id,
+			externalProjectId: "ROY",
+			name: "ADHD Server",
+			description: "Server-side workflow work",
+			ownerId: "user-1",
+			createdAt: "2026-05-12 01:01:00",
+			updatedAt: "2026-05-12 01:01:00",
+		};
+		const task: NewBoardTaskRow = {
+			id: "task-1",
+			projectId: project.id,
+			title: "Design schema",
+			content: "Define persistent schema for board workflow",
+			priority: 1,
+			status: "open",
+			dueDate: "2026-05-20 00:00:00",
+			creatorId: "user-1",
+			linkedPr: "https://github.com/acme/repo/pull/42",
+			createdAt: "2026-05-12 01:02:00",
+			updatedAt: "2026-05-12 01:02:00",
+		};
+		const humanAssignee: NewTaskAssigneeRow = {
+			id: "assignee-1",
+			taskId: task.id,
+			assigneeId: "user-2",
+			assigneeType: "human",
+			createdAt: "2026-05-12 01:03:00",
+		};
+		const agentAssignee: NewTaskAssigneeRow = {
+			id: "assignee-2",
+			taskId: task.id,
+			assigneeId: "agent-99",
+			assigneeType: "agent",
+			createdAt: "2026-05-12 01:03:10",
+		};
+		const taskTag: NewTaskTagRow = {
+			id: "tag-1",
+			taskId: task.id,
+			tag: "backend",
+		};
+		const taskPr: NewTaskPullRequestRow = {
+			id: "pr-1",
+			taskId: task.id,
+			repository: "acme/repo",
+			prNumber: "42",
+			prUrl: "https://github.com/acme/repo/pull/42",
+			createdAt: "2026-05-12 01:04:00",
+		};
+		const executionLog: NewTaskExecutionLogRow = {
+			id: "exec-1",
+			taskId: task.id,
+			status: "success",
+			startedAt: "2026-05-12 01:05:00",
+			finishedAt: "2026-05-12 01:06:00",
+			log: "Implemented schema and tests",
+		};
+		const executionStep: NewTaskExecutionStepRow = {
+			id: "step-1",
+			executionLogId: executionLog.id,
+			stepNumber: 1,
+			action: "create_tables",
+			status: "success",
+			detail: "Created board/task tables",
+			recordedAt: "2026-05-12 01:05:30",
+		};
+		const taskComment: NewTaskCommentRow = {
+			id: "comment-1",
+			taskId: task.id,
+			authorId: "user-2",
+			authorType: "human",
+			comment: "Schema review complete",
+			createdAt: "2026-05-12 01:07:00",
+		};
+		const taskTokenUsage: NewTokenUsageRow = {
+			id: "tu-task-1",
+			runId: "run-2",
+			taskId: task.id,
+			taskExecutionLogId: executionLog.id,
+			stage: "implement",
+			inputTokens: 100,
+			outputTokens: 200,
+			totalTokens: 300,
+			recordedAt: "2026-05-12 01:08:00",
+		};
+
+		await db.insert(projectBoardsTable).values(board);
+		await db.insert(boardProjectsTable).values(project);
+		await db.insert(boardTasksTable).values(task);
+		await db.insert(taskAssigneesTable).values([humanAssignee, agentAssignee]);
+		await db.insert(taskTagsTable).values(taskTag);
+		await db.insert(taskPullRequestsTable).values(taskPr);
+		await db.insert(taskExecutionLogsTable).values(executionLog);
+		await db.insert(taskExecutionStepsTable).values(executionStep);
+		await db.insert(taskCommentsTable).values(taskComment);
+		await db.insert(tokenUsageTable).values(taskTokenUsage);
+
+		const [boardRow] = await db
+			.select()
+			.from(projectBoardsTable)
+			.where(eq(projectBoardsTable.id, board.id));
+		const [projectRow] = await db
+			.select()
+			.from(boardProjectsTable)
+			.where(eq(boardProjectsTable.id, project.id));
+		const [taskRow] = await db
+			.select()
+			.from(boardTasksTable)
+			.where(eq(boardTasksTable.id, task.id));
+		const assigneeRows = await db
+			.select()
+			.from(taskAssigneesTable)
+			.where(eq(taskAssigneesTable.taskId, task.id));
+		const [tagRow] = await db
+			.select()
+			.from(taskTagsTable)
+			.where(eq(taskTagsTable.id, taskTag.id));
+		const [prRow] = await db
+			.select()
+			.from(taskPullRequestsTable)
+			.where(eq(taskPullRequestsTable.id, taskPr.id));
+		const [executionLogRow] = await db
+			.select()
+			.from(taskExecutionLogsTable)
+			.where(eq(taskExecutionLogsTable.id, executionLog.id));
+		const [executionStepRow] = await db
+			.select()
+			.from(taskExecutionStepsTable)
+			.where(eq(taskExecutionStepsTable.id, executionStep.id));
+		const [commentRow] = await db
+			.select()
+			.from(taskCommentsTable)
+			.where(eq(taskCommentsTable.id, taskComment.id));
+		const [tokenUsageRow] = await db
+			.select()
+			.from(tokenUsageTable)
+			.where(eq(tokenUsageTable.id, taskTokenUsage.id));
+
+		expect(boardRow?.id).toBe(board.id);
+		expect(boardRow?.name).toBe(board.name);
+		expect(boardRow?.description).toBe(board.description ?? null);
+		expect(boardRow?.ownerId).toBe(board.ownerId);
+		expect(projectRow?.id).toBe(project.id);
+		expect(projectRow?.boardId).toBe(project.boardId);
+		expect(projectRow?.externalProjectId).toBe(
+			project.externalProjectId ?? null,
+		);
+		expect(projectRow?.name).toBe(project.name);
+		expect(projectRow?.description).toBe(project.description ?? null);
+		expect(taskRow?.id).toBe(task.id);
+		expect(taskRow?.projectId).toBe(task.projectId);
+		expect(taskRow?.title).toBe(task.title);
+		expect(taskRow?.content).toBe(task.content);
+		expect(taskRow?.dueDate).toBe(task.dueDate ?? null);
+		expect(taskRow?.linkedPr).toBe(task.linkedPr ?? null);
+		expect(assigneeRows).toHaveLength(2);
+		expect(assigneeRows).toContainEqual(humanAssignee);
+		expect(assigneeRows).toContainEqual(agentAssignee);
+		expect(tagRow?.id).toBe(taskTag.id);
+		expect(tagRow?.taskId).toBe(taskTag.taskId);
+		expect(tagRow?.tag).toBe(taskTag.tag);
+		expect(prRow?.id).toBe(taskPr.id);
+		expect(prRow?.repository).toBe(taskPr.repository);
+		expect(prRow?.prNumber).toBe(taskPr.prNumber);
+		expect(prRow?.prUrl).toBe(taskPr.prUrl ?? null);
+		expect(executionLogRow?.id).toBe(executionLog.id);
+		expect(executionLogRow?.taskId).toBe(executionLog.taskId);
+		expect(executionLogRow?.status).toBe(executionLog.status);
+		expect(executionLogRow?.finishedAt).toBe(executionLog.finishedAt ?? null);
+		expect(executionStepRow?.id).toBe(executionStep.id);
+		expect(executionStepRow?.executionLogId).toBe(executionStep.executionLogId);
+		expect(executionStepRow?.detail).toBe(executionStep.detail ?? null);
+		expect(commentRow?.id).toBe(taskComment.id);
+		expect(commentRow?.taskId).toBe(taskComment.taskId);
+		expect(commentRow?.comment).toBe(taskComment.comment);
+		expect(tokenUsageRow?.id).toBe(taskTokenUsage.id);
+		expect(tokenUsageRow?.runId).toBe(taskTokenUsage.runId);
+		expect(tokenUsageRow?.taskId).toBe(taskTokenUsage.taskId ?? null);
+		expect(tokenUsageRow?.taskExecutionLogId).toBe(
+			taskTokenUsage.taskExecutionLogId ?? null,
+		);
 	});
 
 	it("initializes the same database path twice without startup errors", async () => {

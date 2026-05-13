@@ -1,5 +1,14 @@
+export { boardProjectsTable } from "./board-projects.schema";
+export { boardTasksTable } from "./board-tasks.schema";
 export { agentsTable } from "./agents.schema";
 export { commandHistoryTable } from "./command-history.schema";
 export { jobsTable } from "./jobs.schema";
+export { projectBoardsTable } from "./project-boards.schema";
 export { skillsTable } from "./skills.schema";
+export { taskAssigneesTable } from "./task-assignees.schema";
+export { taskCommentsTable } from "./task-comments.schema";
+export { taskExecutionLogsTable } from "./task-execution-logs.schema";
+export { taskExecutionStepsTable } from "./task-execution-steps.schema";
+export { taskPullRequestsTable } from "./task-pull-requests.schema";
+export { taskTagsTable } from "./task-tags.schema";
 export { tokenUsageTable } from "./token-usage.schema";
