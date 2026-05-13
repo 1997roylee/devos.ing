@@ -296,6 +296,13 @@ function resolveInvocation(
 			},
 		};
 	}
+	if (request.action === "stop") {
+		return {
+			status: "error",
+			error:
+				"Unsupported CLI action: stop (typed stop workflow boundary is not available)",
+		};
+	}
 	return {
 		status: "error",
 		error: `Unsupported CLI action: ${request.action}`,

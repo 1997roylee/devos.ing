@@ -93,6 +93,30 @@ describe("CliCommandExecutor", () => {
 		expect(callCount).toBe(0);
 	});
 
+	it("rejects stop action without execution when no typed stop boundary exists", async () => {
+		let callCount = 0;
+		const runCommandFn: RunCommandFn = async () => {
+			callCount += 1;
+			return { code: 0, stdout: "", stderr: "" };
+		};
+		const executor = new CliCommandExecutor({
+			cwd: "/tmp/work",
+			command: "bun",
+			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			runCommandFn,
+		});
+
+		const result = await executor.execute({
+			action: "stop",
+		} as unknown as { action: string });
+
+		expect(result.status).toBe("rejected");
+		expect(result.error).toBe(
+			"Unsupported CLI action: stop (typed stop workflow boundary is not available)",
+		);
+		expect(callCount).toBe(0);
+	});
+
 	it("rejects malformed status action without execution", async () => {
 		let callCount = 0;
 		const runCommandFn: RunCommandFn = async () => {
