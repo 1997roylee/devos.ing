@@ -6,6 +6,7 @@
 			".bun-cache",
 			"dist",
 			"packages/*/dist",
+			"packages/*/.next/**",
 			"packages/web/.next",
 			".piv-loop",
 			"bun.lock",
