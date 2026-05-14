@@ -8,6 +8,8 @@ export async function runCommand(
 	options: RunCommandOptions,
 ): Promise<CommandResult> {
 	return new Promise((resolve, reject) => {
+		let timedOut = false;
+		let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
 		const child = spawn(command, args, {
 			cwd: options.cwd,
 			env: { ...process.env, ...options.env },
@@ -31,12 +33,37 @@ export async function runCommand(
 				process.stderr.write(text);
 			}
 		});
-		child.on("error", reject);
+		const timeout =
+			options.timeoutMs !== undefined
+				? setTimeout(() => {
+						timedOut = true;
+						child.kill("SIGTERM");
+						forceKillTimer = setTimeout(() => child.kill("SIGKILL"), 5000);
+					}, options.timeoutMs)
+				: undefined;
+		child.on("error", (error) => {
+			if (timeout) {
+				clearTimeout(timeout);
+			}
+			if (forceKillTimer) {
+				clearTimeout(forceKillTimer);
+			}
+			reject(error);
+		});
 		child.on("close", (code) => {
+			if (timeout) {
+				clearTimeout(timeout);
+			}
+			if (forceKillTimer) {
+				clearTimeout(forceKillTimer);
+			}
+			const timeoutMessage = timedOut
+				? `${command} ${args.join(" ")} timed out after ${options.timeoutMs}ms`
+				: "";
 			resolve({
-				code: code ?? 1,
+				code: timedOut ? 124 : (code ?? 1),
 				stdout,
-				stderr,
+				stderr: [stderr, timeoutMessage].filter(Boolean).join("\n"),
 			});
 		});
 	});

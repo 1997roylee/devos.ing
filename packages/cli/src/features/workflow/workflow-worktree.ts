@@ -48,15 +48,44 @@ export async function prepareIsolatedExecutionConfig(
 	state: RunState,
 	runtime: WorkflowRuntime,
 ): Promise<ResolvedProjectConfig> {
+	const isolatedConfig = await prepareIsolatedExecutionWorkspace(
+		config,
+		state,
+		runtime,
+	);
+	await runtime.prepareWorktreeDependencies(isolatedConfig.executionPath);
+	return isolatedConfig;
+}
+
+export async function prepareIsolatedExecutionWorkspace(
+	config: ResolvedProjectConfig,
+	state: RunState,
+	runtime: WorkflowRuntime,
+): Promise<ResolvedProjectConfig> {
 	const worktreePath = isolatedWorktreePath(config, state);
+	logger.info(
+		{
+			projectId: state.projectId,
+			issueKey: state.issue.key,
+			worktreePath,
+		},
+		"Refreshing base branch for isolated worktree",
+	);
 	await runtime.ensureBaseBranchFresh(config);
+	logger.info(
+		{
+			projectId: state.projectId,
+			issueKey: state.issue.key,
+			worktreePath,
+		},
+		"Ensuring isolated issue worktree",
+	);
 	const branch = await runtime.ensureIssueWorktree(
 		config,
 		state.issue.key,
 		state.pullRequest,
 		worktreePath,
 	);
-	await runtime.prepareWorktreeDependencies(worktreePath);
 	state.executionWorkspace = {
 		mode: "git-worktree",
 		path: worktreePath,

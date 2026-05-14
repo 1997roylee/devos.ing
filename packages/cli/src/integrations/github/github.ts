@@ -4,6 +4,10 @@ import type {
 	PullRequestRef,
 	ResolvedProjectConfig,
 } from "../../features/types";
+import {
+	PREP_COMMAND_TIMEOUT_MS,
+	runPrepCommandWithRetry,
+} from "../../utils/prep-command-retry";
 import { assertCommandOk, runCommand } from "../../utils/shell";
 import type {
 	GithubCommandDeps,
@@ -39,10 +43,12 @@ export async function ensureBaseBranchFresh(
 	const commandRunner = deps.runCommand ?? runCommand;
 	const assertOk = deps.assertCommandOk ?? assertCommandOk;
 	const baseBranch = config.repo.baseBranch;
-	const fetch = await commandRunner(
+	const fetch = await runPrepCommandWithRetry(
+		"git fetch base branch",
 		"git",
 		["fetch", "--no-write-fetch-head", "origin", baseBranch],
 		{ cwd: config.executionPath },
+		commandRunner,
 	);
 	assertOk(
 		"git",
@@ -50,16 +56,22 @@ export async function ensureBaseBranchFresh(
 		fetch,
 	);
 
-	const current = await commandRunner("git", ["branch", "--show-current"], {
-		cwd: config.executionPath,
-	});
+	const current = await runPrepCommandWithRetry(
+		"git read current branch",
+		"git",
+		["branch", "--show-current"],
+		{ cwd: config.executionPath },
+		commandRunner,
+	);
 	assertOk("git", ["branch", "--show-current"], current);
 
 	if (current.stdout.trim() === baseBranch) {
-		const merge = await commandRunner(
+		const merge = await runPrepCommandWithRetry(
+			"git fast-forward base branch",
 			"git",
 			["merge", "--ff-only", `origin/${baseBranch}`],
 			{ cwd: config.executionPath },
+			commandRunner,
 		);
 		assertOk("git", ["merge", "--ff-only", `origin/${baseBranch}`], merge);
 		return;
@@ -68,26 +80,30 @@ export async function ensureBaseBranchFresh(
 	const localBranch = await commandRunner(
 		"git",
 		["show-ref", "--verify", "--quiet", `refs/heads/${baseBranch}`],
-		{ cwd: config.executionPath },
+		{ cwd: config.executionPath, timeoutMs: PREP_COMMAND_TIMEOUT_MS },
 	);
 	if (localBranch.code !== 0) {
 		return;
 	}
 
-	const ancestor = await commandRunner(
+	const ancestor = await runPrepCommandWithRetry(
+		"git verify base branch ancestor",
 		"git",
 		["merge-base", "--is-ancestor", baseBranch, `origin/${baseBranch}`],
 		{ cwd: config.executionPath },
+		commandRunner,
 	);
 	assertOk(
 		"git",
 		["merge-base", "--is-ancestor", baseBranch, `origin/${baseBranch}`],
 		ancestor,
 	);
-	const update = await commandRunner(
+	const update = await runPrepCommandWithRetry(
+		"git update local base branch",
 		"git",
 		["update-ref", `refs/heads/${baseBranch}`, `origin/${baseBranch}`],
 		{ cwd: config.executionPath },
+		commandRunner,
 	);
 	assertOk(
 		"git",
@@ -264,7 +280,7 @@ export async function ensureIssueWorktree(
 		const existingWorktreeBranch = await commandRunner(
 			"git",
 			["branch", "--show-current"],
-			{ cwd: worktreePath },
+			{ cwd: worktreePath, timeoutMs: PREP_COMMAND_TIMEOUT_MS },
 		);
 		if (existingWorktreeBranch.code === 0) {
 			if (existingWorktreeBranch.stdout.trim() !== branch) {
@@ -273,20 +289,24 @@ export async function ensureIssueWorktree(
 				);
 			}
 			if (pullRequest?.branch) {
-				const fetchBranch = await commandRunner(
+				const fetchBranch = await runPrepCommandWithRetry(
+					"git fetch issue worktree branch",
 					"git",
 					["fetch", "origin", `${branch}:refs/remotes/origin/${branch}`],
 					{ cwd: worktreePath },
+					commandRunner,
 				);
 				assertOk(
 					"git",
 					["fetch", "origin", `${branch}:refs/remotes/origin/${branch}`],
 					fetchBranch,
 				);
-				const reset = await commandRunner(
+				const reset = await runPrepCommandWithRetry(
+					"git reset issue worktree branch",
 					"git",
 					["reset", "--hard", `origin/${branch}`],
 					{ cwd: worktreePath },
+					commandRunner,
 				);
 				assertOk("git", ["reset", "--hard", `origin/${branch}`], reset);
 			}
@@ -301,15 +321,17 @@ export async function ensureIssueWorktree(
 	const localBranch = await commandRunner(
 		"git",
 		["show-ref", "--verify", "--quiet", `refs/heads/${branch}`],
-		{ cwd: config.executionPath },
+		{ cwd: config.executionPath, timeoutMs: PREP_COMMAND_TIMEOUT_MS },
 	);
 	if (localBranch.code === 0) {
-		const add = await commandRunner(
+		const add = await runPrepCommandWithRetry(
+			"git add issue worktree",
 			"git",
 			["worktree", "add", worktreePath, branch],
 			{
 				cwd: config.executionPath,
 			},
+			commandRunner,
 		);
 		assertOk("git", ["worktree", "add", worktreePath, branch], add);
 		return branch;
@@ -320,17 +342,19 @@ export async function ensureIssueWorktree(
 		const fetchBranch = await commandRunner(
 			"git",
 			["fetch", "origin", `${branch}:refs/remotes/origin/${branch}`],
-			{ cwd: config.executionPath },
+			{ cwd: config.executionPath, timeoutMs: PREP_COMMAND_TIMEOUT_MS },
 		);
 		if (fetchBranch.code === 0) {
 			startPoint = `origin/${branch}`;
 		}
 	}
 
-	const add = await commandRunner(
+	const add = await runPrepCommandWithRetry(
+		"git create issue worktree",
 		"git",
 		["worktree", "add", "-b", branch, worktreePath, startPoint],
 		{ cwd: config.executionPath },
+		commandRunner,
 	);
 	assertOk(
 		"git",

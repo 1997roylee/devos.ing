@@ -71,6 +71,31 @@ describe("ensureGhAuth", () => {
 });
 
 describe("ensureBaseBranchFresh", () => {
+	it("retries transient base branch prep failures", async () => {
+		let fetchAttempts = 0;
+		const runCommand = mock(
+			async (_command: string, args: string[]): Promise<CommandResult> => {
+				if (args[0] === "fetch") {
+					fetchAttempts += 1;
+					if (fetchAttempts < 3) {
+						return { code: 1, stdout: "", stderr: "network unavailable" };
+					}
+				}
+				if (args[0] === "branch") {
+					return { code: 0, stdout: "main\n", stderr: "" };
+				}
+				return { code: 0, stdout: "", stderr: "" };
+			},
+		);
+
+		await ensureBaseBranchFresh(createProjectConfig(), {
+			runCommand,
+			assertCommandOk: assertOk,
+		});
+
+		expect(fetchAttempts).toBe(3);
+	});
+
 	it("fetches without writing FETCH_HEAD and fast-forwards checked-out base branch", async () => {
 		const calls: string[][] = [];
 		const runCommand = mock(
@@ -419,6 +444,38 @@ describe("createDraftPrFromWorktree", () => {
 });
 
 describe("ensureIssueWorktree", () => {
+	it("retries transient issue worktree creation failures", async () => {
+		let addAttempts = 0;
+		const runCommand = mock(
+			async (_command: string, args: string[]): Promise<CommandResult> => {
+				if (args[0] === "rev-parse") {
+					return { code: 0, stdout: "true\n", stderr: "" };
+				}
+				if (args[0] === "show-ref") {
+					return { code: 1, stdout: "", stderr: "" };
+				}
+				if (args[0] === "worktree") {
+					addAttempts += 1;
+					if (addAttempts < 3) {
+						return { code: 1, stdout: "", stderr: "index.lock exists" };
+					}
+				}
+				return { code: 0, stdout: "", stderr: "" };
+			},
+		);
+
+		const branch = await ensureIssueWorktree(
+			createProjectConfig(),
+			"ENG-42",
+			undefined,
+			"/tmp/worktrees/eng-42",
+			{ runCommand, assertCommandOk: assertOk },
+		);
+
+		expect(branch).toBe("codex/eng-42");
+		expect(addAttempts).toBe(3);
+	});
+
 	it("creates a new issue worktree from the base branch", async () => {
 		const calls: string[][] = [];
 		const runCommand = mock(
@@ -590,6 +647,23 @@ describe("ensureIssueWorktree", () => {
 });
 
 describe("prepareWorktreeDependencies", () => {
+	it("retries transient bun install failures", async () => {
+		let attempts = 0;
+		const runCommand = mock(async (): Promise<CommandResult> => {
+			attempts += 1;
+			if (attempts < 3) {
+				return { code: 1, stdout: "", stderr: "temporary registry failure" };
+			}
+			return { code: 0, stdout: "", stderr: "" };
+		});
+
+		await prepareWorktreeDependencies("/tmp/worktrees/eng-42", {
+			runCommand,
+		});
+
+		expect(attempts).toBe(3);
+	});
+
 	it("runs frozen bun install in the isolated worktree", async () => {
 		const calls: Array<{ command: string; args: string[]; cwd: string }> = [];
 		const runCommand = mock(
@@ -617,7 +691,9 @@ describe("prepareWorktreeDependencies", () => {
 	});
 
 	it("throws an actionable dependency setup error when install fails", async () => {
+		let attempts = 0;
 		const runCommand = mock(async (): Promise<CommandResult> => {
+			attempts += 1;
 			return {
 				code: 1,
 				stdout: "",
@@ -632,6 +708,7 @@ describe("prepareWorktreeDependencies", () => {
 		).rejects.toThrow(
 			"Ensure this environment has network access or a populated Bun dependency cache / node_modules matching bun.lock.",
 		);
+		expect(attempts).toBe(3);
 	});
 });
 

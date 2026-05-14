@@ -25,9 +25,11 @@ single workspace.
 ## Package Ownership Map
 
 - `packages/cli/`: CLI parsing, config resolution, workflow orchestration,
-  run-state handling, integrations, and agent adapters.
-- `packages/server/`: HTTP/API server runtime, request handling, server
-  contracts, health/readiness behavior, and server-specific tests.
+  run-state handling, integrations, agent adapters, and interactions with
+  Codex, Claude, Git, and CLI workflows.
+- `packages/server/`: Database, server runtime, and API responsibilities
+  including request handling, server contracts, health/readiness behavior, and
+  server-specific tests.
 - `packages/web/`: Next.js operator UI, client-side data access, providers,
   components, styles, and frontend verification.
 

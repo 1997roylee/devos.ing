@@ -2,6 +2,7 @@ import { describe, expect, it, mock } from "bun:test";
 import { mkdtemp, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { LoadedConfig } from "../src/features/config";
 import type {
 	IssueRef,
 	PollingConfig,
@@ -14,6 +15,7 @@ import {
 	applyRunLease,
 	isRunLeaseExpired,
 	normalizeBlockedPlanningFailureForResume,
+	saveRunState,
 	transitionStage,
 } from "../src/features/workflow/state";
 import {
@@ -43,6 +45,7 @@ import {
 	resolveReviewOnlyBootstrapStage,
 	routeProjectsForIssueProjectId,
 	runAgentWithChatLog,
+	runWorkflow,
 	selectIssueQueueForCycle,
 	selectReviewOnlyIssueKeys,
 	selectStaleRunIssueKeys,
@@ -58,6 +61,7 @@ import {
 	cleanupTerminalIsolatedWorktree,
 	isolatedWorktreePath,
 	prepareIsolatedExecutionConfig,
+	prepareIsolatedExecutionWorkspace,
 	shouldUseIsolatedWorktree,
 } from "../src/features/workflow/workflow-worktree";
 import type { AgentAdapter } from "../src/integrations/agent-adapters";
@@ -625,6 +629,199 @@ describe("processIssueQueueBounded", () => {
 			release.shift()?.();
 		}
 		await done;
+	});
+
+	it("starts each queue item once while running workers in parallel", async () => {
+		const starts: number[] = [];
+		const seen = new Set<number>();
+		let running = 0;
+		let maxRunning = 0;
+		let releaseGate!: () => void;
+		const gate = new Promise<void>((resolve) => {
+			releaseGate = resolve;
+		});
+
+		await processIssueQueueBounded([1, 2, 3, 4], 2, async (issue) => {
+			starts.push(issue);
+			expect(seen.has(issue)).toBe(false);
+			seen.add(issue);
+			running += 1;
+			maxRunning = Math.max(maxRunning, running);
+			if (maxRunning === 2) {
+				releaseGate();
+			}
+			await gate;
+			running -= 1;
+		});
+
+		expect(maxRunning).toBe(2);
+		expect(starts.slice().sort((a, b) => a - b)).toEqual([1, 2, 3, 4]);
+		expect(seen.size).toBe(4);
+	});
+});
+
+describe("runWorkflow parallel issue regression", () => {
+	it("processes multiple issues with concurrency and prepares isolated paths per issue", async () => {
+		const workspacePath = await mkdtemp(
+			path.join(os.tmpdir(), "adhd-workflow-parallel-"),
+		);
+		const config = createProject("default");
+		config.workspacePath = workspacePath;
+		config.executionPath = workspacePath;
+		config.workflow.issueConcurrency = 2;
+
+		await saveRunState(
+			workspacePath,
+			createRunState("ENG-1", "human_review", Date.now()),
+		);
+		await saveRunState(
+			workspacePath,
+			createRunState("ENG-2", "human_review", Date.now()),
+		);
+
+		const issues = [
+			createWorkflowIssue("ENG-1", 1, "Urgent"),
+			createWorkflowIssue("ENG-2", 2, "High"),
+		];
+		const ensureIssueWorktreeCalls: string[] = [];
+		const prepareDependenciesCalls: string[] = [];
+		const isolatedExecutionStarts: string[] = [];
+		const isolatedExecutionReleases: Array<() => void> = [];
+		let isolatedActive = 0;
+		let isolatedMaxActive = 0;
+
+		const runtime = {
+			createLinearClient: () =>
+				({
+					fetchWork: mock(async () => issues),
+					isAssignedState: mock(async () => true),
+				}) as unknown,
+			createAgentAdapter: () => ({}) as AgentAdapter,
+			ensureBaseBranchFresh: mock(
+				async (projectConfig: ResolvedProjectConfig) => {
+					if (!projectConfig.executionPath.includes("/worktrees/")) {
+						return;
+					}
+					isolatedExecutionStarts.push(projectConfig.executionPath);
+					isolatedActive += 1;
+					isolatedMaxActive = Math.max(isolatedMaxActive, isolatedActive);
+					if (isolatedExecutionStarts.length <= 2) {
+						await new Promise<void>((resolve) => {
+							isolatedExecutionReleases.push(resolve);
+							if (isolatedExecutionReleases.length === 2) {
+								const pendingReleases = isolatedExecutionReleases.splice(0);
+								for (const release of pendingReleases) {
+									release();
+								}
+							}
+						});
+					}
+					isolatedActive -= 1;
+				},
+			),
+			ensureIssueWorktree: mock(
+				async (
+					_projectConfig: ResolvedProjectConfig,
+					_issueKey: string,
+					_pullRequest: RunState["pullRequest"],
+					worktreePath: string,
+				) => {
+					ensureIssueWorktreeCalls.push(worktreePath);
+					return `codex/${path.basename(worktreePath)}`;
+				},
+			),
+			prepareWorktreeDependencies: mock(async (worktreePath: string) => {
+				prepareDependenciesCalls.push(worktreePath);
+			}),
+			removeIssueWorktree: mock(async () => ({ removed: true })),
+		} as unknown as WorkflowRuntime;
+
+		const loadedConfig: LoadedConfig = {
+			projects: [config],
+			polling: {
+				intervalMs: 1,
+				maxCycles: 1,
+				exitWhenIdle: true,
+				staleRunTimeoutMs: 60000,
+			},
+			notifications: {
+				email: {
+					enabled: false,
+					resendApiKey: undefined,
+					from: undefined,
+					to: [],
+				},
+			},
+		};
+
+		await runWorkflow(loadedConfig, {}, runtime);
+
+		expect(isolatedMaxActive).toBe(2);
+		expect(
+			new Set(ensureIssueWorktreeCalls.map((value) => path.basename(value))),
+		).toEqual(new Set(["eng-1", "eng-2"]));
+		expect(
+			new Set(prepareDependenciesCalls.map((value) => path.basename(value))),
+		).toEqual(new Set(["eng-1", "eng-2"]));
+	});
+
+	it("skips duplicate processing when an active lease already exists", async () => {
+		const workspacePath = await mkdtemp(
+			path.join(os.tmpdir(), "adhd-workflow-lease-"),
+		);
+		const config = createProject("default");
+		config.workspacePath = workspacePath;
+		config.executionPath = workspacePath;
+		config.workflow.issueConcurrency = 2;
+
+		const state = createRunState("ENG-9", "human_review", Date.now());
+		state.lease = {
+			ownerId: "other-worker",
+			acquiredAt: new Date(Date.now() - 2000).toISOString(),
+			heartbeatAt: new Date(Date.now() - 1000).toISOString(),
+			expiresAt: new Date(Date.now() + 60000).toISOString(),
+		};
+		await saveRunState(workspacePath, state);
+
+		const ensureIssueWorktree = mock(async () => "codex/eng-9");
+		const createAgentAdapter = mock(() => ({}) as AgentAdapter);
+		const runtime = {
+			createLinearClient: () =>
+				({
+					fetchWork: mock(async () => [
+						createWorkflowIssue("ENG-9", 1, "Urgent"),
+					]),
+					isAssignedState: mock(async () => true),
+				}) as unknown,
+			createAgentAdapter,
+			ensureBaseBranchFresh: mock(async () => {}),
+			ensureIssueWorktree,
+			prepareWorktreeDependencies: mock(async () => {}),
+			removeIssueWorktree: mock(async () => ({ removed: true })),
+		} as unknown as WorkflowRuntime;
+
+		const loadedConfig: LoadedConfig = {
+			projects: [config],
+			polling: {
+				intervalMs: 1,
+				maxCycles: 1,
+				exitWhenIdle: true,
+				staleRunTimeoutMs: 60000,
+			},
+			notifications: {
+				email: {
+					enabled: false,
+					resendApiKey: undefined,
+					from: undefined,
+					to: [],
+				},
+			},
+		};
+
+		await runWorkflow(loadedConfig, {}, runtime);
+
+		expect(ensureIssueWorktree).not.toHaveBeenCalled();
+		expect(createAgentAdapter).not.toHaveBeenCalled();
 	});
 });
 
@@ -1704,7 +1901,37 @@ describe("isolated worktree workflow helpers", () => {
 		]);
 	});
 
-	it("does not record isolated execution state when dependency setup fails", async () => {
+	it("prepares isolated workspace metadata without installing dependencies", async () => {
+		const config = createProject("default");
+		config.workflow.isolatedWorktrees = { enabled: true };
+		const state = createRunState("ENG-42", "implementing", Date.now());
+		const ensureBaseBranchFresh = mock(async () => {});
+		const ensureIssueWorktree = mock(async () => "codex/eng-42");
+		const prepareWorktreeDependencies = mock(async () => {});
+		const runtime = {
+			ensureBaseBranchFresh,
+			ensureIssueWorktree,
+			prepareWorktreeDependencies,
+		} as unknown as WorkflowRuntime;
+
+		const isolatedConfig = await prepareIsolatedExecutionWorkspace(
+			config,
+			state,
+			runtime,
+		);
+
+		expect(isolatedConfig.executionPath).toBe(
+			"/tmp/workspace/.piv-loop/projects/default/worktrees/eng-42",
+		);
+		expect(prepareWorktreeDependencies).not.toHaveBeenCalled();
+		expect(state.executionWorkspace).toMatchObject({
+			mode: "git-worktree",
+			path: isolatedConfig.executionPath,
+			branch: "codex/eng-42",
+		});
+	});
+
+	it("records isolated execution state before dependency setup and rethrows failures", async () => {
 		const config = createProject("default");
 		config.workflow.isolatedWorktrees = { enabled: true };
 		const state = createRunState("ENG-42", "implementing", Date.now());
@@ -1723,7 +1950,11 @@ describe("isolated worktree workflow helpers", () => {
 		expect(prepareWorktreeDependencies).toHaveBeenCalledWith(
 			"/tmp/workspace/.piv-loop/projects/default/worktrees/eng-42",
 		);
-		expect(state.executionWorkspace).toBeUndefined();
+		expect(state.executionWorkspace).toMatchObject({
+			mode: "git-worktree",
+			path: "/tmp/workspace/.piv-loop/projects/default/worktrees/eng-42",
+			branch: "codex/eng-42",
+		});
 	});
 
 	it("cleans terminal worktrees and keeps dirty retained worktrees in state", async () => {

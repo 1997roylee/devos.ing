@@ -41,7 +41,7 @@ import {
 } from "./workflow-runtime";
 import {
 	cleanupTerminalIsolatedWorktree,
-	prepareIsolatedExecutionConfig,
+	prepareIsolatedExecutionWorkspace,
 	shouldUseIsolatedWorktree,
 } from "./workflow-worktree";
 import type {
@@ -851,18 +851,30 @@ async function processIssue(
 			);
 			return;
 		}
+		issueLogger.info({ leaseOwnerId }, "Issue lease acquired");
 		const executionConfig =
 			isolatedWorktreesEnabled && !config.dryRun && runState.stage !== "done"
 				? await withExecutionPathLock(config.executionPath, async () => {
-						const isolatedConfig = await prepareIsolatedExecutionConfig(
+						const isolatedConfig = await prepareIsolatedExecutionWorkspace(
 							config,
 							runState,
 							runtime,
 						);
 						await saveRunState(config.workspacePath, runState);
+						issueLogger.info(
+							{ executionPath: isolatedConfig.executionPath },
+							"Isolated issue worktree prepared",
+						);
 						return isolatedConfig;
 					})
 				: config;
+		if (
+			isolatedWorktreesEnabled &&
+			!config.dryRun &&
+			runState.stage !== "done"
+		) {
+			await runtime.prepareWorktreeDependencies(executionConfig.executionPath);
+		}
 		await executeIssue(
 			executionConfig,
 			notifications,

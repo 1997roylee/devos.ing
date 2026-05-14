@@ -267,4 +267,61 @@ describe("deterministic workflow smoke flow", () => {
 		expect((await h.state("default", "ENG-10"))?.stage).toBe("done");
 		expect(elapsedMs).toBeLessThan(180);
 	});
+
+	it("starts assigned issues concurrently with isolated worktrees when concurrency is above one", async () => {
+		const h = await createSmokeHarness();
+		const defaultProject = h.project("default");
+		defaultProject.dryRun = false;
+		h.addIssue("default", issue("ENG-15"));
+		h.addIssue("default", issue("ENG-16"));
+		const agent = h.agent("default");
+		agent.plans.push(
+			result(simplePlan, "session-15"),
+			result(simplePlan, "session-16"),
+		);
+		agent.resumes.push(result("implemented-15"), result("implemented-16"));
+		agent.reviews.push(result(passReview), result(passReview));
+
+		const startedDependencyPaths: string[] = [];
+		const releases: Array<() => void> = [];
+		h.runtime.ensureIssueWorktree = async (
+			_config,
+			issueKey,
+			_pullRequest,
+			worktreePath,
+		) => {
+			return `codex/${issueKey.toLowerCase()}@${worktreePath}`;
+		};
+		h.runtime.prepareWorktreeDependencies = async (worktreePath: string) => {
+			startedDependencyPaths.push(worktreePath);
+			await new Promise<void>((resolve) => releases.push(resolve));
+		};
+		h.runtime.removeIssueWorktree = async () => ({ removed: true });
+
+		const runPromise = h.run({ concurrency: 2 });
+		const waitDeadline = Date.now() + 300;
+		while (startedDependencyPaths.length < 2 && Date.now() < waitDeadline) {
+			await new Promise((resolve) => setTimeout(resolve, 5));
+		}
+		expect(startedDependencyPaths).toHaveLength(2);
+		expect(new Set(startedDependencyPaths).size).toBe(2);
+		expect(
+			startedDependencyPaths.some((path) => path.includes("/worktrees/eng-15")),
+		).toBe(true);
+		expect(
+			startedDependencyPaths.some((path) => path.includes("/worktrees/eng-16")),
+		).toBe(true);
+
+		while (releases.length > 0) {
+			releases.shift()?.();
+		}
+		await runPromise;
+
+		const run15 = await h.state("default", "ENG-15");
+		const run16 = await h.state("default", "ENG-16");
+		expect(run15?.stage).toBe("done");
+		expect(run16?.stage).toBe("done");
+		expect(run15?.workspacePath).toBe(h.project("default").workspacePath);
+		expect(run16?.workspacePath).toBe(h.project("default").workspacePath);
+	});
 });

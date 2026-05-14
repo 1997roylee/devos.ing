@@ -10,4 +10,5 @@ export interface RunCommandOptions {
 	streamStdout?: boolean;
 	streamStderr?: boolean;
 	stdinMode?: "ignore" | "pipe";
+	timeoutMs?: number;
 }

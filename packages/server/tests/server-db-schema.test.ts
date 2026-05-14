@@ -34,7 +34,7 @@ import {
 	taskPullRequestsTable,
 	taskTagsTable,
 	tokenUsageTable,
-} from "../src/features/server/db";
+} from "../src/db";
 import {
 	type DrizzleServerTestDatabase,
 	createDrizzleServerTestDatabase,
