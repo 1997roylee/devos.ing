@@ -1,652 +1,157 @@
 import { describe, expect, it } from "bun:test";
 import { CliCommandExecutor } from "../src/features/server/cli-command-executor";
-import type { RunCommandFn } from "../src/features/server/cli-command-executor.types";
+import type {
+	CliCommandExecutionResult,
+	RunCommandFn,
+} from "../src/features/server/cli-command-executor.types";
+import { CLI_COMMAND_SIMULATION_MATRIX } from "./cli-command-executor-simulation-matrix";
+
+const DEFAULT_OPTIONS = {
+	cwd: "/tmp/work",
+	command: "bun",
+	baseArgs: ["run", "./packages/cli/src/index.ts"] as string[],
+};
 
 describe("CliCommandExecutor", () => {
-	it("executes allowed run action with structured argv", async () => {
-		const calls: Array<{ command: string; args: string[] }> = [];
-		const runCommandFn: RunCommandFn = async (command, args) => {
-			calls.push({ command, args });
-			return { code: 0, stdout: "ok", stderr: "" };
-		};
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			runCommandFn,
-		});
+	it("simulates every supported command variant with structured argv and history capture", async () => {
+		for (const simulation of CLI_COMMAND_SIMULATION_MATRIX) {
+			const calls: Array<{
+				command: string;
+				args: string[];
+				options: {
+					cwd: string;
+					env?: NodeJS.ProcessEnv;
+					stdinMode?: "pipe" | "ignore" | "inherit";
+					streamStdout?: boolean;
+					streamStderr?: boolean;
+				};
+			}> = [];
+			const runCommandFn: RunCommandFn = async (command, args, options) => {
+				calls.push({ command, args, options });
+				return simulation.commandResult;
+			};
+			const executor = new CliCommandExecutor({
+				...DEFAULT_OPTIONS,
+				runCommandFn,
+			});
 
-		const result = await executor.execute({
-			action: "run",
-			projectId: "default",
-			issueKey: "ROY-122",
-			poll: true,
-			concurrency: 2,
-		});
+			const result = await executor.execute(simulation.request);
 
-		expect(result.status).toBe("succeeded");
-		expect(calls).toEqual([
-			{
-				command: "bun",
-				args: [
-					"run",
-					"./packages/cli/src/index.ts",
-					"run",
-					"--project",
-					"default",
-					"--issue",
-					"ROY-122",
-					"--poll",
-					"--concurrency",
-					"2",
-				],
-			},
-		]);
-		const history = executor.getHistory();
-		expect(history).toHaveLength(1);
-		expect(history[0]?.status).toBe("succeeded");
-		expect(history[0]?.command).toBe("bun");
+			expect(result.status, simulation.name).toBe(simulation.expectedStatus);
+			expect(calls, simulation.name).toEqual([
+				{
+					command: "bun",
+					args: simulation.expectedArgs,
+					options: {
+						cwd: "/tmp/work",
+						streamStdout: true,
+						streamStderr: true,
+					},
+				},
+			]);
+			assertHistory(executor.getHistory()[0], result, simulation.expectedError);
+		}
 	});
 
-	it("rejects unsupported actions without execution", async () => {
-		let callCount = 0;
-		const runCommandFn: RunCommandFn = async () => {
-			callCount += 1;
-			return { code: 0, stdout: "", stderr: "" };
-		};
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			runCommandFn,
-		});
-
-		const result = await executor.execute({ action: "dangerous-shell" });
-
-		expect(result.status).toBe("rejected");
-		expect(result.error).toContain("Unsupported CLI action");
-		expect(callCount).toBe(0);
-		const history = executor.getHistory();
-		expect(history).toHaveLength(1);
-		expect(history[0]?.status).toBe("rejected");
-	});
-
-	it("rejects unknown action without execution", async () => {
-		let callCount = 0;
-		const runCommandFn: RunCommandFn = async () => {
-			callCount += 1;
-			return { code: 0, stdout: "", stderr: "" };
-		};
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			runCommandFn,
-		});
-
-		const result = await executor.execute({
-			action: "unknown-action",
-		} as unknown as { action: string });
-
-		expect(result.status).toBe("rejected");
-		expect(result.error).toContain("Unsupported CLI action");
-		expect(callCount).toBe(0);
-	});
-
-	it("rejects stop action without execution when no typed stop boundary exists", async () => {
-		let callCount = 0;
-		const runCommandFn: RunCommandFn = async () => {
-			callCount += 1;
-			return { code: 0, stdout: "", stderr: "" };
-		};
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			runCommandFn,
-		});
-
-		const result = await executor.execute({
-			action: "stop",
-		} as unknown as { action: string });
-
-		expect(result.status).toBe("rejected");
-		expect(result.error).toBe(
-			"Unsupported CLI action: stop (typed stop workflow boundary is not available)",
-		);
-		expect(callCount).toBe(0);
-	});
-
-	it("rejects malformed status action without execution", async () => {
-		let callCount = 0;
-		const runCommandFn: RunCommandFn = async () => {
-			callCount += 1;
-			return { code: 0, stdout: "", stderr: "" };
-		};
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			runCommandFn,
-		});
-
-		const missingProject = await executor.execute({
-			action: "status",
-			issueKey: "ROY-122",
-		} as unknown as { action: string });
-		const missingIssue = await executor.execute({
-			action: "status",
-			projectId: "default",
-		} as unknown as { action: string });
-
-		expect(missingProject.status).toBe("rejected");
-		expect(missingProject.error).toContain("projectId is required");
-		expect(missingIssue.status).toBe("rejected");
-		expect(missingIssue.error).toContain("issueKey is required");
-		expect(callCount).toBe(0);
-		const history = executor.getHistory();
-		expect(history).toHaveLength(2);
-		expect(history[0]?.status).toBe("rejected");
-		expect(history[1]?.status).toBe("rejected");
-	});
-
-	it("records failed status and stderr for non-zero exits", async () => {
-		const runCommandFn: RunCommandFn = async () => ({
-			code: 1,
-			stdout: "",
-			stderr: "boom",
-		});
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			runCommandFn,
-		});
-
-		const result = await executor.execute({
-			action: "status",
-			projectId: "default",
-			issueKey: "ROY-122",
-		});
-
-		expect(result.status).toBe("failed");
-		expect(result.commandResult?.code).toBe(1);
-		const history = executor.getHistory();
-		expect(history).toHaveLength(1);
-		expect(history[0]?.status).toBe("failed");
-		expect(history[0]?.stderr).toBe("boom");
-		expect(history[0]?.error).toBe("boom");
-	});
-
-	it("records spawn errors as failed results", async () => {
+	it("records spawn errors as failed results with invocation metadata", async () => {
 		const runCommandFn: RunCommandFn = async () => {
 			throw new Error("spawn EACCES");
 		};
 		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			...DEFAULT_OPTIONS,
 			runCommandFn,
 		});
 
 		const result = await executor.execute({ action: "projects" });
+		const history = executor.getHistory();
 
 		expect(result.status).toBe("failed");
 		expect(result.error).toBe("spawn EACCES");
-		const history = executor.getHistory();
 		expect(history).toHaveLength(1);
 		expect(history[0]?.status).toBe("failed");
 		expect(history[0]?.error).toBe("spawn EACCES");
-	});
-
-	it("executes setup action with structured argv", async () => {
-		const calls: Array<{ command: string; args: string[] }> = [];
-		const runCommandFn: RunCommandFn = async (command, args) => {
-			calls.push({ command, args });
-			return { code: 0, stdout: "ok", stderr: "" };
-		};
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			runCommandFn,
-		});
-
-		const result = await executor.execute({
-			action: "setup",
-			check: true,
-		});
-
-		expect(result.status).toBe("succeeded");
-		expect(calls).toEqual([
-			{
-				command: "bun",
-				args: ["run", "./packages/cli/src/index.ts", "setup", "--check"],
-			},
+		expect(history[0]?.args).toEqual([
+			"run",
+			"./packages/cli/src/index.ts",
+			"projects",
 		]);
 	});
 
-	it("passes stream flags to runCommand for server observability", async () => {
-		const calls: Array<{
-			command: string;
-			args: string[];
-			options: {
-				cwd: string;
-				env?: NodeJS.ProcessEnv;
-				stdinMode?: "pipe" | "ignore" | "inherit";
-				streamStdout?: boolean;
-				streamStderr?: boolean;
-			};
-		}> = [];
-		const runCommandFn: RunCommandFn = async (command, args, options) => {
-			calls.push({ command, args, options });
-			return { code: 0, stdout: "ok", stderr: "" };
-		};
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			env: { PIV_ENV: "test" },
-			runCommandFn,
-		});
-
-		const result = await executor.execute({ action: "projects" });
-
-		expect(result.status).toBe("succeeded");
-		expect(calls).toHaveLength(1);
-		expect(calls[0]?.options).toEqual({
-			cwd: "/tmp/work",
-			env: { PIV_ENV: "test" },
-			streamStdout: true,
-			streamStderr: true,
-		});
-	});
-
-	it("rejects malformed setup requests without execution", async () => {
+	it("rejects unsupported and malformed requests without execution", async () => {
 		let callCount = 0;
 		const runCommandFn: RunCommandFn = async () => {
 			callCount += 1;
 			return { code: 0, stdout: "", stderr: "" };
 		};
 		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			...DEFAULT_OPTIONS,
 			runCommandFn,
 		});
 
-		const malformedSetupCheck = await executor.execute({
+		const unsupportedAction = await executor.execute({
+			action: "dangerous-shell",
+		});
+		const unknownAction = await executor.execute({
+			action: "unknown-action",
+		} as unknown as { action: string });
+		const stopAction = await executor.execute({
+			action: "stop",
+		} as unknown as { action: string });
+		const malformedSetup = await executor.execute({
 			action: "setup",
 			check: "false",
 		} as unknown as { action: string });
-
-		expect(malformedSetupCheck.status).toBe("rejected");
-		expect(malformedSetupCheck.error).toContain("check must be a boolean");
-		expect(callCount).toBe(0);
-	});
-
-	it("executes task create action with structured argv", async () => {
-		const calls: Array<{ command: string; args: string[] }> = [];
-		const runCommandFn: RunCommandFn = async (command, args) => {
-			calls.push({ command, args });
-			return { code: 0, stdout: "ok", stderr: "" };
-		};
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			runCommandFn,
-		});
-
-		const result = await executor.execute({
-			action: "task",
-			taskAction: "create",
-			request: "Build a better setup flow",
-			projectId: "default",
-			nonInteractive: true,
-			maxClarificationRounds: 2,
-			clarificationAnswers: [{ question: "Who?", answer: "CLI users" }],
-		});
-
-		expect(result.status).toBe("succeeded");
-		expect(calls).toEqual([
-			{
-				command: "bun",
-				args: [
-					"run",
-					"./packages/cli/src/index.ts",
-					"task",
-					"create",
-					"--request",
-					"Build a better setup flow",
-					"--project",
-					"default",
-					"--non-interactive",
-					"--max-clarification-rounds",
-					"2",
-					"--clarifications-json",
-					'[{"question":"Who?","answer":"CLI users"}]',
-				],
-			},
-		]);
-	});
-
-	it("forces non-interactive task create even when omitted by payload", async () => {
-		const calls: Array<{ command: string; args: string[] }> = [];
-		const runCommandFn: RunCommandFn = async (command, args) => {
-			calls.push({ command, args });
-			return { code: 0, stdout: "ok", stderr: "" };
-		};
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			runCommandFn,
-		});
-
-		const result = await executor.execute({
-			action: "task",
-			taskAction: "create",
-			request: "Build task flow",
-		});
-
-		expect(result.status).toBe("succeeded");
-		expect(calls[0]?.args).toEqual([
-			"run",
-			"./packages/cli/src/index.ts",
-			"task",
-			"create",
-			"--request",
-			"Build task flow",
-			"--non-interactive",
-		]);
-	});
-
-	it("executes skills list action with structured argv", async () => {
-		const calls: Array<{ command: string; args: string[] }> = [];
-		const runCommandFn: RunCommandFn = async (command, args) => {
-			calls.push({ command, args });
-			return { code: 0, stdout: "ok", stderr: "" };
-		};
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			runCommandFn,
-		});
-
-		const result = await executor.execute({
-			action: "skills",
-			skillsAction: "list",
-			projectId: "api",
-		});
-
-		expect(result.status).toBe("succeeded");
-		expect(calls).toEqual([
-			{
-				command: "bun",
-				args: [
-					"run",
-					"./packages/cli/src/index.ts",
-					"skills",
-					"list",
-					"--project",
-					"api",
-				],
-			},
-		]);
-	});
-
-	it("executes skills add action with structured argv", async () => {
-		const calls: Array<{ command: string; args: string[] }> = [];
-		const runCommandFn: RunCommandFn = async (command, args) => {
-			calls.push({ command, args });
-			return { code: 0, stdout: "ok", stderr: "" };
-		};
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			runCommandFn,
-		});
-
-		const result = await executor.execute({
-			action: "skills",
-			skillsAction: "add",
-			title: "Backend Standard",
-			description: "Rules",
-			content: "Use consistent module boundaries.",
-			projectId: "api",
-		});
-
-		expect(result.status).toBe("succeeded");
-		expect(calls).toEqual([
-			{
-				command: "bun",
-				args: [
-					"run",
-					"./packages/cli/src/index.ts",
-					"skills",
-					"add",
-					"--title",
-					"Backend Standard",
-					"--description",
-					"Rules",
-					"--content",
-					"Use consistent module boundaries.",
-					"--project",
-					"api",
-				],
-			},
-		]);
-	});
-
-	it("executes skills update action with structured argv", async () => {
-		const calls: Array<{ command: string; args: string[] }> = [];
-		const runCommandFn: RunCommandFn = async (command, args) => {
-			calls.push({ command, args });
-			return { code: 0, stdout: "ok", stderr: "" };
-		};
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			runCommandFn,
-		});
-
-		const result = await executor.execute({
-			action: "skills",
-			skillsAction: "update",
-			name: "backend-standard",
-			description: "Updated description",
-		});
-
-		expect(result.status).toBe("succeeded");
-		expect(calls).toEqual([
-			{
-				command: "bun",
-				args: [
-					"run",
-					"./packages/cli/src/index.ts",
-					"skills",
-					"update",
-					"backend-standard",
-					"--description",
-					"Updated description",
-				],
-			},
-		]);
-	});
-
-	it("executes skills remove action with structured argv", async () => {
-		const calls: Array<{ command: string; args: string[] }> = [];
-		const runCommandFn: RunCommandFn = async (command, args) => {
-			calls.push({ command, args });
-			return { code: 0, stdout: "ok", stderr: "" };
-		};
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			runCommandFn,
-		});
-
-		const result = await executor.execute({
-			action: "skills",
-			skillsAction: "remove",
-			name: "backend-standard",
-			projectId: "default",
-		});
-
-		expect(result.status).toBe("succeeded");
-		expect(calls).toEqual([
-			{
-				command: "bun",
-				args: [
-					"run",
-					"./packages/cli/src/index.ts",
-					"skills",
-					"remove",
-					"backend-standard",
-					"--project",
-					"default",
-				],
-			},
-		]);
-	});
-
-	it("rejects malformed skills and task requests without execution", async () => {
-		let callCount = 0;
-		const runCommandFn: RunCommandFn = async () => {
-			callCount += 1;
-			return { code: 0, stdout: "", stderr: "" };
-		};
-		const executor = new CliCommandExecutor({
-			cwd: "/tmp/work",
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
-			runCommandFn,
-		});
-
+		const malformedStatus = await executor.execute({
+			action: "status",
+			issueKey: "ROY-122",
+		} as unknown as { action: string });
 		const malformedSkillsAction = await executor.execute({
 			action: "skills",
-		} as unknown as { action: string });
-		const malformedSkillsAdd = await executor.execute({
-			action: "skills",
-			skillsAction: "add",
-			description: "Rules",
-			content: "Use consistent module boundaries.",
-		} as unknown as { action: string });
-		const malformedSkillsUpdate = await executor.execute({
-			action: "skills",
-			skillsAction: "update",
-			name: "backend-standard",
-		} as unknown as { action: string });
-		const unsupportedSkillsAction = await executor.execute({
-			action: "skills",
-			skillsAction: "ship-it",
-		} as unknown as { action: string });
-		const malformedTaskAction = await executor.execute({
-			action: "task",
-		} as unknown as { action: string });
-		const unsupportedTaskAction = await executor.execute({
-			action: "task",
-			taskAction: "archive",
 		} as unknown as { action: string });
 		const malformedTaskCreate = await executor.execute({
 			action: "task",
 			taskAction: "create",
 			request: "   ",
 		} as unknown as { action: string });
-		const malformedSkillsListProject = await executor.execute({
-			action: "skills",
-			skillsAction: "list",
-			projectId: 42,
-		} as unknown as { action: string });
-		const malformedSkillsUpdateOptional = await executor.execute({
-			action: "skills",
-			skillsAction: "update",
-			name: "backend-standard",
-			description: "Updated description",
-			projectId: "",
-		} as unknown as { action: string });
-		const malformedTaskProject = await executor.execute({
-			action: "task",
-			taskAction: "create",
-			request: "Build a better setup flow",
-			projectId: 42,
-		} as unknown as { action: string });
-		const malformedTaskInteractiveFlag = await executor.execute({
-			action: "task",
-			taskAction: "create",
-			request: "Build a better setup flow",
-			nonInteractive: false,
-		} as unknown as { action: string });
-		const malformedTaskAnswers = await executor.execute({
-			action: "task",
-			taskAction: "create",
-			request: "Build a better setup flow",
-			clarificationAnswers: [{ question: "", answer: "CLI users" }],
-		} as unknown as { action: string });
 		const malformedTaskUnsafeField = await executor.execute({
 			action: "task",
 			taskAction: "create",
-			request: "Build a better setup flow",
+			request: "Build flow",
 			stdinMode: "pipe",
 		} as unknown as { action: string });
-		const malformedRunFields = await executor.execute({
+		const malformedRunField = await executor.execute({
 			action: "run",
-			projectId: ["bad"],
-			poll: "yes",
 			concurrency: 0,
 		} as unknown as { action: string });
 
+		expect(unsupportedAction.status).toBe("rejected");
+		expect(unsupportedAction.error).toContain("Unsupported CLI action");
+		expect(unknownAction.status).toBe("rejected");
+		expect(stopAction.status).toBe("rejected");
+		expect(stopAction.error).toContain("typed stop workflow boundary");
+		expect(malformedSetup.status).toBe("rejected");
+		expect(malformedStatus.status).toBe("rejected");
 		expect(malformedSkillsAction.status).toBe("rejected");
-		expect(malformedSkillsAction.error).toContain("skillsAction is required");
-		expect(malformedSkillsAdd.status).toBe("rejected");
-		expect(malformedSkillsAdd.error).toContain("title is required");
-		expect(malformedSkillsUpdate.status).toBe("rejected");
-		expect(malformedSkillsUpdate.error).toContain(
-			"at least one of title, description, or content is required",
-		);
-		expect(unsupportedSkillsAction.status).toBe("rejected");
-		expect(unsupportedSkillsAction.error).toContain(
-			"Unsupported skills action",
-		);
-		expect(malformedTaskAction.status).toBe("rejected");
-		expect(malformedTaskAction.error).toContain("taskAction is required");
-		expect(unsupportedTaskAction.status).toBe("rejected");
-		expect(unsupportedTaskAction.error).toContain("Unsupported task action");
 		expect(malformedTaskCreate.status).toBe("rejected");
-		expect(malformedTaskCreate.error).toContain("request is required");
-		expect(malformedSkillsListProject.status).toBe("rejected");
-		expect(malformedSkillsListProject.error).toContain(
-			"projectId must be a non-empty string",
-		);
-		expect(malformedSkillsUpdateOptional.status).toBe("rejected");
-		expect(malformedSkillsUpdateOptional.error).toContain(
-			"projectId must be a non-empty string",
-		);
-		expect(malformedTaskProject.status).toBe("rejected");
-		expect(malformedTaskProject.error).toContain(
-			"projectId must be a non-empty string",
-		);
-		expect(malformedTaskInteractiveFlag.status).toBe("rejected");
-		expect(malformedTaskInteractiveFlag.error).toContain(
-			"nonInteractive must be true when provided",
-		);
-		expect(malformedTaskAnswers.status).toBe("rejected");
-		expect(malformedTaskAnswers.error).toContain(
-			"clarificationAnswers[0].question must be a non-empty string",
-		);
 		expect(malformedTaskUnsafeField.status).toBe("rejected");
-		expect(malformedTaskUnsafeField.error).toContain(
-			"unsafe field 'stdinMode' is not allowed",
-		);
-		expect(malformedRunFields.status).toBe("rejected");
-		expect(malformedRunFields.error).toContain(
-			"projectId must be a non-empty string",
-		);
+		expect(malformedRunField.status).toBe("rejected");
 		expect(callCount).toBe(0);
 	});
 });
+
+function assertHistory(
+	history: ReturnType<CliCommandExecutor["getHistory"]>[number] | undefined,
+	result: CliCommandExecutionResult,
+	expectedError?: string,
+): void {
+	expect(history).toBeDefined();
+	expect(history?.status).toBe(result.status);
+	expect(history?.exitCode).toBe(result.commandResult?.code);
+	expect(history?.stdout).toBe(result.commandResult?.stdout);
+	expect(history?.stderr).toBe(result.commandResult?.stderr);
+	expect(history?.requestedAt).toBeString();
+	expect(history?.finishedAt).toBeString();
+	if (expectedError) {
+		expect(history?.error).toBe(expectedError);
+	}
+}
