@@ -10,6 +10,10 @@ export type {
 } from "./command-history.types";
 export type { JobRow, NewJobRow } from "./jobs.types";
 export type {
+	NewProjectCronJobRow,
+	ProjectCronJobRow,
+} from "./project-cron-jobs.types";
+export type {
 	NewProjectBoardRow,
 	ProjectBoardRow,
 } from "./project-boards.types";

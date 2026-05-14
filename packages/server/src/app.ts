@@ -1,4 +1,5 @@
 import type { AppDeps, RouteHandler } from "./app.types";
+import { handleEntityCrudRequest, matchCrudRoute } from "./routes/entity-crud";
 
 const UNSAFE_RAW_COMMAND_FIELDS = ["command", "cmd", "args", "argv", "shell"];
 const WORKSPACE_PROJECTS_PATTERN =
@@ -14,8 +15,13 @@ export function createHandleRequest(deps: AppDeps): RouteHandler {
 		const workspaceProjectsMatch = pathname.match(WORKSPACE_PROJECTS_PATTERN);
 		const projectBoardMatch = pathname.match(PROJECT_BOARD_PATTERN);
 
-		if (pathname === "/health" && request.method === "GET") {
-			return Response.json({ status: "ok" });
+		const cliResponse = await handleCliRoute(
+			request,
+			deps.cliExecutor,
+			pathname,
+		);
+		if (cliResponse) {
+			return cliResponse;
 		}
 		if (workspaceProjectsMatch) {
 			if (request.method !== "GET") {
@@ -49,25 +55,27 @@ export function createHandleRequest(deps: AppDeps): RouteHandler {
 			);
 		}
 
-		if (pathname === "/api/cli/history") {
-			if (request.method !== "GET") {
-				return Response.json({ error: "Method Not Allowed" }, { status: 405 });
-			}
-			return Response.json(deps.cliExecutor.getHistory());
+		const projectResponse = await handleProjectsRoute(
+			request,
+			deps.db,
+			pathname,
+		);
+		if (projectResponse) {
+			return projectResponse;
 		}
 
-		if (pathname === "/api/cli/dispatch") {
-			if (request.method !== "POST") {
-				return Response.json({ error: "Method Not Allowed" }, { status: 405 });
+		const taskResponse = await handleTasksRoute(request, deps.db, pathname);
+		if (taskResponse) {
+			return taskResponse;
+		}
+
+		const crudRoute = matchCrudRoute(pathname);
+		if (crudRoute) {
+			const result = await handleEntityCrudRequest(request, deps, crudRoute);
+			if (result?.body === undefined) {
+				return new Response(null, { status: result.status });
 			}
-			const parsed = await parseDispatchRequest(request);
-			if (parsed.status === "error") {
-				return Response.json({ error: parsed.error }, { status: 400 });
-			}
-			const result = await deps.cliExecutor.execute(parsed.request);
-			return Response.json(result, {
-				status: result.status === "rejected" ? 400 : 200,
-			});
+			return Response.json(result.body, { status: result.status });
 		}
 
 		return new Response("Not Found", { status: 404 });
@@ -116,14 +124,8 @@ async function parseDispatchRequest(
 				error: `Unsafe dispatch request: raw command field '${field}' is not allowed`,
 			};
 		}
+		return jsonSuccess({ status: "ok" });
 	}
 
-	return {
-		status: "ok",
-		request: body as Record<string, unknown> & { action: string },
-	};
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+	return notFoundResponse();
+};

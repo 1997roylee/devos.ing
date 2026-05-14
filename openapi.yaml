@@ -294,6 +294,103 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/AgentRecord'
+    post:
+      tags: [Read Models]
+      summary: Create an agent record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentCreateRequest'
+      responses:
+        '201':
+          description: Created agent row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRecord'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypedError'
+  /api/agents/{id}:
+    get:
+      tags: [Read Models]
+      summary: Read one agent record by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRecord'
+        '404':
+          description: Agent not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypedError'
+    patch:
+      tags: [Read Models]
+      summary: Update fields on an agent record
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentUpdateRequest'
+      responses:
+        '200':
+          description: Updated agent row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRecord'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypedError'
+        '404':
+          description: Agent not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypedError'
+    delete:
+      tags: [Read Models]
+      summary: Delete an agent record
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Agent deleted
+        '404':
+          description: Agent not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypedError'
   /api/skills:
     get:
       tags: [Read Models]
@@ -307,6 +404,103 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/SkillRecord'
+    post:
+      tags: [Read Models]
+      summary: Create a skill record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillCreateRequest'
+      responses:
+        '201':
+          description: Created skill row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecord'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypedError'
+  /api/skills/{id}:
+    get:
+      tags: [Read Models]
+      summary: Read one skill record by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Skill row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecord'
+        '404':
+          description: Skill not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypedError'
+    patch:
+      tags: [Read Models]
+      summary: Update fields on a skill record
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SkillUpdateRequest'
+      responses:
+        '200':
+          description: Updated skill row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillRecord'
+        '400':
+          description: Invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypedError'
+        '404':
+          description: Skill not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypedError'
+    delete:
+      tags: [Read Models]
+      summary: Delete a skill record
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Skill deleted
+        '404':
+          description: Skill not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypedError'
   /api/command-history:
     get:
       tags: [Read Models]
@@ -639,6 +833,43 @@ components:
           type: string
         createdAt:
           type: string
+    AgentCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [id, name, backend, model, createdAt]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        backend:
+          type: string
+          minLength: 1
+        model:
+          type: string
+          minLength: 1
+        createdAt:
+          type: string
+          minLength: 1
+    AgentUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+        backend:
+          type: string
+          minLength: 1
+        model:
+          type: string
+          minLength: 1
+        createdAt:
+          type: string
+          minLength: 1
     SkillRecord:
       type: object
       additionalProperties: false
@@ -654,6 +885,43 @@ components:
           type: string
         updatedAt:
           type: string
+    SkillCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [id, name, description, source, updatedAt]
+      properties:
+        id:
+          type: string
+          minLength: 1
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        source:
+          type: string
+          minLength: 1
+        updatedAt:
+          type: string
+          minLength: 1
+    SkillUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        source:
+          type: string
+          minLength: 1
+        updatedAt:
+          type: string
+          minLength: 1
     CommandHistoryRecord:
       type: object
       additionalProperties: false

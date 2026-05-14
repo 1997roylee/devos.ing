@@ -3,6 +3,7 @@ export { boardTasksTable } from "./board-tasks.schema";
 export { agentsTable } from "./agents.schema";
 export { commandHistoryTable } from "./command-history.schema";
 export { jobsTable } from "./jobs.schema";
+export { projectCronJobsTable } from "./project-cron-jobs.schema";
 export { projectBoardsTable } from "./project-boards.schema";
 export { skillsTable } from "./skills.schema";
 export { taskAssigneesTable } from "./task-assignees.schema";

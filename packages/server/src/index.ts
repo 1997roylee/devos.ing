@@ -18,8 +18,9 @@ export async function startServer(port = 3000): Promise<Bun.Server<undefined>> {
 	return Bun.serve({
 		port,
 		fetch: createHandleRequest({
+			persistence,
 			cliExecutor: new CliCommandExecutor({
-				cwd: process.cwd(),
+				cwd,
 				command: "bun",
 				baseArgs: ["run", "./packages/cli/src/index.ts"],
 			}),

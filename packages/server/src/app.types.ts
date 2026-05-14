@@ -3,6 +3,7 @@ import type {
 	CliCommandExecutionResult,
 	CliCommandRequest,
 } from "adhdai/features/server";
+import type { ServerDatabase } from "./db";
 
 export interface CliExecutor {
 	execute(request: CliCommandRequest): Promise<CliCommandExecutionResult>;
