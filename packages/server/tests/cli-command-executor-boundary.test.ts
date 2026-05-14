@@ -12,7 +12,10 @@ import {
 describe("cli executor boundary export", () => {
 	it("allows server to consume executor and boundary types", async () => {
 		const request: CliCommandRequest = { action: "projects" };
-		const invocation: CliCommandInvocation = { command: "bun", args: ["run"] };
+		const invocation: CliCommandInvocation = {
+			command: "npx",
+			args: ["devos"],
+		};
 		const failedResult: CliCommandExecutionResult = {
 			status: "failed",
 			request,
@@ -31,8 +34,8 @@ describe("cli executor boundary export", () => {
 
 		const options: CliCommandExecutorOptions = {
 			cwd: process.cwd(),
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			command: "npx",
+			baseArgs: ["devos"],
 			runCommandFn: async () => ({ code: 0, stdout: "ok", stderr: "" }),
 		};
 		const executor = new CliCommandExecutor(options);
@@ -46,8 +49,8 @@ describe("cli executor boundary export", () => {
 		const invocations: string[][] = [];
 		const executor = new CliCommandExecutor({
 			cwd: process.cwd(),
-			command: "bun",
-			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			command: "npx",
+			baseArgs: ["devos"],
 			runCommandFn: async (_command, args) => {
 				invocations.push(args);
 				return { code: 0, stdout: "ok", stderr: "" };

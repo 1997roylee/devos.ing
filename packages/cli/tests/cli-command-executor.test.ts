@@ -8,8 +8,8 @@ import { CLI_COMMAND_SIMULATION_MATRIX } from "./cli-command-executor-simulation
 
 const DEFAULT_OPTIONS = {
 	cwd: "/tmp/work",
-	command: "bun",
-	baseArgs: ["run", "./packages/cli/src/index.ts"] as string[],
+	command: "npx",
+	baseArgs: ["devos"] as string[],
 };
 
 describe("CliCommandExecutor", () => {
@@ -40,7 +40,7 @@ describe("CliCommandExecutor", () => {
 			expect(result.status, simulation.name).toBe(simulation.expectedStatus);
 			expect(calls, simulation.name).toEqual([
 				{
-					command: "bun",
+					command: "npx",
 					args: simulation.expectedArgs,
 					options: {
 						cwd: "/tmp/work",
@@ -70,11 +70,7 @@ describe("CliCommandExecutor", () => {
 		expect(history).toHaveLength(1);
 		expect(history[0]?.status).toBe("failed");
 		expect(history[0]?.error).toBe("spawn EACCES");
-		expect(history[0]?.args).toEqual([
-			"run",
-			"./packages/cli/src/index.ts",
-			"projects",
-		]);
+		expect(history[0]?.args).toEqual(["devos", "projects"]);
 	});
 
 	it("rejects unsupported and malformed requests without execution", async () => {

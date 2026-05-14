@@ -39,8 +39,8 @@ export async function startServer(
 			db: serverDatabase.db,
 			cliExecutor: new CliCommandExecutor({
 				cwd,
-				command: "bun",
-				baseArgs: ["run", "./packages/cli/src/index.ts"],
+				command: "npx",
+				baseArgs: ["devos"],
 			}),
 			boardRepository: createBoardRepository(serverDatabase.db),
 			notificationSender: createNotificationSender({

@@ -14,7 +14,7 @@ describe("CLI server routes", () => {
 					return {
 						status: "succeeded",
 						request: request as { action: string },
-						invocation: { command: "bun", args: ["run", "projects"] },
+						invocation: { command: "npx", args: ["devos", "projects"] },
 						commandResult: { code: 0, stdout: "ok", stderr: "" },
 					};
 				},
@@ -138,8 +138,8 @@ describe("CLI server routes", () => {
 				finishedAt: "2026-05-12T00:00:01.000Z",
 				request: { action: "projects" as const },
 				status: "succeeded" as const,
-				command: "bun",
-				args: ["run", "projects"],
+				command: "npx",
+				args: ["devos", "projects"],
 				exitCode: 0,
 				stdout: "ok",
 				stderr: "",

@@ -38,7 +38,9 @@ describe("web api client task create", () => {
 					taskAction: "create",
 					request: "Create a task",
 					projectId: "default",
-					answers: [{ question: "Who is this for?", answer: "CLI users" }],
+					clarificationAnswers: [
+						{ question: "Who is this for?", answer: "CLI users" },
+					],
 				},
 			},
 		]);

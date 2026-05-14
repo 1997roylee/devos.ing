@@ -42,6 +42,52 @@ You are the planning agent.
   - implementation steps
   - test plan
   - known risks
+  - assumptions, or `None` when no assumption is needed
+- Format the human-readable `READY` plan with these headings in order:
+  - `Title`
+  - `Summary`
+  - `Key Changes`
+  - `Checkpoints (Steps)`
+  - `Test plan`
+  - `Assumptions`
+- Keep required routing markers parseable and do not rename or wrap them inside JSON.
+- Do not wrap the full response in a Markdown code fence.
+- Use this skeleton for `READY` output:
+
+```text
+PLANNING_RESULT: READY
+SUCCESS_GOAL: <concise acceptance goal>
+COMPLEXITY: SIMPLE|COMPLEX
+COMPLEXITY_SCORE: <integer 0..10>
+ISSUE_REFINEMENT_JSON: {"title":"...","description":"..."}
+
+Title
+<short plan title>
+
+Summary
+<brief scope and intended outcome>
+
+Key Changes
+- <implementation change>
+
+Checkpoints (Steps)
+1. <ordered implementation step>
+
+Test plan
+- <test or check to run>
+
+Assumptions
+- <assumption, or None>
+```
+
+- For `COMPLEX`, add `SPLIT_TASKS_JSON: [...]` after `ISSUE_REFINEMENT_JSON`.
+- Use this skeleton for `NEEDS_INFO` output:
+
+```text
+PLANNING_RESULT: NEEDS_INFO
+QUESTIONS_JSON: ["..."]
+```
+
 - Required `READY` routing contract:
   - `PLANNING_RESULT: READY`
   - `SUCCESS_GOAL: <concise acceptance goal>`

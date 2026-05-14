@@ -13,6 +13,7 @@ import { selectPlanningSupplementalSkills } from "../skills/catalog";
 import { buildPlanPrompt } from "../skills/prompts";
 import { parsePlannerDecision } from "./plan-parsing";
 import { applyPlannerIssueRefinement } from "./plan-refinement";
+import { buildPlannerRepairPrompt } from "./plan-repair-prompt";
 import type {
 	HandlePlanningStageDeps,
 	PlannerDecision,
@@ -226,22 +227,4 @@ function shouldRetryMalformedPlannerOutput(planSummary: string): boolean {
 			planSummary,
 		) && !/(?:^|\n)\s*SUCCESS_GOAL\s*:\s*[^\n]+\s*(?:\n|$)/i.test(planSummary)
 	);
-}
-
-function buildPlannerRepairPrompt(
-	originalPrompt: string,
-	malformedOutput: string,
-): string {
-	return [
-		originalPrompt,
-		"",
-		"The previous planning response did not follow the required routing contract.",
-		"Return only one corrected final planning response using exactly one of:",
-		"- PLANNING_RESULT: READY with SUCCESS_GOAL, COMPLEXITY, COMPLEXITY_SCORE, and ISSUE_REFINEMENT_JSON.",
-		"- PLANNING_RESULT: NEEDS_INFO with QUESTIONS_JSON when no concise acceptance goal can be stated safely.",
-		"Do not invent a success goal when the requirements are unclear.",
-		"",
-		"Previous malformed response:",
-		malformedOutput.trim() || "(empty)",
-	].join("\n");
 }

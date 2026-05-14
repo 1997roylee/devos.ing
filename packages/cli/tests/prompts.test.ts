@@ -110,6 +110,9 @@ describe("buildPlanPrompt", () => {
 			expect(prompt).toContain(
 				"When including SPLIT_TASKS_JSON, write action-oriented task titles",
 			);
+			expect(prompt).toContain(
+				"Title, Summary, Key Changes, Checkpoints (Steps), Test plan, Assumptions",
+			);
 		} finally {
 			await rm(tmpDir, { recursive: true, force: true });
 		}
@@ -131,6 +134,11 @@ describe("buildPlanPrompt", () => {
 		expect(prompt).toContain("Surgical changes");
 		expect(prompt).toContain("Surface conflicts instead of averaging them");
 		expect(prompt).toContain("Checkpoint after every significant step");
+		expect(prompt).toContain("PLANNING_RESULT: READY");
+		expect(prompt).toContain('ISSUE_REFINEMENT_JSON: {"title"');
+		expect(prompt).toContain("`Checkpoints (Steps)`");
+		expect(prompt).toContain("`Assumptions`");
+		expect(prompt).toContain("Do not wrap the full response");
 		expect(prompt).toContain("## Scope Guardrails");
 		expect(prompt).toContain(
 			"Preserve stable contracts used by downstream parsing and routing.",

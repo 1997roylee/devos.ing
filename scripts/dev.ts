@@ -1,14 +1,14 @@
 import { spawn } from "node:child_process";
 
 const commands = [
-	["bun", ["run", "dev:server"]],
-	["bun", ["run", "dev:web"]],
+	["bun", ["run", "dev:server"], {}],
+	["bun", ["run", "dev:web"], { PORT: "3002" }],
 ] as const;
 
-const children = commands.map(([command, args]) =>
+const children = commands.map(([command, args, env]) =>
 	spawn(command, args, {
 		stdio: "inherit",
-		env: process.env,
+		env: { ...process.env, ...env },
 	}),
 );
 

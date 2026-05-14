@@ -71,7 +71,8 @@ export async function buildPlanPrompt(
 		"For NEEDS_INFO, include QUESTIONS_JSON with one to three concise clarification questions and do not include SUCCESS_GOAL.",
 		"Do not invent a success goal when acceptance criteria are unclear; use NEEDS_INFO instead.",
 		"When including SPLIT_TASKS_JSON, write action-oriented task titles and clear descriptions that include expected behavior, implementation scope, and tests.",
-		"Create a concrete implementation plan and include risks and tests.",
+		"Create a concrete implementation plan and format the READY narrative with these headings in order: Title, Summary, Key Changes, Checkpoints (Steps), Test plan, Assumptions.",
+		"Use Assumptions for explicit assumptions only; write None when there are no assumptions.",
 	].join("\n");
 }
 

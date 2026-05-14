@@ -40,9 +40,9 @@ npx devos setup
 npx devos setup --check
 
 # local workspace startup/build shortcuts
+bun run dev
 bun run dev:server
 bun run dev:web
-bun run dev
 bun run build:server
 bun run build:web
 bun run build
@@ -91,7 +91,9 @@ After `bun install` and `bun run build`, use `npx devos ...` from the repo root 
 
 ## Local Server/Web Notes
 
-`dev:server`, `dev:web`, `dev`, `build:server`, and `build:web` are wired at the workspace level for ROY-120 local server/web flows. In this branch, only `packages/cli` exists, so these commands currently print a status message until server/web workspace packages are added.
+Use `bun run dev` from the repository root to start the local API server and web UI together. The combined entrypoint runs `dev:server` with `PIV_SERVER_PORT=3001` and `dev:web` with `PORT=3002` so the two local servers do not contend for the same port.
+
+Use `bun run dev:server` or `bun run dev:web` when you only need one side of the local stack.
 
 ## Workflow Summary
 

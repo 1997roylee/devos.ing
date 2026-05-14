@@ -3,6 +3,7 @@
 import { Columns3, Filter, SlidersHorizontal } from "lucide-react";
 import { type ReactElement, useEffect, useMemo, useState } from "react";
 
+import { TaskCreateChatDialog } from "@/components/task-create/task-create-chat-dialog";
 import type { ProjectBoardTaskRecord, TaskMutationRequest } from "@/lib/api";
 import {
 	useCreateBoardTaskMutation,
@@ -39,10 +40,14 @@ export function IssuesBoard({
 		...STATUS_ORDER,
 	]);
 	const [dialog, setDialog] = useState<IssueDialogState>(null);
+	const [isChatDialogOpen, setIsChatDialogOpen] = useState(false);
 	const [mutationError, setMutationError] = useState<string | null>(null);
 
 	const projectsQuery = useWorkspaceProjectsQuery(workspaceId);
 	const selectedProjectId = projectId ?? projectsQuery.data?.[0]?.id ?? null;
+	const selectedProject = projectsQuery.data?.find(
+		(project) => project.id === selectedProjectId,
+	);
 	const boardQuery = useProjectBoardQuery(workspaceId, selectedProjectId);
 	const createTask = useCreateBoardTaskMutation(workspaceId, selectedProjectId);
 	const updateTask = useUpdateBoardTaskMutation(workspaceId, selectedProjectId);
@@ -56,7 +61,7 @@ export function IssuesBoard({
 
 	useEffect(() => {
 		if (createIssueRequest > 0) {
-			setDialog({ mode: "create", status: "planning" });
+			setIsChatDialogOpen(true);
 		}
 	}, [createIssueRequest]);
 
@@ -125,7 +130,7 @@ export function IssuesBoard({
 			<BoardHeader
 				activeTab={activeTab}
 				onTabChange={setActiveTab}
-				onCreateIssue={() => setDialog({ mode: "create", status: "planning" })}
+				onCreateIssue={() => setIsChatDialogOpen(true)}
 			/>
 			<div className="flex flex-wrap items-center gap-3 border-b border-zinc-900 px-5 py-3">
 				<input
@@ -195,6 +200,12 @@ export function IssuesBoard({
 					onSubmit={submitDialog}
 					projectId={selectedProjectId}
 					task={dialog.mode === "edit" ? dialog.task : undefined}
+				/>
+			) : null}
+			{isChatDialogOpen ? (
+				<TaskCreateChatDialog
+					defaultProjectId={selectedProject?.externalProjectId ?? ""}
+					onClose={() => setIsChatDialogOpen(false)}
 				/>
 			) : null}
 		</section>

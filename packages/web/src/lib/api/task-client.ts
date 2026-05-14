@@ -125,11 +125,17 @@ export function createTaskApiMethods(
 ): TaskApiMethods {
 	return {
 		async createTaskFromCli(request, options) {
+			const { answers, ...taskRequest } = request;
 			const payload = await requestWithBase(
 				"/api/cli/dispatch",
 				"POST",
 				options,
-				{ action: "task", taskAction: "create", ...request },
+				{
+					action: "task",
+					taskAction: "create",
+					...taskRequest,
+					clarificationAnswers: answers,
+				},
 			);
 			return parseTaskCreateResponse(payload);
 		},
