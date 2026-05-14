@@ -1,8 +1,8 @@
 import { createApiClient } from "./client";
 import type {
 	HealthResponse,
-	ProjectBoardRecord,
-	WorkspaceProjectRecord,
+	TaskCreateRequest,
+	TaskCreateResponse,
 } from "./client.types";
 import { createWebApiClient } from "./web-client";
 
@@ -11,12 +11,12 @@ const webClient = createWebApiClient();
 
 const healthResponsePromise: Promise<HealthResponse> = client.getHealth();
 const webHealthResponsePromise: Promise<HealthResponse> = webClient.getHealth();
-const workspaceProjectsPromise: Promise<WorkspaceProjectRecord[]> =
-	webClient.listWorkspaceProjects("workspace-1");
-const projectBoardPromise: Promise<ProjectBoardRecord> =
-	webClient.getProjectBoard("workspace-1", "project-1");
+const taskCreateRequest: TaskCreateRequest = {
+	request: "Create a task from web UI",
+};
+const taskCreateResponsePromise: Promise<TaskCreateResponse> =
+	webClient.createTask(taskCreateRequest);
 
 void healthResponsePromise;
 void webHealthResponsePromise;
-void workspaceProjectsPromise;
-void projectBoardPromise;
+void taskCreateResponsePromise;

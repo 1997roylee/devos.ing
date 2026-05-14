@@ -2,11 +2,8 @@ export interface ServerStateQueryOptions {
 	enabled?: boolean;
 }
 
-export interface WorkspaceProjectsQueryOptions extends ServerStateQueryOptions {
-	workspaceId: string | null;
-}
-
-export interface ProjectBoardQueryOptions extends ServerStateQueryOptions {
-	workspaceId: string | null;
-	projectId: string | null;
+export interface TaskCreateMutationInput {
+	request: string;
+	projectId?: string;
+	answers?: Array<{ question: string; answer: string }>;
 }

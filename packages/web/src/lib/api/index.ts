@@ -5,6 +5,7 @@ export type {
 	ApiClient,
 	ApiClientOptions,
 	CommandHistoryRecord,
+	CreatedTaskRef,
 	HealthRequestOptions,
 	HealthResponse,
 	HealthStatus,
@@ -12,11 +13,13 @@ export type {
 	ProjectBoardRecord,
 	ProjectBoardTaskRecord,
 	SkillRecord,
+	TaskCreateAnswer,
+	TaskCreateRequest,
+	TaskCreateResponse,
 	TokenUsageRecord,
 	WorkspaceProjectRecord,
 } from "./client.types";
 export type {
-	ProjectBoardQueryOptions,
 	ServerStateQueryOptions,
-	WorkspaceProjectsQueryOptions,
+	TaskCreateMutationInput,
 } from "./queries.types";

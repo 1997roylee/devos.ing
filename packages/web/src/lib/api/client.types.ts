@@ -50,41 +50,38 @@ export interface CommandHistoryRecord {
 	executedAt: string;
 }
 
-export interface WorkspaceProjectRecord {
-	id: string;
-	boardId: string;
-	externalProjectId: string | null;
-	name: string;
-	description: string | null;
-	ownerId: string;
-	createdAt: string;
-	updatedAt: string;
+export interface TaskCreateAnswer {
+	question: string;
+	answer: string;
 }
 
-export interface ProjectBoardTaskRecord {
-	id: string;
-	projectId: string;
-	title: string;
-	content: string;
-	priority: number;
-	status: string;
-	dueDate: string | null;
-	creatorId: string;
-	linkedPr: string | null;
-	createdAt: string;
-	updatedAt: string;
+export interface TaskCreateRequest {
+	request: string;
+	projectId?: string;
+	answers?: TaskCreateAnswer[];
 }
 
-export interface ProjectBoardRecord {
-	id: string;
-	name: string;
-	description: string | null;
-	ownerId: string;
-	createdAt: string;
-	updatedAt: string;
-	projects: WorkspaceProjectRecord[];
-	tasks: ProjectBoardTaskRecord[];
+export interface CreatedTaskRef {
+	identifier: string;
+	url: string;
 }
+
+export type TaskCreateResponse =
+	| {
+			status: "created";
+			issue: CreatedTaskRef;
+			rawOutput: string;
+	  }
+	| {
+			status: "needs_info";
+			questions: string[];
+			rawOutput: string;
+	  }
+	| {
+			status: "error";
+			error: string;
+			rawOutput: string;
+	  };
 
 export interface ApiClientOptions {
 	baseUrl?: string;
@@ -101,13 +98,8 @@ export interface ApiClient {
 	listCommandHistory(
 		options?: HealthRequestOptions,
 	): Promise<CommandHistoryRecord[]>;
-	listWorkspaceProjects(
-		workspaceId: string,
+	createTask(
+		request: TaskCreateRequest,
 		options?: HealthRequestOptions,
-	): Promise<WorkspaceProjectRecord[]>;
-	getProjectBoard(
-		workspaceId: string,
-		projectId: string,
-		options?: HealthRequestOptions,
-	): Promise<ProjectBoardRecord>;
+	): Promise<TaskCreateResponse>;
 }
