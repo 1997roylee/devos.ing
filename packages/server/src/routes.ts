@@ -1,3 +1,9 @@
+import {
+	jsonSuccess,
+	methodNotAllowedResponse,
+	notFoundJsonResponse,
+	serverErrorResponse,
+} from "./http/response";
 import type { ServerRouteDeps } from "./routes.types";
 
 type RouteHandler = (deps: ServerRouteDeps) => Promise<unknown>;
@@ -18,28 +24,24 @@ const routes: Record<string, RouteHandler> = {
 	"/api/command-history": (deps) => deps.repositories.listCommandHistory(),
 };
 
-function json(body: unknown, status = 200): Response {
-	return Response.json(body, { status });
-}
-
 export async function handleServerRequest(
 	request: Request,
 	deps: ServerRouteDeps,
 ): Promise<Response> {
 	if (request.method !== "GET") {
-		return json({ error: "Method Not Allowed" }, 405);
+		return methodNotAllowedResponse();
 	}
 
 	const url = new URL(request.url);
 	const handler = routes[url.pathname];
 	if (!handler) {
-		return json({ error: "Not Found" }, 404);
+		return notFoundJsonResponse();
 	}
 
 	try {
-		return json(await handler(deps), 200);
+		return jsonSuccess(await handler(deps));
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		return json({ error: message }, 500);
+		return serverErrorResponse(message);
 	}
 }

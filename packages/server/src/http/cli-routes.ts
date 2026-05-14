@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { CliExecutor } from "../app.types";
 import { methodNotAllowed } from "./http-utils";
+import { badRequestResponse, jsonSuccess } from "./response";
 import { isRecord } from "./zod-utils";
 
 const UNSAFE_RAW_COMMAND_FIELDS = ["command", "cmd", "args", "argv", "shell"];
@@ -17,7 +18,7 @@ export async function handleCliRoute(
 		if (request.method !== "GET") {
 			return methodNotAllowed();
 		}
-		return Response.json(cliExecutor.getHistory());
+		return jsonSuccess(cliExecutor.getHistory());
 	}
 
 	if (pathname === "/api/cli/dispatch") {
@@ -26,10 +27,10 @@ export async function handleCliRoute(
 		}
 		const parsed = await parseDispatchRequest(request);
 		if (parsed.status === "error") {
-			return Response.json({ error: parsed.error }, { status: 400 });
+			return badRequestResponse(parsed.error);
 		}
 		const result = await cliExecutor.execute(parsed.request);
-		return Response.json(result, {
+		return jsonSuccess(result, {
 			status: result.status === "rejected" ? 400 : 200,
 		});
 	}

@@ -2,6 +2,14 @@ import type { AppDeps, RouteHandler } from "./app.types";
 import { handleCliRoute } from "./http/cli-routes";
 import { handleProjectsRoute } from "./http/projects-routes";
 import { withRequestLogging } from "./http/request-logger";
+import {
+	badRequestResponse,
+	jsonError,
+	jsonSuccess,
+	methodNotAllowedResponse,
+	notFoundJsonResponse,
+	serverErrorResponse,
+} from "./http/response";
 import { handleTasksRoute } from "./http/tasks-routes";
 import { parseNotificationServerRequest } from "./notifications/notification-server-request";
 import { parseNotificationRequest } from "./notifications/notifications-request";
@@ -17,7 +25,7 @@ export function createHandleRequest(deps: AppDeps): RouteHandler {
 		const { pathname } = new URL(request.url);
 
 		if (pathname === "/health" && request.method === "GET") {
-			return Response.json({ status: "ok" });
+			return jsonSuccess({ status: "ok" });
 		}
 
 		const cliResponse = await handleCliRoute(
@@ -50,10 +58,7 @@ export function createHandleRequest(deps: AppDeps): RouteHandler {
 		const crudRoute = matchCrudRoute(pathname);
 		if (crudRoute) {
 			if (!deps.db) {
-				return Response.json(
-					{ error: "Server database not configured" },
-					{ status: 500 },
-				);
+				return serverErrorResponse("Server database not configured");
 			}
 			const result = await handleEntityCrudRequest(
 				request,
@@ -63,102 +68,87 @@ export function createHandleRequest(deps: AppDeps): RouteHandler {
 			if (result?.body === undefined) {
 				return new Response(null, { status: result.status });
 			}
-			return Response.json(result.body, { status: result.status });
+			return jsonSuccess(result.body, { status: result.status });
 		}
 		const projectMatch = pathname.match(WORKSPACE_PROJECTS_ROUTE);
 		if (projectMatch) {
 			if (request.method !== "GET") {
-				return Response.json({ error: "Method Not Allowed" }, { status: 405 });
+				return methodNotAllowedResponse();
 			}
 			if (!deps.boardRepository) {
-				return Response.json(
-					{ error: "Board repository not configured" },
-					{ status: 500 },
-				);
+				return serverErrorResponse("Board repository not configured");
 			}
 			const workspaceId = decodeURIComponent(projectMatch[1] ?? "");
 			if (workspaceId.length === 0) {
-				return Response.json({ error: "Not Found" }, { status: 404 });
+				return notFoundJsonResponse();
 			}
 			const projects =
 				await deps.boardRepository.listWorkspaceProjects(workspaceId);
-			return Response.json({ workspaceId, projects });
+			return jsonSuccess({ workspaceId, projects });
 		}
 
 		const boardMatch = pathname.match(WORKSPACE_PROJECT_BOARD_ROUTE);
 		if (boardMatch) {
 			if (request.method !== "GET") {
-				return Response.json({ error: "Method Not Allowed" }, { status: 405 });
+				return methodNotAllowedResponse();
 			}
 			if (!deps.boardRepository) {
-				return Response.json(
-					{ error: "Board repository not configured" },
-					{ status: 500 },
-				);
+				return serverErrorResponse("Board repository not configured");
 			}
 			const workspaceId = decodeURIComponent(boardMatch[1] ?? "");
 			const projectId = decodeURIComponent(boardMatch[2] ?? "");
 			if (workspaceId.length === 0 || projectId.length === 0) {
-				return Response.json({ error: "Not Found" }, { status: 404 });
+				return notFoundJsonResponse();
 			}
 			const board = await deps.boardRepository.getWorkspaceProjectBoard(
 				workspaceId,
 				projectId,
 			);
 			if (!board) {
-				return Response.json({ error: "Not Found" }, { status: 404 });
+				return notFoundJsonResponse();
 			}
-			return Response.json(board);
+			return jsonSuccess(board);
 		}
 
 		if (pathname === "/api/notifications") {
 			if (request.method !== "POST") {
-				return Response.json({ error: "Method Not Allowed" }, { status: 405 });
+				return methodNotAllowedResponse();
 			}
 			const parsed = await parseNotificationServerRequest(request);
 			if (parsed.status === "error") {
-				return Response.json({ error: parsed.error }, { status: 400 });
+				return badRequestResponse(parsed.error);
 			}
 			if (!deps.notificationSender) {
-				return Response.json(
-					{ error: "Notification sender not configured" },
-					{ status: 500 },
-				);
+				return serverErrorResponse("Notification sender not configured");
 			}
 			await deps.notificationSender.sendNotification(parsed.request);
-			return Response.json({ status: "accepted" }, { status: 202 });
+			return jsonSuccess({ status: "accepted" }, { status: 202 });
 		}
 
 		if (pathname === "/api/notifications/email") {
 			if (request.method !== "POST") {
-				return Response.json({ error: "Method Not Allowed" }, { status: 405 });
+				return methodNotAllowedResponse();
 			}
 			const parsed = await parseNotificationRequest(request);
 			if (parsed.status === "error") {
-				return Response.json({ error: parsed.error }, { status: 400 });
+				return badRequestResponse(parsed.error);
 			}
 			if (!deps.notificationService) {
-				return Response.json(
-					{ error: "Notification service not configured" },
-					{ status: 500 },
-				);
+				return serverErrorResponse("Notification service not configured");
 			}
 			const result = await deps.notificationService.send(parsed.request);
 			if (result.status === "config_error") {
-				return Response.json({ error: result.error }, { status: 503 });
+				return jsonError(result.error, { status: 503 });
 			}
 			if (result.status === "send_error") {
-				return Response.json({ error: result.error }, { status: 502 });
+				return jsonError(result.error, { status: 502 });
 			}
-			return Response.json({ status: "sent" }, { status: 200 });
+			return jsonSuccess({ status: "sent" }, { status: 200 });
 		}
 
 		if ((READ_ONLY_SERVER_PATHS as readonly string[]).includes(pathname)) {
 			if (!deps.repositories) {
-				return Response.json(
-					{ error: "Read repositories not configured" },
-					{ status: 500 },
-				);
+				return serverErrorResponse("Read repositories not configured");
 			}
 			return handleServerRequest(request, { repositories: deps.repositories });
 		}
@@ -172,7 +162,7 @@ export const handleRequest: RouteHandler = async (request) => {
 	const { pathname } = new URL(request.url);
 
 	if (pathname === "/health" && request.method === "GET") {
-		return Response.json({ status: "ok" });
+		return jsonSuccess({ status: "ok" });
 	}
 
 	return new Response("Not Found", { status: 404 });

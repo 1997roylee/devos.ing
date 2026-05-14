@@ -1,15 +1,20 @@
 import type { ValidationFailure, ValidationResult } from "./api-error.types";
+import {
+	badRequestResponse,
+	methodNotAllowedResponse,
+	notFoundJsonResponse,
+} from "./response";
 
 export function methodNotAllowed(): Response {
-	return Response.json({ error: "Method Not Allowed" }, { status: 405 });
+	return methodNotAllowedResponse();
 }
 
 export function badRequest(error: string): Response {
-	return Response.json({ error }, { status: 400 });
+	return badRequestResponse(error);
 }
 
 export function notFound(error: string): Response {
-	return Response.json({ error }, { status: 404 });
+	return notFoundJsonResponse(error);
 }
 
 export async function parseObjectJsonBody(
