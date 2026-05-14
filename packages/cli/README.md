@@ -24,7 +24,7 @@ Use `bun run src/index.ts projects` to list available project IDs, then pass one
 
 ## Command Reference
 
-Use either `bun run src/index.ts ...` or `adhd ...` (after linking/installing
+Use either `bun run src/index.ts ...` or `devos ...` (after linking/installing
 the package bin).
 
 ### Help

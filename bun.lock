@@ -14,7 +14,7 @@
       "name": "devos",
       "version": "0.0.1",
       "bin": {
-        "adhd": "dist/index.js",
+        "devos": "dist/index.js",
       },
       "dependencies": {
         "@linear/sdk": "^83.0.0",
