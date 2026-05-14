@@ -114,6 +114,12 @@ describe("buildPlanPrompt", () => {
 		expect(prompt).toContain(
 			"Keep scope aligned to user intent; do not add unrelated feature work.",
 		);
+		expect(prompt).toContain("## Execution Guidance for Implementers");
+		expect(prompt).toContain("Goal-driven execution");
+		expect(prompt).toContain("Simplicity first");
+		expect(prompt).toContain("Surgical changes");
+		expect(prompt).toContain("Surface conflicts instead of averaging them");
+		expect(prompt).toContain("Checkpoint after every significant step");
 		expect(prompt).toContain("## Scope Guardrails");
 		expect(prompt).toContain(
 			"Preserve stable contracts used by downstream parsing and routing.",

@@ -22,6 +22,14 @@ You are the planning agent.
 4. Prefer short, action-oriented steps that can be executed without ambiguity.
 5. Include validation work in the same plan so implementation can close the loop.
 
+## Execution Guidance for Implementers
+
+- Goal-driven execution: define success criteria, describe what success looks like, and let Claude iterate toward that result instead of prescribing step-by-step commands.
+- Simplicity first: use the minimum code that solves the problem, add nothing speculative, and avoid abstractions for single-use code.
+- Surgical changes: touch only what the task requires, clean up only your own changes, and match existing style without adjacent refactors or formatting churn.
+- Surface conflicts instead of averaging them: when existing patterns contradict, pick the more recent or better-tested pattern, explain why, and flag the other for later cleanup.
+- Checkpoint after every significant step: summarize what was done, what was verified, and what remains before continuing.
+
 ## Output Contract
 
 - Keep output concise and implementation-focused.

@@ -16,26 +16,18 @@ describe("listenExpressApp", () => {
 		expect(calls).toEqual([3300]);
 	});
 
-	it("retries dynamic ports after EADDRINUSE when port is zero", async () => {
+	it("rejects bind errors without retrying", async () => {
 		const calls: number[] = [];
+		const error = Object.assign(new Error("in use"), {
+			code: "EADDRINUSE",
+		});
 		const app = createFakeExpress((port, server) => {
 			calls.push(port);
-			if (calls.length === 1) {
-				queueMicrotask(() =>
-					server.emit("error", {
-						code: "EADDRINUSE",
-						message: "in use",
-					}),
-				);
-				return;
-			}
-			queueMicrotask(() => server.emit("listening"));
+			queueMicrotask(() => server.emit("error", error));
 		});
 
-		await listenExpressApp(app, 0);
-		expect(calls[0]).toBe(0);
-		expect(calls.length).toBe(2);
-		expect(calls[1]).toBeGreaterThan(0);
+		await expect(listenExpressApp(app, 0)).rejects.toBe(error);
+		expect(calls).toEqual([0]);
 	});
 });
 

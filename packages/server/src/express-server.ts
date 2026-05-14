@@ -11,8 +11,6 @@ import * as OpenApiValidator from "express-openapi-validator";
 import swaggerUi from "swagger-ui-express";
 import type { RouteHandler } from "./app.types";
 
-const PORT_ZERO_RETRY_LIMIT = 5;
-const PORT_ZERO_RETRY_START = 3001;
 const OPENAPI_SPEC_PATH = path.resolve(
 	path.dirname(fileURLToPath(import.meta.url)),
 	"../../..",
@@ -55,41 +53,10 @@ export function createExpressApp(handler: RouteHandler): Express {
 
 export function listenExpressApp(app: Express, port: number): Promise<Server> {
 	return new Promise((resolve, reject) => {
-		let attempts = 0;
-		const maxAttempts = port === 0 ? PORT_ZERO_RETRY_LIMIT : 1;
-
-		const listen = (): void => {
-			attempts += 1;
-			const listenPort =
-				port === 0 && attempts > 1
-					? PORT_ZERO_RETRY_START + attempts - 2
-					: port;
-			const server = app.listen(listenPort);
-			server.once("listening", () => resolve(server));
-			server.once("error", (error) => {
-				if (
-					port === 0 &&
-					isAddressInUseError(error) &&
-					attempts < maxAttempts
-				) {
-					listen();
-					return;
-				}
-				reject(error);
-			});
-		};
-
-		listen();
+		const server = app.listen(port);
+		server.once("listening", () => resolve(server));
+		server.once("error", reject);
 	});
-}
-
-function isAddressInUseError(error: unknown): boolean {
-	return (
-		typeof error === "object" &&
-		error !== null &&
-		"code" in error &&
-		(error as { code?: unknown }).code === "EADDRINUSE"
-	);
 }
 
 function toWebRequest(request: ExpressRequest): Request {
