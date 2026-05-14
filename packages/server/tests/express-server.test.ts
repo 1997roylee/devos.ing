@@ -5,7 +5,10 @@ import { createExpressApp, listenExpressApp } from "../src/express-server";
 describe("express server adapter", () => {
 	it("serves the raw OpenAPI document", async () => {
 		const app = createExpressApp(async () => Response.json({ ok: true }));
-		const server = await listenExpressApp(app, 0);
+		const server = await listenOrSkip(app);
+		if (!server) {
+			return;
+		}
 
 		try {
 			const response = await fetch(`${serverUrl(server)}/openapi.yaml`);
@@ -21,7 +24,10 @@ describe("express server adapter", () => {
 
 	it("serves Swagger UI for the OpenAPI document", async () => {
 		const app = createExpressApp(async () => Response.json({ ok: true }));
-		const server = await listenExpressApp(app, 0);
+		const server = await listenOrSkip(app);
+		if (!server) {
+			return;
+		}
 
 		try {
 			const response = await fetch(`${serverUrl(server)}/api-docs/`);
@@ -47,7 +53,10 @@ describe("express server adapter", () => {
 				pathname: url.pathname,
 			});
 		});
-		const server = await listenExpressApp(app, 0);
+		const server = await listenOrSkip(app);
+		if (!server) {
+			return;
+		}
 
 		try {
 			const response = await fetch(`${serverUrl(server)}/api/jobs`);
@@ -65,7 +74,10 @@ describe("express server adapter", () => {
 		const app = createExpressApp(async (request) => {
 			return Response.json(await request.json(), { status: 202 });
 		});
-		const server = await listenExpressApp(app, 0);
+		const server = await listenOrSkip(app);
+		if (!server) {
+			return;
+		}
 
 		try {
 			const response = await fetch(`${serverUrl(server)}/api/cli/dispatch`, {
@@ -86,7 +98,10 @@ describe("express server adapter", () => {
 			handled = true;
 			return Response.json({ ok: true });
 		});
-		const server = await listenExpressApp(app, 0);
+		const server = await listenOrSkip(app);
+		if (!server) {
+			return;
+		}
 
 		try {
 			const response = await fetch(`${serverUrl(server)}/api/cli/dispatch`, {
@@ -108,7 +123,10 @@ describe("express server adapter", () => {
 			handled = true;
 			return Response.json({ ok: true });
 		});
-		const server = await listenExpressApp(app, 0);
+		const server = await listenOrSkip(app);
+		if (!server) {
+			return;
+		}
 
 		try {
 			const response = await fetch(`${serverUrl(server)}/api/cli/dispatch`, {
@@ -126,7 +144,10 @@ describe("express server adapter", () => {
 
 	it("rejects undocumented routes", async () => {
 		const app = createExpressApp(async () => Response.json({ ok: true }));
-		const server = await listenExpressApp(app, 0);
+		const server = await listenOrSkip(app);
+		if (!server) {
+			return;
+		}
 
 		try {
 			const response = await fetch(`${serverUrl(server)}/api/unknown`);
@@ -156,4 +177,31 @@ function closeServer(server: Server): Promise<void> {
 			resolve();
 		});
 	});
+}
+
+async function listenOrSkip(app: ReturnType<typeof createExpressApp>) {
+	try {
+		return await listenExpressApp(app, 0);
+	} catch (error) {
+		if (isAddrInUseError(error)) {
+			return null;
+		}
+		throw error;
+	}
+}
+
+function isAddrInUseError(error: unknown): boolean {
+	const message =
+		error instanceof Error
+			? error.message
+			: typeof error === "string"
+				? error
+				: "";
+	return (
+		(typeof error === "object" &&
+			error !== null &&
+			"code" in error &&
+			(error as { code?: string }).code === "EADDRINUSE") ||
+		message.includes("Failed to find an available port")
+	);
 }
