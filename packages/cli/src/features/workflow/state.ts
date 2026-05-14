@@ -3,6 +3,7 @@ import {
 	mkdir,
 	readFile,
 	readdir,
+	rm,
 	writeFile,
 } from "node:fs/promises";
 import path from "node:path";
@@ -103,6 +104,20 @@ export async function saveRunState(
 	await mkdir(path.dirname(file), { recursive: true });
 	state.updatedAt = new Date().toISOString();
 	await writeFile(file, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+}
+
+export async function deleteRunState(
+	cwd: string,
+	projectId: string,
+	issueKey: string,
+): Promise<boolean> {
+	const file = stateFilePath(cwd, projectId, issueKey);
+	try {
+		await rm(file);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 export async function listRunStates(

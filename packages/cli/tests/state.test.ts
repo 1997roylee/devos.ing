@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtemp, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { RunState } from "../src/features/types";
@@ -10,6 +10,7 @@ import {
 	appendProjectErrorLog,
 	applyRunLease,
 	clearRunLease,
+	deleteRunState,
 	hasRunLeaseConflict,
 	isRunLeaseExpired,
 	normalizeIssueKey,
@@ -201,5 +202,34 @@ describe("state helpers", () => {
 		expect(entries[0]?.prompt).toBe("prompt-6");
 		expect(entries[0]?.finalMessage).toBe("final-6");
 		expect(entries.at(-1)?.prompt).toBe(`prompt-${totalEntries}`);
+	});
+
+	it("deletes run state for only the requested project and issue", async () => {
+		const cwd = await mkdtemp(path.join(os.tmpdir(), "adhd-run-state-delete-"));
+		const targetPath = path.join(
+			cwd,
+			".piv-loop/projects/default/runs/ENG-10.json",
+		);
+		const otherProjectPath = path.join(
+			cwd,
+			".piv-loop/projects/api/runs/ENG-10.json",
+		);
+		const otherIssuePath = path.join(
+			cwd,
+			".piv-loop/projects/default/runs/ENG-11.json",
+		);
+
+		await mkdir(path.dirname(targetPath), { recursive: true });
+		await mkdir(path.dirname(otherProjectPath), { recursive: true });
+		await writeFile(targetPath, "{}\n", "utf8");
+		await writeFile(otherProjectPath, "{}\n", "utf8");
+		await writeFile(otherIssuePath, "{}\n", "utf8");
+
+		expect(await deleteRunState(cwd, "default", "eng-10")).toBe(true);
+		expect(await deleteRunState(cwd, "default", "eng-10")).toBe(false);
+
+		await expect(readFile(targetPath, "utf8")).rejects.toThrow();
+		await expect(readFile(otherProjectPath, "utf8")).resolves.toBe("{}\n");
+		await expect(readFile(otherIssuePath, "utf8")).resolves.toBe("{}\n");
 	});
 });

@@ -166,6 +166,35 @@ describe("parseArgs", () => {
 		});
 	});
 
+	it("parses resume command", () => {
+		const parsed = parseArgs([
+			"bun",
+			"adhd-ai",
+			"resume",
+			"--project",
+			"api",
+			"--issue",
+			"https://linear.app/acme/issue/ABC-1/task",
+		]);
+		expect(parsed).toEqual({
+			kind: "resume",
+			issueKey: "https://linear.app/acme/issue/ABC-1/task",
+			projectId: "api",
+		});
+	});
+
+	it("requires resume project flag", () => {
+		expect(() =>
+			parseArgs(["bun", "adhd-ai", "resume", "--issue", "ABC-1"]),
+		).toThrow("resume command requires --project <PROJECT_ID>");
+	});
+
+	it("requires resume issue flag", () => {
+		expect(() =>
+			parseArgs(["bun", "adhd-ai", "resume", "--project", "api"]),
+		).toThrow("resume command requires --issue <LINEAR_KEY>");
+	});
+
 	it("rejects unknown command", () => {
 		expect(() => parseArgs(["bun", "adhd-ai", "unknown", "--option"])).toThrow(
 			"Unknown command: unknown",

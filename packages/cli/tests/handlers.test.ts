@@ -4,11 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import {
 	handleCommand,
+	printHelp,
 	resolveTaskCreateRequest,
 } from "../src/commands/handlers";
 import type { LoadedConfig } from "../src/features/config";
 import type { ResolvedProjectConfig, RunState } from "../src/features/types";
-import { saveRunState } from "../src/features/workflow/state";
+import { loadRunState, saveRunState } from "../src/features/workflow/state";
+import { LinearClient } from "../src/integrations/linear";
 
 const originalStdoutWrite = process.stdout.write.bind(process.stdout);
 
@@ -86,6 +88,136 @@ describe("resolveTaskCreateRequest", () => {
 				readStdin: async () => "",
 			}),
 		).rejects.toThrow("task create requires a non-empty request");
+	});
+});
+
+describe("handleCommand resume", () => {
+	it("moves issue to assigned and clears only matching run state", async () => {
+		const workspaceRoot = await mkdtemp(
+			path.join(os.tmpdir(), "adhd-resume-handler-"),
+		);
+		const project = createProject("default", workspaceRoot);
+		const config: LoadedConfig = {
+			projects: [project],
+			polling: {
+				intervalMs: 30000,
+				maxCycles: 1,
+				exitWhenIdle: true,
+				staleRunTimeoutMs: 3600000,
+			},
+			notifications: {
+				email: {
+					enabled: false,
+					resendApiKey: undefined,
+					from: undefined,
+					to: [],
+				},
+			},
+		};
+		await saveRunState(workspaceRoot, createRunState("ROY-215", "planning"));
+		await saveRunState(workspaceRoot, createRunState("ROY-999", "planning"));
+
+		const originalFetch = LinearClient.prototype.fetchIssueByIdentifier;
+		const originalMarkStage = LinearClient.prototype.markStage;
+		const markCalls: Array<{ issueId: string; stage: string }> = [];
+		LinearClient.prototype.fetchIssueByIdentifier = async (issueArg) =>
+			({
+				id: "lin_ROY-215",
+				identifier: issueArg,
+				title: "Resume test",
+				description: "",
+				url: "https://linear.app/roy/issue/ROY-215/resume-test",
+				state: { id: "state", name: "In Progress" },
+				labels: [],
+			}) as never;
+		LinearClient.prototype.markStage = async (issueId, stage) => {
+			markCalls.push({ issueId, stage });
+		};
+
+		const writes: string[] = [];
+		process.stdout.write = ((chunk: string | Uint8Array) => {
+			writes.push(
+				typeof chunk === "string" ? chunk : Buffer.from(chunk).toString(),
+			);
+			return true;
+		}) as typeof process.stdout.write;
+
+		try {
+			await handleCommand(
+				{
+					kind: "resume",
+					projectId: "default",
+					issueKey: "roy-215",
+				},
+				config,
+			);
+		} finally {
+			LinearClient.prototype.fetchIssueByIdentifier = originalFetch;
+			LinearClient.prototype.markStage = originalMarkStage;
+		}
+
+		expect(markCalls).toEqual([{ issueId: "lin_ROY-215", stage: "assigned" }]);
+		expect(await loadRunState(workspaceRoot, "default", "ROY-215")).toBeNull();
+		expect(
+			await loadRunState(workspaceRoot, "default", "ROY-999"),
+		).not.toBeNull();
+		expect(writes.join("")).toContain(
+			"Resumed issue and cleared run state for ROY-215 in project default",
+		);
+	});
+
+	it("fails when the requested Linear issue does not exist", async () => {
+		const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), "adhd-resume-"));
+		const project = createProject("default", workspaceRoot);
+		const config: LoadedConfig = {
+			projects: [project],
+			polling: {
+				intervalMs: 30000,
+				maxCycles: 1,
+				exitWhenIdle: true,
+				staleRunTimeoutMs: 3600000,
+			},
+			notifications: {
+				email: {
+					enabled: false,
+					resendApiKey: undefined,
+					from: undefined,
+					to: [],
+				},
+			},
+		};
+		const originalFetch = LinearClient.prototype.fetchIssueByIdentifier;
+		LinearClient.prototype.fetchIssueByIdentifier = async () => null;
+		try {
+			await expect(
+				handleCommand(
+					{
+						kind: "resume",
+						projectId: "default",
+						issueKey: "ROY-404",
+					},
+					config,
+				),
+			).rejects.toThrow("Linear issue 'ROY-404' was not found");
+		} finally {
+			LinearClient.prototype.fetchIssueByIdentifier = originalFetch;
+		}
+	});
+});
+
+describe("printHelp", () => {
+	it("includes resume command help", () => {
+		const writes: string[] = [];
+		process.stdout.write = ((chunk: string | Uint8Array) => {
+			writes.push(
+				typeof chunk === "string" ? chunk : Buffer.from(chunk).toString(),
+			);
+			return true;
+		}) as typeof process.stdout.write;
+		printHelp();
+		expect(writes.join("")).toContain(
+			"adhd-ai resume --project <PROJECT_ID> --issue <LINEAR_KEY_OR_URL>",
+		);
 	});
 });
 

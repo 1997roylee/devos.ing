@@ -13,7 +13,11 @@ import {
 } from "../skills/manage";
 import { readStdinText, withQuestionReader } from "../task-intake/io";
 import { runTaskIntake } from "../task-intake/run";
-import { loadRunState, normalizeIssueKey } from "../workflow/state";
+import {
+	deleteRunState,
+	loadRunState,
+	normalizeIssueKey,
+} from "../workflow/state";
 import { runWorkflow } from "../workflow/workflow";
 
 type SetupCommand = Extract<CliCommand, { kind: "setup" }>;
@@ -57,7 +61,28 @@ export async function handleCommand(
 		await runWorkflow(config, command.options);
 		return;
 	}
-
+	if (command.kind === "resume") {
+		const project = getProjectById(config, command.projectId);
+		if (!project) {
+			throw new Error(`Project '${command.projectId}' not found`);
+		}
+		const issueKey = normalizeIssueKey(command.issueKey);
+		const linear = new LinearClient(project);
+		const issue = await linear.fetchIssueByIdentifier(issueKey);
+		if (!issue) {
+			throw new Error(`Linear issue '${issueKey}' was not found`);
+		}
+		await linear.markStage(issue.id, "assigned");
+		const deleted = await deleteRunState(
+			project.workspacePath,
+			project.id,
+			issueKey,
+		);
+		process.stdout.write(
+			`${deleted ? "Resumed issue and cleared run state" : "Resumed issue; run state was already absent"} for ${issue.identifier} in project ${project.id}\n`,
+		);
+		return;
+	}
 	if (command.kind === "projects") {
 		for (const project of config.projects) {
 			process.stdout.write(
@@ -71,7 +96,6 @@ export async function handleCommand(
 		}
 		return;
 	}
-
 	if (command.kind === "skills") {
 		const selectedProject = command.command.projectId
 			? getProjectById(config, command.command.projectId)
@@ -83,7 +107,6 @@ export async function handleCommand(
 		if (!project) {
 			throw new Error("No project is configured");
 		}
-
 		if (command.command.action === "list") {
 			const skills = await listSkills(project.skills.root);
 			if (skills.length === 0) {
@@ -97,7 +120,6 @@ export async function handleCommand(
 			}
 			return;
 		}
-
 		if (command.command.action === "add") {
 			const created = await addSkill(project.skills.root, {
 				title: command.command.title,
@@ -107,7 +129,6 @@ export async function handleCommand(
 			process.stdout.write(`Added skill ${created.name} at ${created.path}\n`);
 			return;
 		}
-
 		if (command.command.action === "update") {
 			const updated = await updateSkill(
 				project.skills.root,
@@ -123,7 +144,6 @@ export async function handleCommand(
 			);
 			return;
 		}
-
 		const removed = await removeSkill(
 			project.skills.root,
 			command.command.name,
@@ -133,7 +153,6 @@ export async function handleCommand(
 		);
 		return;
 	}
-
 	if (command.kind === "task") {
 		const project = command.command.projectId
 			? getProjectById(config, command.command.projectId)
@@ -182,7 +201,6 @@ export async function handleCommand(
 		);
 		return;
 	}
-
 	const project = getProjectById(config, command.projectId);
 	if (!project) {
 		throw new Error(`Project '${command.projectId}' not found`);
@@ -222,6 +240,7 @@ export function printHelp(): void {
 			"  adhd-ai run [--project <PROJECT_ID>] [--issue <LINEAR_KEY_OR_URL>] [--poll] [--no-exit-when-idle] [--poll-interval-ms <MS>] [--max-poll-cycles <N>] [--isolated-worktrees]",
 			"  adhd-ai run --all-projects [--issue <LINEAR_KEY_OR_URL>] [--poll] [--no-exit-when-idle]",
 			"  adhd-ai status --project <PROJECT_ID> --issue <LINEAR_KEY>",
+			"  adhd-ai resume --project <PROJECT_ID> --issue <LINEAR_KEY_OR_URL>",
 			"  adhd-ai projects",
 			"  adhd-ai task create [<REQUEST>] [--request <TEXT|->] [--project <PROJECT_ID>] [--non-interactive] [--max-clarification-rounds <N>] [--clarifications-json <JSON>]",
 			"  adhd-ai skills list [--project <PROJECT_ID>]",

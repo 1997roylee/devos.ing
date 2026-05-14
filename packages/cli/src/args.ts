@@ -69,6 +69,18 @@ export function parseArgs(argv: string[]): CliCommand {
 		return { kind: "status", issueKey, projectId };
 	}
 
+	if (command === "resume") {
+		const issueKey = readFlagValue(rest.slice(1), "--issue");
+		const projectId = readFlagValue(rest.slice(1), "--project");
+		if (!issueKey) {
+			throw new Error("resume command requires --issue <LINEAR_KEY>");
+		}
+		if (!projectId) {
+			throw new Error("resume command requires --project <PROJECT_ID>");
+		}
+		return { kind: "resume", issueKey, projectId };
+	}
+
 	if (command === "projects") {
 		return { kind: "projects" };
 	}
