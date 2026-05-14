@@ -21,11 +21,19 @@ export interface PlanningLinearClient {
 	clearWorkflowStageLabels(issueId: string): Promise<void>;
 }
 
-export interface PlannerDecision {
+export type PlannerDecision = PlannerReadyDecision | PlannerNeedsInfoDecision;
+
+export interface PlannerReadyDecision {
+	result: "READY";
 	complexity: "SIMPLE" | "COMPLEX";
 	splitTasks: PlannedSplitTask[];
 	complexityScore: number;
 	successGoal: string;
+}
+
+export interface PlannerNeedsInfoDecision {
+	result: "NEEDS_INFO";
+	questions: string[];
 }
 
 export interface PlannerIssueRefinement {

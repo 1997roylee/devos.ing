@@ -1057,15 +1057,19 @@ export {
 } from "./workflow-polling";
 export { routeProjectsForIssueProjectId } from "./workflow-routing";
 export {
-	applyPlannerIssueRefinement,
 	parsePlannerComplexityScore,
 	parsePlannerDecision,
-	parsePlannerIssueRefinement,
 	parsePlannerSuccessGoal,
-	parsePlannerSplitTasks,
+} from "./plan-parsing";
+export {
 	resolveReviewModeForComplexityScore,
 	shouldSquashMergePullRequestForComplexityScore,
 } from "./plan";
+export {
+	applyPlannerIssueRefinement,
+	parsePlannerIssueRefinement,
+} from "./plan-refinement";
+export { parsePlannerSplitTasks } from "./plan-split-tasks";
 export type { PlannerDecision, PlannerIssueRefinement } from "./plan";
 export {
 	normalizeFailedReviewBugs,

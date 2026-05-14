@@ -50,6 +50,11 @@ describe("buildImplementPrompt", () => {
 		expect(prompt).toContain(
 			"List the exact checks/tests run and their outcome.",
 		);
+		expect(prompt).toContain("## Checkpoints");
+		expect(prompt).toContain("Scope checkpoint");
+		expect(prompt).toContain("Implementation checkpoint");
+		expect(prompt).toContain("Validation checkpoint");
+		expect(prompt).toContain("Final checkpoint");
 	});
 });
 
@@ -93,9 +98,15 @@ describe("buildPlanPrompt", () => {
 			expect(prompt).toContain("COMPLEXITY: SIMPLE|COMPLEX");
 			expect(prompt).toContain("COMPLEXITY_SCORE: 0..10");
 			expect(prompt).toContain("SPLIT_TASKS_JSON: [...]");
+			expect(prompt).toContain("PLANNING_RESULT: READY");
+			expect(prompt).toContain("PLANNING_RESULT: NEEDS_INFO");
+			expect(prompt).toContain("QUESTIONS_JSON");
 			expect(prompt).toContain("SUCCESS_GOAL");
 			expect(prompt).toContain("ISSUE_REFINEMENT_JSON");
 			expect(prompt).toContain("do not run git fetch or git pull");
+			expect(prompt).toContain(
+				"Do not invent a success goal when acceptance criteria are unclear",
+			);
 			expect(prompt).toContain(
 				"When including SPLIT_TASKS_JSON, write action-oriented task titles",
 			);
@@ -170,7 +181,7 @@ describe("buildPlanPrompt", () => {
 
 			expect(prompt).toContain("Description: Planning should auto-select");
 			expect(prompt).toContain("Auto-selected supplemental skills:");
-			expect(prompt).toContain("Include ISSUE_REFINEMENT_JSON");
+			expect(prompt).toContain("include ISSUE_REFINEMENT_JSON");
 			expect(prompt).toContain("1. linear");
 			expect(prompt).toContain("source: folder");
 			expect(prompt).toContain("score: 9");

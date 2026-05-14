@@ -35,6 +35,7 @@ import {
 	parsePlannerComplexityScore,
 	parsePlannerDecision,
 	parsePlannerIssueRefinement,
+	parsePlannerQuestions,
 	parsePlannerSuccessGoal,
 	prepareImplementationBranchForStage,
 	readyPullRequestAfterPassingReview,
@@ -1422,6 +1423,7 @@ describe("parsePlannerDecision", () => {
 			].join("\n"),
 		);
 		expect(result).toEqual({
+			result: "READY",
 			complexity: "SIMPLE",
 			splitTasks: [],
 			complexityScore: 4,
@@ -1456,6 +1458,10 @@ describe("parsePlannerDecision", () => {
 			].join("\n"),
 		);
 
+		expect(result.result).toBe("READY");
+		if (result.result !== "READY") {
+			throw new Error("Expected READY planner decision.");
+		}
 		expect(result.complexity).toBe("COMPLEX");
 		expect(result.successGoal).toBe("Ship both split tasks.");
 		expect(result.splitTasks).toEqual([
@@ -1513,6 +1519,38 @@ describe("parsePlannerDecision", () => {
 		).toThrow("Invalid COMPLEXITY_SCORE");
 	});
 
+	it("parses NEEDS_INFO with clarification questions", () => {
+		const result = parsePlannerDecision(
+			[
+				"PLANNING_RESULT: NEEDS_INFO",
+				"QUESTIONS_JSON:",
+				JSON.stringify([
+					"Which workflow should change?",
+					"What acceptance behavior should review verify?",
+				]),
+			].join("\n"),
+		);
+
+		expect(result).toEqual({
+			result: "NEEDS_INFO",
+			questions: [
+				"Which workflow should change?",
+				"What acceptance behavior should review verify?",
+			],
+		});
+	});
+
+	it("throws when NEEDS_INFO questions are missing or empty", () => {
+		expect(() => parsePlannerDecision("PLANNING_RESULT: NEEDS_INFO")).toThrow(
+			"QUESTIONS_JSON",
+		);
+		expect(() =>
+			parsePlannerDecision(
+				["PLANNING_RESULT: NEEDS_INFO", "QUESTIONS_JSON: []"].join("\n"),
+			),
+		).toThrow("at least one question");
+	});
+
 	it("parses SUCCESS_GOAL", () => {
 		expect(parsePlannerSuccessGoal("SUCCESS_GOAL: Ship the retry cap.")).toBe(
 			"Ship the retry cap.",
@@ -1526,6 +1564,20 @@ describe("parsePlannerDecision", () => {
 		expect(() => parsePlannerSuccessGoal("SUCCESS_GOAL:   ")).toThrow(
 			"SUCCESS_GOAL",
 		);
+	});
+
+	it("parses fenced QUESTIONS_JSON", () => {
+		expect(
+			parsePlannerQuestions(
+				[
+					"PLANNING_RESULT: NEEDS_INFO",
+					"QUESTIONS_JSON:",
+					"```json",
+					JSON.stringify(["What should happen?"]),
+					"```",
+				].join("\n"),
+			),
+		).toEqual(["What should happen?"]);
 	});
 });
 
@@ -1662,6 +1714,144 @@ describe("handlePlanningStage", () => {
 		expect(agent.runPlan).toHaveBeenCalled();
 		expect(agent.resume).not.toHaveBeenCalled();
 		expect(state.codexSessionId).toBe("new-child-session");
+	});
+
+	it("parks unclear planner output in backlog with clarification questions", async () => {
+		const config = createProject("default");
+		const state = createRunState("ROY-95", "planning", Date.now());
+		const planSummary = [
+			"PLANNING_RESULT: NEEDS_INFO",
+			"QUESTIONS_JSON:",
+			JSON.stringify(["What acceptance behavior should review verify?"]),
+		].join("\n");
+		const agent: AgentAdapter = {
+			runPlan: mock(async () => ({
+				finalMessage: planSummary,
+				stdout: "",
+				sessionId: "needs-info-session",
+			})),
+			runTaskIntake: mock(async () => ({ finalMessage: "", stdout: "" })),
+			resume: mock(async () => ({ finalMessage: "", stdout: "" })),
+			runReview: mock(async () => ({ finalMessage: "", stdout: "" })),
+			runGithubComment: mock(async () => ({ finalMessage: "", stdout: "" })),
+		};
+		const markStage = mock(async () => {});
+		const clearWorkflowStageLabels = mock(async () => {});
+		const comment = mock(async () => {});
+		const saveRunState = mock(async () => {});
+		const safeNotifyTaskOutcome = mock(async () => {});
+
+		await handlePlanningStage(
+			config,
+			agent,
+			{ email: { enabled: false, to: [] } },
+			{
+				createTodoIssueFromPlan: mock(async () => ({
+					id: "lin_child",
+					identifier: "ROY-96",
+					title: "unused",
+					url: "https://linear.example/ROY-96",
+				})),
+				markStage,
+				clearWorkflowStageLabels,
+				comment,
+				updateIssueDetails: mock(async () => {}),
+			} as never,
+			state,
+			{
+				runAgentWithChatLog: async ({ invoke }) => invoke(),
+				appendCodexUsage: () => {},
+				saveRunState,
+				transitionStage,
+				safeNotifyTaskOutcome,
+				loggerInfo: () => {},
+				buildIssueJobLogFields: () => ({}),
+			},
+		);
+
+		expect(state.stage).toBe("blocked");
+		expect(state.failedStage).toBe("planning");
+		expect(state.successGoal).toBeUndefined();
+		expect(state.planningNeedsInfoQuestions).toEqual([
+			"What acceptance behavior should review verify?",
+		]);
+		expect(saveRunState).toHaveBeenCalledWith(config.workspacePath, state);
+		expect(markStage).toHaveBeenCalledWith(state.issue.id, "backlog");
+		expect(clearWorkflowStageLabels).toHaveBeenCalledWith(state.issue.id);
+		const commentCalls = comment.mock.calls as unknown as [string, string][];
+		expect(commentCalls[0]?.[1]).toContain(
+			"Planning could not define a concise acceptance goal",
+		);
+		expect(safeNotifyTaskOutcome).toHaveBeenCalledWith(
+			{ email: { enabled: false, to: [] } },
+			state,
+			"blocked",
+			"Planning needs clarification before implementation.",
+		);
+	});
+
+	it("retries malformed planner output once before parking in backlog", async () => {
+		const config = createProject("default");
+		const state = createRunState("ROY-97", "planning", Date.now());
+		const agent: AgentAdapter = {
+			runPlan: mock(async () => ({
+				finalMessage: "I cannot tell what this means.",
+				stdout: "",
+				sessionId: "malformed-session",
+			})),
+			runTaskIntake: mock(async () => ({ finalMessage: "", stdout: "" })),
+			resume: mock(async () => ({
+				finalMessage: "Still no routing contract.",
+				stdout: "",
+				sessionId: "repair-session",
+			})),
+			runReview: mock(async () => ({ finalMessage: "", stdout: "" })),
+			runGithubComment: mock(async () => ({ finalMessage: "", stdout: "" })),
+		};
+		const markStage = mock(async () => {});
+		const clearWorkflowStageLabels = mock(async () => {});
+		const comment = mock(async () => {});
+
+		await handlePlanningStage(
+			config,
+			agent,
+			{ email: { enabled: false, to: [] } },
+			{
+				createTodoIssueFromPlan: mock(async () => ({
+					id: "lin_child",
+					identifier: "ROY-98",
+					title: "unused",
+					url: "https://linear.example/ROY-98",
+				})),
+				markStage,
+				clearWorkflowStageLabels,
+				comment,
+				updateIssueDetails: mock(async () => {}),
+			} as never,
+			state,
+			{
+				runAgentWithChatLog: async ({ invoke }) => invoke(),
+				appendCodexUsage: () => {},
+				saveRunState: mock(async () => {}),
+				transitionStage,
+				safeNotifyTaskOutcome: mock(async () => {}),
+				loggerInfo: () => {},
+				buildIssueJobLogFields: () => ({}),
+			},
+		);
+
+		expect(agent.resume).toHaveBeenCalledWith(
+			"malformed-session",
+			expect.stringContaining("previous planning response"),
+		);
+		expect(state.stage).toBe("blocked");
+		expect(state.planningNeedsInfoQuestions).toEqual([
+			"What outcome should this task accomplish, and how should review/testing verify it?",
+		]);
+		expect(markStage).toHaveBeenCalledWith(state.issue.id, "backlog");
+		expect(clearWorkflowStageLabels).toHaveBeenCalledWith(state.issue.id);
+		const commentCalls = comment.mock.calls as unknown as [string, string][];
+		expect(commentCalls[0]?.[1]).toContain("Questions:");
 	});
 
 	it("moves the parent issue to backlog after creating split sub-issues", async () => {
@@ -1881,6 +2071,10 @@ describe("planner routing with missing score", () => {
 				"implementation steps",
 			].join("\n"),
 		);
+		expect(decision.result).toBe("READY");
+		if (decision.result !== "READY") {
+			throw new Error("Expected READY planner decision.");
+		}
 		expect(resolveReviewModeForComplexityScore(decision.complexityScore)).toBe(
 			"bot",
 		);

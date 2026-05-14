@@ -148,6 +148,7 @@ export interface RunState {
 	reviewSummary?: string;
 	testingSummary?: string;
 	successGoal?: string;
+	planningNeedsInfoQuestions?: string[];
 	complexityScore?: number;
 	reviewMode?: "bot" | "human";
 	automatedReviewFixPasses?: number;

@@ -2,12 +2,19 @@ import type { ReactElement } from "react";
 
 import { HeroVisual } from "@/components/hero-visual";
 import type { SectionIntroProps } from "@/components/landing-sections.types";
-import { faqs, features, workflowSteps } from "@/lib/landing-content";
+import {
+	faqs,
+	features,
+	readmeUrl,
+	repositoryUrl,
+	workflowFlow,
+	workflowSteps,
+} from "@/lib/landing-content";
 
 export function HeroSection(): ReactElement {
 	return (
-		<section className="relative border-b-2 border-ink bg-paper px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
-			<div className="mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[0.92fr_1.08fr]">
+		<section className="relative border-b-2 border-ink bg-paper px-4 py-14 sm:px-6 lg:px-8 lg:py-20">
+			<div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[0.9fr_1.1fr]">
 				<div className="reveal">
 					<p className="font-mono text-xs font-black uppercase tracking-[0.28em] text-copper">
 						Agentic Development Hub & Daemon
@@ -25,13 +32,13 @@ export function HeroSection(): ReactElement {
 					<div className="mt-8 flex flex-col gap-3 sm:flex-row">
 						<a
 							className="border-2 border-ink bg-circuit px-5 py-4 text-center font-mono text-xs font-black uppercase tracking-[0.18em] shadow-[6px_6px_0_#10110d] transition hover:-translate-y-0.5"
-							href="https://github.com/1997roylee/show-me-ur-agents"
+							href={repositoryUrl}
 						>
 							Show the system
 						</a>
 						<a
 							className="border-2 border-ink bg-bone px-5 py-4 text-center font-mono text-xs font-black uppercase tracking-[0.18em] transition hover:bg-ink hover:text-bone"
-							href="/README.md"
+							href={readmeUrl}
 						>
 							bun run setup
 						</a>
@@ -56,6 +63,26 @@ export function HowItWorksSection(): ReactElement {
 					kicker="How this works"
 					title="A staged loop for real engineering work."
 				/>
+				<div
+					aria-label="Agent workflow from project board through testing loop"
+					className="mt-10 border-2 border-ink bg-paper p-3 shadow-[8px_8px_0_#10110d]"
+				>
+					<ol className="grid gap-3 md:grid-cols-6">
+						{workflowFlow.map((step, index) => (
+							<li
+								className="flow-node relative flex min-h-24 flex-col justify-between border-2 border-ink bg-bone p-4"
+								key={step}
+							>
+								<p className="font-mono text-[10px] font-black uppercase tracking-[0.18em] text-copper">
+									0{index + 1}
+								</p>
+								<h3 className="mt-4 font-display text-xl font-black leading-none">
+									{step}
+								</h3>
+							</li>
+						))}
+					</ol>
+				</div>
 				<div className="mt-10 grid gap-4 md:grid-cols-4">
 					{workflowSteps.map((step) => (
 						<article

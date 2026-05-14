@@ -1,3 +1,7 @@
+export const repositoryUrl = "https://github.com/1997roylee/show-me-ur-agents";
+export const readmeUrl =
+	"https://github.com/1997roylee/show-me-ur-agents#readme";
+
 export const navItems = [
 	{ href: "#how", label: "How it works" },
 	{ href: "#features", label: "Features" },
@@ -25,6 +29,15 @@ export const workflowSteps = [
 		title: "Review, test, and loop",
 		body: "Structured review output feeds failures back into implementation until the run is done or clearly blocked.",
 	},
+];
+
+export const workflowFlow = [
+	"Project board",
+	"Explore / Researching",
+	"Plan",
+	"Implementation",
+	"Testing",
+	"Loop",
 ];
 
 export const features = [
@@ -99,18 +112,30 @@ export const footerGroups = [
 	{
 		title: "Docs",
 		links: [
-			{ href: "/docs/PLANS.md", label: "Plans" },
-			{ href: "/docs/RELIABILITY.md", label: "Reliability" },
-			{ href: "/docs/SECURITY.md", label: "Security" },
+			{
+				href: "https://github.com/1997roylee/show-me-ur-agents/blob/main/docs/PLANS.md",
+				label: "Plans",
+			},
+			{
+				href: "https://github.com/1997roylee/show-me-ur-agents/blob/main/docs/RELIABILITY.md",
+				label: "Reliability",
+			},
+			{
+				href: "https://github.com/1997roylee/show-me-ur-agents/blob/main/docs/SECURITY.md",
+				label: "Security",
+			},
 		],
 	},
 	{
 		title: "Start",
 		links: [
-			{ href: "/README.md", label: "Quick start" },
-			{ href: "/ARCHITECTURE.md", label: "Architecture" },
+			{ href: readmeUrl, label: "Quick start" },
 			{
-				href: "https://github.com/1997roylee/show-me-ur-agents",
+				href: "https://github.com/1997roylee/show-me-ur-agents/blob/main/ARCHITECTURE.md",
+				label: "Architecture",
+			},
+			{
+				href: repositoryUrl,
 				label: "GitHub",
 			},
 		],

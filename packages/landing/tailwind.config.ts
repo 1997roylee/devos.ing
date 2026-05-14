@@ -13,9 +13,9 @@ const config: Config = {
 				oxide: "#24342a",
 			},
 			fontFamily: {
-				display: ["Georgia", "Iowan Old Style", "serif"],
-				body: ["Aptos", "Gill Sans", "Trebuchet MS", "sans-serif"],
-				mono: ["IBM Plex Mono", "Menlo", "monospace"],
+				display: ["Geist", "Geist Fallback", "sans-serif"],
+				body: ["Geist", "Geist Fallback", "sans-serif"],
+				mono: ["Geist", "Geist Fallback", "sans-serif"],
 			},
 			boxShadow: {
 				"hard-ink": "10px 10px 0 #10110d",

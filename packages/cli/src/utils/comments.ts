@@ -81,6 +81,24 @@ export function buildPlanSplitComment(
 	].join("\n");
 }
 
+export function buildPlanNeedsInfoComment(input: {
+	issueKey: string;
+	questions: string[];
+	usage?: TokenUsage;
+}): string {
+	return [
+		`devos.ing planning needs clarification for ${input.issueKey}`,
+		"",
+		"Planning could not define a concise acceptance goal, so implementation did not start.",
+		"Moved the issue back to Backlog for clarification.",
+		"",
+		formatCodexUsageLine(input.usage),
+		"",
+		"Questions:",
+		...input.questions.map((question, index) => `${index + 1}. ${question}`),
+	].join("\n");
+}
+
 export function buildImplementationComment(
 	draftPrUrl: string | undefined,
 	usage?: TokenUsage,

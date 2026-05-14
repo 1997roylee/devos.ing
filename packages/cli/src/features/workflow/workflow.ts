@@ -1477,15 +1477,20 @@ export function appendCodexUsage(
 }
 
 export {
-	applyPlannerIssueRefinement,
 	parsePlannerComplexityScore,
 	parsePlannerDecision,
-	parsePlannerIssueRefinement,
+	parsePlannerQuestions,
 	parsePlannerSuccessGoal,
-	parsePlannerSplitTasks,
+} from "./plan-parsing";
+export {
 	resolveReviewModeForComplexityScore,
 	shouldSquashMergePullRequestForComplexityScore,
 } from "./plan";
+export {
+	applyPlannerIssueRefinement,
+	parsePlannerIssueRefinement,
+} from "./plan-refinement";
+export { parsePlannerSplitTasks } from "./plan-split-tasks";
 export type { PlannerDecision, PlannerIssueRefinement } from "./plan";
 export {
 	normalizeFailedReviewBugs,
