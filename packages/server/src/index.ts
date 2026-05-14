@@ -1,8 +1,25 @@
-import { CliCommandExecutor } from "adhdai/features/server/cli-command-executor";
+import path from "node:path";
+import {
+	CliCommandExecutor,
+	initializeServerDatabase,
+} from "adhdai/features/server";
 import { createHandleRequest } from "./app";
+import { createReadRepositories } from "./repositories";
 
-export const startServer = (port = 3000): Bun.Server<undefined> =>
-	Bun.serve({
+const DEFAULT_DATABASE_PATH = path.resolve(
+	process.cwd(),
+	".piv-loop/state/server-db",
+);
+
+export const startServer = async (
+	port = 3000,
+): Promise<Bun.Server<undefined>> => {
+	const databasePath =
+		process.env.ADHDAI_SERVER_DATABASE_PATH ?? DEFAULT_DATABASE_PATH;
+	const database = await initializeServerDatabase(databasePath);
+	const repositories = createReadRepositories(database);
+
+	return Bun.serve({
 		port,
 		fetch: createHandleRequest({
 			cliExecutor: new CliCommandExecutor({
@@ -15,7 +32,8 @@ export const startServer = (port = 3000): Bun.Server<undefined> =>
 			},
 		}),
 	});
+};
 
 if (import.meta.main) {
-	startServer();
+	void startServer();
 }
