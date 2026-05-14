@@ -12,6 +12,7 @@ This directory is the default skill pack root for devos.ing.
 - `adhd-docs/SKILL.md`
 - `backend-standard/SKILL.md`
 - `frontend-standard/SKILL.md`
+- `frontend-design/SKILL.md`
 - `daily-codebase-maintenance/SKILL.md`
 - `typescript-biome-style/SKILL.md`
 
@@ -92,3 +93,8 @@ boundaries focused, and improve reliability with tests.
 ## Included Documentation Skill
 
 `adhd-docs/SKILL.md` is for generating and maintaining plain-language, operator-facing documentation that explains workflow behavior and integrations (Linear, GitHub, optional Resend notifications, and Claude/OpenAI Codex runtime options) without exposing secrets.
+
+## Included Frontend Design Skill
+
+`frontend-design/SKILL.md` is for building distinctive, production-grade frontend
+interfaces with explicit aesthetic direction and non-generic visual execution.
