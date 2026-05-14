@@ -16,12 +16,16 @@ Use this skill when implementing or reviewing backend code.
 
 ## Structure
 
-1. Keep configuration and environment resolution centralized.
-2. Keep workflow/stage sequencing in workflow modules, not service adapters.
-3. Keep external integrations isolated by provider module.
-4. Keep run-state or persistence path logic in dedicated state modules.
-5. Keep CLI argument parsing and command dispatch isolated from core workflow logic.
-6. Avoid raw shell command construction in workflow logic; use helper modules.
+1. Organize backend modules by feature behavior, with clear ownership and
+   boundaries.
+2. Keep configuration and environment resolution centralized.
+3. Keep cross-cutting infrastructure concerns (logging, middleware, data
+   access, health checks) in dedicated shared modules.
+4. Keep workflow/stage sequencing in workflow modules, not service adapters.
+5. Keep external integrations isolated by provider module.
+6. Keep run-state or persistence path logic in dedicated state modules.
+7. Keep CLI argument parsing and command dispatch isolated from core workflow logic.
+8. Avoid raw shell command construction in workflow logic; use helper modules.
 
 ## Implementation Rules
 
@@ -31,11 +35,13 @@ Use this skill when implementing or reviewing backend code.
 4. Use typed interfaces for adapter contracts.
 5. Prefer explicit return values over hidden shared mutable state.
 6. Handle errors with context-rich messages and stable categories.
-7. Add retries only for transient failures, with bounded attempts and clear logging.
-8. Log key state transitions, request identifiers, and failure context without secrets.
-9. Never log tokens, credentials, or private user content.
-10. Keep database or filesystem operations idempotent where reruns are expected.
-11. Avoid framework lock-in in core logic; keep framework-specific code near integration edges.
+7. Keep error-to-response mapping stable at boundaries so clients receive
+   predictable status codes and error shapes.
+8. Add retries only for transient failures, with bounded attempts and clear logging.
+9. Log key state transitions, request identifiers, and failure context without secrets.
+10. Never log tokens, credentials, or private user content.
+11. Keep database or filesystem operations idempotent where reruns are expected.
+12. Avoid framework lock-in in core logic; keep framework-specific code near integration edges.
 
 ## Testing Expectations
 
@@ -46,3 +52,5 @@ Use this skill when implementing or reviewing backend code.
    - `bun run check`
    - `bun run typecheck`
    - `bun test`
+5. Use Bun-based scripts only; do not introduce npm, Yarn, or pnpm command
+   paths in implementation or validation instructions.

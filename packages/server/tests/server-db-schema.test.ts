@@ -11,6 +11,7 @@ import {
 	type NewCommandHistoryRow,
 	type NewJobRow,
 	type NewProjectBoardRow,
+	type NewProjectCronJobRow,
 	type NewSkillRow,
 	type NewTaskAssigneeRow,
 	type NewTaskCommentRow,
@@ -26,6 +27,7 @@ import {
 	initializeServerDatabase,
 	jobsTable,
 	projectBoardsTable,
+	projectCronJobsTable,
 	skillsTable,
 	taskAssigneesTable,
 	taskCommentsTable,
@@ -330,6 +332,60 @@ describe("server drizzle schema", () => {
 		expect(tokenUsageRow?.taskExecutionLogId).toBe(
 			taskTokenUsage.taskExecutionLogId ?? null,
 		);
+	});
+
+	it("stores and reads project cron job definitions per project", async () => {
+		testDatabase = await createDrizzleServerTestDatabase();
+		const { db } = testDatabase;
+
+		const board: NewProjectBoardRow = {
+			id: "board-cron-1",
+			name: "Automations Board",
+			description: "Tracks automation schedules",
+			ownerId: "user-1",
+			createdAt: "2026-05-12 02:00:00",
+			updatedAt: "2026-05-12 02:00:00",
+		};
+		const project: NewBoardProjectRow = {
+			id: "project-cron-1",
+			boardId: board.id,
+			externalProjectId: "ROY",
+			name: "Server Automations",
+			description: "Cron jobs for project workflows",
+			ownerId: "user-1",
+			createdAt: "2026-05-12 02:01:00",
+			updatedAt: "2026-05-12 02:01:00",
+		};
+		const cronJob: NewProjectCronJobRow = {
+			id: "cron-1",
+			projectId: project.id,
+			cronExpression: "0 */2 * * *",
+			targetType: "hook",
+			target: "review:hourly",
+			skills: JSON.stringify(["adhd-plan", "adhd-implement"]),
+			enabled: true,
+			createdAt: "2026-05-12 02:02:00",
+			updatedAt: "2026-05-12 02:02:00",
+		};
+
+		await db.insert(projectBoardsTable).values(board);
+		await db.insert(boardProjectsTable).values(project);
+		await db.insert(projectCronJobsTable).values(cronJob);
+
+		const [cronJobRow] = await db
+			.select()
+			.from(projectCronJobsTable)
+			.where(eq(projectCronJobsTable.id, cronJob.id));
+
+		expect(cronJobRow?.id).toBe(cronJob.id);
+		expect(cronJobRow?.projectId).toBe(cronJob.projectId);
+		expect(cronJobRow?.cronExpression).toBe(cronJob.cronExpression);
+		expect(cronJobRow?.targetType).toBe(cronJob.targetType);
+		expect(cronJobRow?.target).toBe(cronJob.target);
+		expect(cronJobRow?.skills).toBe(cronJob.skills);
+		expect(cronJobRow?.enabled).toBe(cronJob.enabled);
+		expect(cronJobRow?.createdAt).toBe(cronJob.createdAt);
+		expect(cronJobRow?.updatedAt).toBe(cronJob.updatedAt);
 	});
 
 	it("initializes the same database path twice without startup errors", async () => {

@@ -303,6 +303,9 @@ describe("CliCommandExecutor", () => {
 			taskAction: "create",
 			request: "Build a better setup flow",
 			projectId: "default",
+			nonInteractive: true,
+			maxClarificationRounds: 2,
+			clarificationAnswers: [{ question: "Who?", answer: "CLI users" }],
 		});
 
 		expect(result.status).toBe("succeeded");
@@ -318,8 +321,44 @@ describe("CliCommandExecutor", () => {
 					"Build a better setup flow",
 					"--project",
 					"default",
+					"--non-interactive",
+					"--max-clarification-rounds",
+					"2",
+					"--clarifications-json",
+					'[{"question":"Who?","answer":"CLI users"}]',
 				],
 			},
+		]);
+	});
+
+	it("forces non-interactive task create even when omitted by payload", async () => {
+		const calls: Array<{ command: string; args: string[] }> = [];
+		const runCommandFn: RunCommandFn = async (command, args) => {
+			calls.push({ command, args });
+			return { code: 0, stdout: "ok", stderr: "" };
+		};
+		const executor = new CliCommandExecutor({
+			cwd: "/tmp/work",
+			command: "bun",
+			baseArgs: ["run", "./packages/cli/src/index.ts"],
+			runCommandFn,
+		});
+
+		const result = await executor.execute({
+			action: "task",
+			taskAction: "create",
+			request: "Build task flow",
+		});
+
+		expect(result.status).toBe("succeeded");
+		expect(calls[0]?.args).toEqual([
+			"run",
+			"./packages/cli/src/index.ts",
+			"task",
+			"create",
+			"--request",
+			"Build task flow",
+			"--non-interactive",
 		]);
 	});
 
@@ -537,6 +576,24 @@ describe("CliCommandExecutor", () => {
 			request: "Build a better setup flow",
 			projectId: 42,
 		} as unknown as { action: string });
+		const malformedTaskInteractiveFlag = await executor.execute({
+			action: "task",
+			taskAction: "create",
+			request: "Build a better setup flow",
+			nonInteractive: false,
+		} as unknown as { action: string });
+		const malformedTaskAnswers = await executor.execute({
+			action: "task",
+			taskAction: "create",
+			request: "Build a better setup flow",
+			clarificationAnswers: [{ question: "", answer: "CLI users" }],
+		} as unknown as { action: string });
+		const malformedTaskUnsafeField = await executor.execute({
+			action: "task",
+			taskAction: "create",
+			request: "Build a better setup flow",
+			stdinMode: "pipe",
+		} as unknown as { action: string });
 		const malformedRunFields = await executor.execute({
 			action: "run",
 			projectId: ["bad"],
@@ -573,6 +630,18 @@ describe("CliCommandExecutor", () => {
 		expect(malformedTaskProject.status).toBe("rejected");
 		expect(malformedTaskProject.error).toContain(
 			"projectId must be a non-empty string",
+		);
+		expect(malformedTaskInteractiveFlag.status).toBe("rejected");
+		expect(malformedTaskInteractiveFlag.error).toContain(
+			"nonInteractive must be true when provided",
+		);
+		expect(malformedTaskAnswers.status).toBe("rejected");
+		expect(malformedTaskAnswers.error).toContain(
+			"clarificationAnswers[0].question must be a non-empty string",
+		);
+		expect(malformedTaskUnsafeField.status).toBe("rejected");
+		expect(malformedTaskUnsafeField.error).toContain(
+			"unsafe field 'stdinMode' is not allowed",
 		);
 		expect(malformedRunFields.status).toBe("rejected");
 		expect(malformedRunFields.error).toContain(

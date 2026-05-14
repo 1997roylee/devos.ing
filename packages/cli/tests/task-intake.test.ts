@@ -146,6 +146,64 @@ describe("runTaskIntake", () => {
 		expect(prompts[1]).toContain("A: CLI users");
 	});
 
+	it("uses provided clarification answers in non-interactive mode", async () => {
+		const prompts: string[] = [];
+		const result = await runTaskIntake(
+			project(),
+			agent(
+				[
+					'RESULT: NEEDS_INFO\nQUESTIONS_JSON: ["Who is this for?"]',
+					'RESULT: CLEAR\nTASK_JSON: {"title":"Add task CLI","description":"Create tasks for CLI users."}',
+				],
+				prompts,
+			),
+			{
+				createBacklogTask: async (input) => ({
+					id: "lin_3",
+					identifier: "ROY-3",
+					title: input.title,
+					url: "https://linear.example/ROY-3",
+				}),
+			},
+			{
+				request: "create task",
+				providedAnswers: [
+					{ question: "Who is this for?", answer: "CLI users" },
+				],
+				nonInteractive: true,
+				askQuestion: async () => {
+					throw new Error("should not ask interactive questions");
+				},
+			},
+		);
+		expect(result.status).toBe("created");
+		expect(prompts[1]).toContain("Q: Who is this for?");
+		expect(prompts[1]).toContain("A: CLI users");
+	});
+
+	it("returns needs_info when non-interactive mode lacks answers", async () => {
+		const result = await runTaskIntake(
+			project(),
+			agent(['RESULT: NEEDS_INFO\nQUESTIONS_JSON: ["Who is this for?"]']),
+			{
+				createBacklogTask: async () => {
+					throw new Error("should not create");
+				},
+			},
+			{
+				request: "create task",
+				nonInteractive: true,
+				askQuestion: async () => {
+					throw new Error("should not ask interactive questions");
+				},
+			},
+		);
+		expect(result).toEqual({
+			status: "needs_info",
+			questions: ["Who is this for?"],
+		});
+	});
+
 	it("exits without creating after max clarification rounds", async () => {
 		let created = false;
 		const result = await runTaskIntake(
@@ -171,6 +229,39 @@ describe("runTaskIntake", () => {
 			questions: ["Which workflow?"],
 		});
 		expect(created).toBe(false);
+	});
+
+	it("returns needs_info immediately in non-interactive mode", async () => {
+		let questionAsked = false;
+		const prompts: string[] = [];
+		const result = await runTaskIntake(
+			project(),
+			agent(
+				['RESULT: NEEDS_INFO\nQUESTIONS_JSON: ["Which project?"]'],
+				prompts,
+			),
+			{
+				createBacklogTask: async () => {
+					throw new Error("should not create");
+				},
+			},
+			{
+				request: "create task",
+				initialAnswers: [{ question: "Who?", answer: "CLI users" }],
+				allowInteractiveQuestions: false,
+				askQuestion: async () => {
+					questionAsked = true;
+					return "answer";
+				},
+			},
+		);
+		expect(result).toEqual({
+			status: "needs_info",
+			questions: ["Which project?"],
+		});
+		expect(questionAsked).toBe(false);
+		expect(prompts[0]).toContain("Q: Who?");
+		expect(prompts[0]).toContain("A: CLI users");
 	});
 });
 

@@ -1,0 +1,221 @@
+import { afterEach, describe, expect, it } from "bun:test";
+import { createHandleRequest } from "../src/app";
+import type { AppDeps } from "../src/app.types";
+import type {
+	AgentCreatePayload,
+	SkillCreatePayload,
+} from "../src/routes/entity-crud.types";
+import {
+	type DrizzleServerTestDatabase,
+	createDrizzleServerTestDatabase,
+} from "./server-db-test-helpers";
+
+let testDatabase: DrizzleServerTestDatabase | undefined;
+
+afterEach(async () => {
+	if (testDatabase) {
+		await testDatabase.cleanup();
+		testDatabase = undefined;
+	}
+});
+
+describe("agent and skill CRUD routes", () => {
+	it("creates, lists, reads, updates, and deletes agents", async () => {
+		const app = await createApp();
+		const payload: AgentCreatePayload = {
+			id: "agent-1",
+			name: "codex-main",
+			backend: "codex",
+			model: "gpt-5",
+			createdAt: "2026-05-12 00:02:00",
+		};
+
+		const createResponse = await app(
+			jsonRequest("POST", "/api/agents", payload),
+		);
+		expect(createResponse.status).toBe(201);
+		expect(await createResponse.json()).toEqual(payload);
+
+		const listResponse = await app(new Request("http://localhost/api/agents"));
+		expect(listResponse.status).toBe(200);
+		expect(await listResponse.json()).toEqual([payload]);
+
+		const readResponse = await app(
+			new Request("http://localhost/api/agents/agent-1"),
+		);
+		expect(readResponse.status).toBe(200);
+		expect(await readResponse.json()).toEqual(payload);
+
+		const updateResponse = await app(
+			jsonRequest("PATCH", "/api/agents/agent-1", { model: "gpt-5.1" }),
+		);
+		expect(updateResponse.status).toBe(200);
+		expect(await updateResponse.json()).toEqual({
+			...payload,
+			model: "gpt-5.1",
+		});
+
+		const deleteResponse = await app(
+			new Request("http://localhost/api/agents/agent-1", { method: "DELETE" }),
+		);
+		expect(deleteResponse.status).toBe(204);
+		expect(await deleteResponse.text()).toBe("");
+
+		const readMissing = await app(
+			new Request("http://localhost/api/agents/agent-1"),
+		);
+		expect(readMissing.status).toBe(404);
+		expect(await readMissing.json()).toEqual({ error: "Not Found" });
+	});
+
+	it("creates, lists, reads, updates, and deletes skills", async () => {
+		const app = await createApp();
+		const payload: SkillCreatePayload = {
+			id: "skill-1",
+			name: "backend-standard",
+			description: "Backend implementation guidance",
+			source: "folder",
+			updatedAt: "2026-05-12 00:03:00",
+		};
+
+		const createResponse = await app(
+			jsonRequest("POST", "/api/skills", payload),
+		);
+		expect(createResponse.status).toBe(201);
+		expect(await createResponse.json()).toEqual(payload);
+
+		const listResponse = await app(new Request("http://localhost/api/skills"));
+		expect(listResponse.status).toBe(200);
+		expect(await listResponse.json()).toEqual([payload]);
+
+		const readResponse = await app(
+			new Request("http://localhost/api/skills/skill-1"),
+		);
+		expect(readResponse.status).toBe(200);
+		expect(await readResponse.json()).toEqual(payload);
+
+		const updateResponse = await app(
+			jsonRequest("PATCH", "/api/skills/skill-1", { source: "inline" }),
+		);
+		expect(updateResponse.status).toBe(200);
+		expect(await updateResponse.json()).toEqual({
+			...payload,
+			source: "inline",
+		});
+
+		const deleteResponse = await app(
+			new Request("http://localhost/api/skills/skill-1", { method: "DELETE" }),
+		);
+		expect(deleteResponse.status).toBe(204);
+		expect(await deleteResponse.text()).toBe("");
+	});
+
+	it("rejects invalid payloads for agents and skills", async () => {
+		const app = await createApp();
+
+		const malformedJson = await app(
+			new Request("http://localhost/api/agents", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: "{bad-json}",
+			}),
+		);
+		expect(malformedJson.status).toBe(400);
+		expect(await malformedJson.json()).toEqual({
+			error: "Malformed JSON body",
+		});
+
+		const missingField = await app(
+			jsonRequest("POST", "/api/agents", {
+				id: "agent-1",
+				name: "codex-main",
+				backend: "codex",
+				model: "gpt-5",
+			}),
+		);
+		expect(missingField.status).toBe(400);
+		expect(await missingField.json()).toEqual({
+			error: "Malformed request: missing required field 'createdAt'",
+		});
+
+		const wrongType = await app(
+			jsonRequest("POST", "/api/skills", {
+				id: "skill-1",
+				name: "backend-standard",
+				description: "Backend implementation guidance",
+				source: "folder",
+				updatedAt: 42,
+			}),
+		);
+		expect(wrongType.status).toBe(400);
+		expect(await wrongType.json()).toEqual({
+			error: "Malformed request: field 'updatedAt' must be a non-empty string",
+		});
+
+		const emptyPatch = await app(
+			jsonRequest("PATCH", "/api/agents/agent-1", {}),
+		);
+		expect(emptyPatch.status).toBe(400);
+		expect(await emptyPatch.json()).toEqual({
+			error: "Malformed request: expected at least one field",
+		});
+
+		const unknownField = await app(
+			jsonRequest("PATCH", "/api/skills/skill-1", { id: "nope" }),
+		);
+		expect(unknownField.status).toBe(400);
+		expect(await unknownField.json()).toEqual({
+			error: "Malformed request: unknown field 'id'",
+		});
+	});
+
+	it("returns not found for missing records and method-not-allowed for unsupported methods", async () => {
+		const app = await createApp();
+
+		const missingRead = await app(
+			new Request("http://localhost/api/skills/missing"),
+		);
+		expect(missingRead.status).toBe(404);
+		expect(await missingRead.json()).toEqual({ error: "Not Found" });
+
+		const missingPatch = await app(
+			jsonRequest("PATCH", "/api/agents/missing", { model: "gpt-5.1" }),
+		);
+		expect(missingPatch.status).toBe(404);
+		expect(await missingPatch.json()).toEqual({ error: "Not Found" });
+
+		const missingDelete = await app(
+			new Request("http://localhost/api/skills/missing", { method: "DELETE" }),
+		);
+		expect(missingDelete.status).toBe(404);
+		expect(await missingDelete.json()).toEqual({ error: "Not Found" });
+
+		const methodNotAllowed = await app(
+			new Request("http://localhost/api/agents/agent-1", { method: "POST" }),
+		);
+		expect(methodNotAllowed.status).toBe(405);
+		expect(await methodNotAllowed.json()).toEqual({
+			error: "Method Not Allowed",
+		});
+	});
+});
+
+async function createApp() {
+	testDatabase = await createDrizzleServerTestDatabase();
+	const deps: AppDeps = {
+		db: testDatabase.db,
+		cliExecutor: {
+			execute: async (request) => ({ status: "succeeded", request }),
+			getHistory: () => [],
+		},
+	};
+	return createHandleRequest(deps);
+}
+
+function jsonRequest(method: string, pathname: string, body: unknown): Request {
+	return new Request(`http://localhost${pathname}`, {
+		method,
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify(body),
+	});
+}

@@ -58,7 +58,7 @@ describe("buildHumanReviewRequiredEmailPayload", () => {
 });
 
 describe("sendTaskOutcomeEmail", () => {
-	it("calls Resend API with expected payload", async () => {
+	it("delegates task outcome notifications to server with expected payload", async () => {
 		const requests: Array<{ url: string; init?: RequestInit }> = [];
 		globalThis.fetch = (async (
 			input: RequestInfo | URL,
@@ -82,19 +82,48 @@ describe("sendTaskOutcomeEmail", () => {
 		);
 
 		expect(requests).toHaveLength(1);
-		expect(requests[0]?.url).toBe("https://api.resend.com/emails");
+		expect(requests[0]?.url).toBe("http://127.0.0.1:3000/api/notifications");
 		expect(requests[0]?.init?.method).toBe("POST");
 		const rawBody = requests[0]?.init?.body;
 		const body =
 			typeof rawBody === "string"
 				? (JSON.parse(rawBody) as Record<string, unknown>)
 				: {};
-		expect(body.from).toBe("ops@example.com");
-		expect(body.to).toEqual(["dev@example.com"]);
-		expect(body.subject).toContain("ENG-1");
+		expect(body.type).toBe("task-outcome");
+		expect(body.payload).toEqual(
+			expect.objectContaining({
+				from: "ops@example.com",
+				to: ["dev@example.com"],
+				subject: expect.stringContaining("ENG-1"),
+			}),
+		);
 	});
 
-	it("throws when Resend request fails", async () => {
+	it("does not call server when notifications are disabled", async () => {
+		const requests: Array<{ url: string; init?: RequestInit }> = [];
+		globalThis.fetch = (async (
+			input: RequestInfo | URL,
+			init?: RequestInit,
+		) => {
+			requests.push({ url: String(input), init });
+			return new Response(JSON.stringify({ ok: true }), { status: 200 });
+		}) as unknown as typeof fetch;
+
+		await sendTaskOutcomeEmail(
+			{
+				enabled: false,
+				resendApiKey: "re_test",
+				from: "ops@example.com",
+				to: ["dev@example.com"],
+			},
+			createRunState(),
+			"done",
+		);
+
+		expect(requests).toHaveLength(0);
+	});
+
+	it("throws when server notification request fails", async () => {
 		globalThis.fetch = (async () =>
 			new Response("bad request", { status: 400 })) as unknown as typeof fetch;
 
@@ -109,12 +138,12 @@ describe("sendTaskOutcomeEmail", () => {
 				createRunState(),
 				"done",
 			),
-		).rejects.toThrow("Resend send failed with status 400.");
+		).rejects.toThrow("Server notification request failed with status 400.");
 	});
 });
 
 describe("sendHumanReviewRequiredEmail", () => {
-	it("calls Resend API with human review payload", async () => {
+	it("delegates human review notifications to server with expected payload", async () => {
 		const requests: Array<{ url: string; init?: RequestInit }> = [];
 		globalThis.fetch = (async (
 			input: RequestInfo | URL,
@@ -146,11 +175,19 @@ describe("sendHumanReviewRequiredEmail", () => {
 			typeof rawBody === "string"
 				? (JSON.parse(rawBody) as Record<string, unknown>)
 				: {};
-		expect(body.subject).toBe(
+		expect(body.type).toBe("human-review-required");
+		const typedBody = body as {
+			payload?: { subject?: string; text?: string };
+			complexityScore?: number;
+			reason?: string;
+		};
+		expect(typedBody.payload?.subject).toBe(
 			"[devos.ing][Default] ENG-1 HUMAN REVIEW REQUIRED",
 		);
-		expect(typeof body.text).toBe("string");
-		expect(String(body.text)).toContain("Complexity Score: 7/10");
+		expect(typeof typedBody.payload?.text).toBe("string");
+		expect(String(typedBody.payload?.text)).toContain("Complexity Score: 7/10");
+		expect(typedBody.complexityScore).toBe(7);
+		expect(typedBody.reason).toBe("High complexity");
 	});
 });
 

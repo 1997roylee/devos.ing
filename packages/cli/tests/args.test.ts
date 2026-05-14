@@ -287,6 +287,9 @@ describe("parseArgs", () => {
 				action: "create",
 				request: "Build a better setup flow",
 				projectId: "default",
+				nonInteractive: undefined,
+				maxClarificationRounds: undefined,
+				clarificationAnswers: undefined,
 			},
 		});
 	});
@@ -300,6 +303,9 @@ describe("parseArgs", () => {
 				action: "create",
 				request: "-",
 				projectId: undefined,
+				nonInteractive: undefined,
+				maxClarificationRounds: undefined,
+				clarificationAnswers: undefined,
 			},
 		});
 	});
@@ -311,6 +317,9 @@ describe("parseArgs", () => {
 				action: "create",
 				request: undefined,
 				projectId: undefined,
+				nonInteractive: undefined,
+				maxClarificationRounds: undefined,
+				clarificationAnswers: undefined,
 			},
 		});
 	});
@@ -334,8 +343,54 @@ describe("parseArgs", () => {
 				action: "create",
 				request: "Build a better setup flow",
 				projectId: undefined,
+				nonInteractive: undefined,
+				maxClarificationRounds: undefined,
+				clarificationAnswers: undefined,
 			},
 		});
+	});
+
+	it("parses non-interactive task create flags", () => {
+		expect(
+			parseArgs([
+				"bun",
+				"adhd-ai",
+				"task",
+				"create",
+				"--request",
+				"Build task flow",
+				"--non-interactive",
+				"--max-clarification-rounds",
+				"2",
+				"--clarifications-json",
+				'[{"question":"Who?","answer":"CLI users"}]',
+			]),
+		).toEqual({
+			kind: "task",
+			command: {
+				action: "create",
+				request: "Build task flow",
+				projectId: undefined,
+				nonInteractive: true,
+				maxClarificationRounds: 2,
+				clarificationAnswers: [{ question: "Who?", answer: "CLI users" }],
+			},
+		});
+	});
+
+	it("rejects invalid task create clarifications json", () => {
+		expect(() =>
+			parseArgs([
+				"bun",
+				"adhd-ai",
+				"task",
+				"create",
+				"--request",
+				"Build task flow",
+				"--clarifications-json",
+				"{bad",
+			]),
+		).toThrow("task create --clarifications-json must be valid JSON");
 	});
 
 	it("rejects skills add without required flags", () => {

@@ -4,15 +4,18 @@ import type {
 } from "../../features/types";
 import { appendStatusEmoji } from "../../utils/status";
 import type {
+	HumanReviewRequiredNotificationServerRequest,
 	NotificationEmailPayload,
 	NotificationOutcome,
+	NotificationServerRequest,
+	TaskOutcomeNotificationServerRequest,
 } from "./notifications.types";
 export type {
 	NotificationEmailPayload,
 	NotificationOutcome,
 } from "./notifications.types";
 
-const RESEND_API_URL = "https://api.resend.com/emails";
+const NOTIFICATION_SERVER_API_URL = "http://127.0.0.1:3000/api/notifications";
 
 export async function sendTaskOutcomeEmail(
 	config: ResolvedNotificationEmailConfig,
@@ -36,7 +39,11 @@ export async function sendTaskOutcomeEmail(
 		outcome,
 		errorMessage,
 	);
-	await sendResendEmail(config.resendApiKey, payload);
+	const request: TaskOutcomeNotificationServerRequest = {
+		type: "task-outcome",
+		payload,
+	};
+	await sendNotificationRequest(request);
 }
 
 export async function sendHumanReviewRequiredEmail(
@@ -60,7 +67,13 @@ export async function sendHumanReviewRequiredEmail(
 		input.complexityScore,
 		input.reason,
 	);
-	await sendResendEmail(config.resendApiKey, payload);
+	const request: HumanReviewRequiredNotificationServerRequest = {
+		type: "human-review-required",
+		payload,
+		complexityScore: input.complexityScore,
+		reason: input.reason,
+	};
+	await sendNotificationRequest(request);
 }
 
 export function buildTaskOutcomeEmailPayload(
@@ -132,24 +145,22 @@ export function buildHumanReviewRequiredEmailPayload(
 	};
 }
 
-async function sendResendEmail(
-	resendApiKey: string,
-	payload: NotificationEmailPayload,
+async function sendNotificationRequest(
+	request: NotificationServerRequest,
 ): Promise<void> {
-	const response = await fetch(RESEND_API_URL, {
+	const response = await fetch(NOTIFICATION_SERVER_API_URL, {
 		method: "POST",
 		headers: {
-			Authorization: `Bearer ${resendApiKey}`,
 			"Content-Type": "application/json",
 		},
-		body: JSON.stringify(payload),
+		body: JSON.stringify(request),
 	});
 
 	if (!response.ok) {
 		const body = (await response.text()).trim();
 		const detail = body ? ` ${body}` : "";
 		throw new Error(
-			`Resend send failed with status ${response.status}.${detail}`.trim(),
+			`Server notification request failed with status ${response.status}.${detail}`.trim(),
 		);
 	}
 }

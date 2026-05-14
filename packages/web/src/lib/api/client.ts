@@ -1,12 +1,16 @@
+import { createBoardApiMethods } from "./board-client";
 import type {
 	AgentRecord,
 	ApiClient,
 	ApiClientOptions,
 	CommandHistoryRecord,
+	CreatedTaskRef,
 	HealthRequestOptions,
 	HealthResponse,
 	JobRecord,
 	SkillRecord,
+	TaskCreateRequest,
+	TaskCreateResponse,
 	TokenUsageRecord,
 } from "./client.types";
 
@@ -132,14 +136,21 @@ function parseListResponse<T>(
 async function requestJson(
 	baseUrl: string,
 	path: string,
+	method: "GET" | "POST",
 	fetchFn: typeof fetch,
 	headers: HeadersInit | undefined,
 	options: HealthRequestOptions | undefined,
+	body?: unknown,
 ): Promise<unknown> {
+	const requestHeaders = new Headers(headers);
+	if (body !== undefined && !requestHeaders.has("content-type")) {
+		requestHeaders.set("content-type", "application/json");
+	}
 	const response = await fetchFn(`${baseUrl}${path}`, {
-		method: "GET",
-		headers,
+		method,
+		headers: requestHeaders,
 		signal: options?.signal,
+		body: body === undefined ? undefined : JSON.stringify(body),
 	});
 
 	if (!response.ok) {
@@ -149,10 +160,95 @@ async function requestJson(
 	return (await response.json()) as unknown;
 }
 
+function parseCreatedTaskRef(output: string): CreatedTaskRef | null {
+	const createdMatch = output.match(
+		/Created Linear task\s+([A-Za-z]+-\d+):\s+(\S+)/,
+	);
+	if (!createdMatch) {
+		return null;
+	}
+
+	return {
+		identifier: createdMatch[1],
+		url: createdMatch[2],
+	};
+}
+
+function parseNeedsInfoQuestions(output: string): string[] {
+	const lines = output.split("\n");
+	const questions: string[] = [];
+	let inQuestionsSection = false;
+
+	for (const line of lines) {
+		const trimmed = line.trim();
+		if (!inQuestionsSection && trimmed === "Remaining questions:") {
+			inQuestionsSection = true;
+			continue;
+		}
+		if (!inQuestionsSection) {
+			continue;
+		}
+		if (trimmed.startsWith("- ")) {
+			const question = trimmed.slice(2).trim();
+			if (question.length > 0) {
+				questions.push(question);
+			}
+			continue;
+		}
+		if (trimmed.length > 0) {
+			break;
+		}
+	}
+
+	return questions;
+}
+
+function parseTaskCreateResponse(payload: unknown): TaskCreateResponse {
+	const row = assertObjectRecord(payload, "/api/cli/dispatch");
+	const status = row.status;
+	if (status !== "succeeded" && status !== "failed" && status !== "rejected") {
+		throw new Error("Invalid /api/cli/dispatch response field 'status'");
+	}
+
+	const output =
+		typeof row.commandResult === "object" &&
+		row.commandResult !== null &&
+		"stdout" in row.commandResult &&
+		typeof row.commandResult.stdout === "string"
+			? row.commandResult.stdout
+			: "";
+	if (status !== "succeeded") {
+		const error =
+			typeof row.error === "string" ? row.error : "Task create failed";
+		return { status: "error", error, rawOutput: output };
+	}
+
+	const createdIssue = parseCreatedTaskRef(output);
+	if (createdIssue) {
+		return { status: "created", issue: createdIssue, rawOutput: output };
+	}
+
+	const questions = parseNeedsInfoQuestions(output);
+	if (questions.length > 0) {
+		return { status: "needs_info", questions, rawOutput: output };
+	}
+
+	return {
+		status: "error",
+		error: "Task create completed without a parseable result",
+		rawOutput: output,
+	};
+}
+
 export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 	const baseUrl = options.baseUrl ?? "";
 	const fetchFn = options.fetchFn ?? fetch;
 	const headers = options.headers;
+	const requestJsonWithBase = (
+		path: string,
+		requestOptions?: HealthRequestOptions,
+	) => requestJson(baseUrl, path, fetchFn, headers, requestOptions);
+	const boardApiMethods = createBoardApiMethods(requestJsonWithBase);
 
 	return {
 		async getHealth(
@@ -161,6 +257,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 			const payload = await requestJson(
 				baseUrl,
 				"/health",
+				"GET",
 				fetchFn,
 				headers,
 				requestOptions,
@@ -173,6 +270,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 			const payload = await requestJson(
 				baseUrl,
 				"/api/token-usage",
+				"GET",
 				fetchFn,
 				headers,
 				requestOptions,
@@ -189,6 +287,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 			const payload = await requestJson(
 				baseUrl,
 				"/api/jobs",
+				"GET",
 				fetchFn,
 				headers,
 				requestOptions,
@@ -201,6 +300,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 			const payload = await requestJson(
 				baseUrl,
 				"/api/agents",
+				"GET",
 				fetchFn,
 				headers,
 				requestOptions,
@@ -213,6 +313,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 			const payload = await requestJson(
 				baseUrl,
 				"/api/skills",
+				"GET",
 				fetchFn,
 				headers,
 				requestOptions,
@@ -225,6 +326,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 			const payload = await requestJson(
 				baseUrl,
 				"/api/command-history",
+				"GET",
 				fetchFn,
 				headers,
 				requestOptions,
@@ -234,6 +336,27 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 				"/api/command-history",
 				parseCommandHistoryRecord,
 			);
+		},
+		async createTask(
+			request: TaskCreateRequest,
+			requestOptions?: HealthRequestOptions,
+		): Promise<TaskCreateResponse> {
+			const payload = await requestJson(
+				baseUrl,
+				"/api/cli/dispatch",
+				"POST",
+				fetchFn,
+				headers,
+				requestOptions,
+				{
+					action: "task",
+					taskAction: "create",
+					request: request.request,
+					projectId: request.projectId,
+					answers: request.answers,
+				},
+			);
+			return parseTaskCreateResponse(payload);
 		},
 	};
 }

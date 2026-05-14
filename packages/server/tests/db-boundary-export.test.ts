@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
 	type AgentRow,
+	type ServerDatabase,
 	agentsTable,
 	initializeServerDatabase,
 	runMigrations,
@@ -21,5 +22,9 @@ describe("db boundary export", () => {
 			createdAt: "2026-05-13 00:00:00",
 		};
 		expect(typedRow.id).toBe("agent-1");
+
+		type CloseFn = ServerDatabase["close"];
+		const closeFn: CloseFn = async () => {};
+		expect(typeof closeFn).toBe("function");
 	});
 });

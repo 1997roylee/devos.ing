@@ -50,6 +50,39 @@ export interface CommandHistoryRecord {
 	executedAt: string;
 }
 
+export interface TaskCreateAnswer {
+	question: string;
+	answer: string;
+}
+
+export interface TaskCreateRequest {
+	request: string;
+	projectId?: string;
+	answers?: TaskCreateAnswer[];
+}
+
+export interface CreatedTaskRef {
+	identifier: string;
+	url: string;
+}
+
+export type TaskCreateResponse =
+	| {
+			status: "created";
+			issue: CreatedTaskRef;
+			rawOutput: string;
+	  }
+	| {
+			status: "needs_info";
+			questions: string[];
+			rawOutput: string;
+	  }
+	| {
+			status: "error";
+			error: string;
+			rawOutput: string;
+	  };
+
 export interface ApiClientOptions {
 	baseUrl?: string;
 	fetchFn?: typeof fetch;
@@ -65,4 +98,8 @@ export interface ApiClient {
 	listCommandHistory(
 		options?: HealthRequestOptions,
 	): Promise<CommandHistoryRecord[]>;
+	createTask(
+		request: TaskCreateRequest,
+		options?: HealthRequestOptions,
+	): Promise<TaskCreateResponse>;
 }
