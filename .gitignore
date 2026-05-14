@@ -4,6 +4,7 @@ packages/*/.next/
 .bun-cache/
 .piv-loop/
 *.log
+*.tsbuildinfo
 .npm-cache/
 
 .env
