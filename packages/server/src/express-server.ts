@@ -10,6 +10,7 @@ import express, {
 import * as OpenApiValidator from "express-openapi-validator";
 import swaggerUi from "swagger-ui-express";
 import type { RouteHandler } from "./app.types";
+import type { ServerLogger } from "./logger.types";
 
 const OPENAPI_SPEC_PATH = path.resolve(
 	path.dirname(fileURLToPath(import.meta.url)),
@@ -17,8 +18,18 @@ const OPENAPI_SPEC_PATH = path.resolve(
 	"openapi.yaml",
 );
 
-export function createExpressApp(handler: RouteHandler): Express {
+export interface ExpressAppOptions {
+	logger?: ServerLogger;
+}
+
+export function createExpressApp(
+	handler: RouteHandler,
+	options: ExpressAppOptions = {},
+): Express {
 	const app = express();
+	if (options.logger) {
+		app.use(createExpressRequestLogger(options.logger));
+	}
 	app.get("/openapi.yaml", (_request, response) => {
 		response.type("application/yaml").sendFile(OPENAPI_SPEC_PATH);
 	});
@@ -49,6 +60,30 @@ export function createExpressApp(handler: RouteHandler): Express {
 	});
 	app.use(handleExpressError);
 	return app;
+}
+
+export function createExpressRequestLogger(logger: ServerLogger) {
+	return (
+		request: ExpressRequest,
+		response: ExpressResponse,
+		next: () => void,
+	): void => {
+		const startedAt = Date.now();
+		response.once("finish", () => {
+			const context = {
+				method: request.method,
+				path: request.path,
+				statusCode: response.statusCode,
+				durationMs: Math.max(0, Date.now() - startedAt),
+			};
+			if (response.statusCode >= 500) {
+				logger.error(context, "HTTP request completed");
+				return;
+			}
+			logger.info(context, "HTTP request completed");
+		});
+		next();
+	};
 }
 
 export function listenExpressApp(app: Express, port: number): Promise<Server> {

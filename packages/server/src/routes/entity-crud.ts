@@ -1,13 +1,11 @@
-import { asc, eq } from "drizzle-orm";
 import type { ServerDatabase } from "../db";
-import { agentsTable, skillsTable } from "../db";
 import {
-	toAgentRecord,
-	toStoredAgentCreatePayload,
-	toStoredAgentUpdatePayload,
 	validateAgentCreatePayload,
 	validateAgentUpdatePayload,
 } from "./entity-crud-agent";
+import { createEntityCrudRepository } from "./entity-crud-repository";
+import { createEntityCrudService } from "./entity-crud-service";
+import type { EntityCrudResult } from "./entity-crud-service.types";
 import {
 	parseJsonBody,
 	validateCreatePayload,
@@ -51,24 +49,21 @@ export async function handleEntityCrudRequest(
 	deps: EntityCrudDeps,
 	route: CrudRouteMatch,
 ): Promise<CrudResponseResult> {
+	const service = createEntityCrudService(createEntityCrudRepository(deps.db));
 	if (route.entity === "agents") {
-		return handleAgentRequest(request, deps, route.id);
+		return handleAgentRequest(request, service, route.id);
 	}
-	return handleSkillRequest(request, deps, route.id);
+	return handleSkillRequest(request, service, route.id);
 }
 
 async function handleAgentRequest(
 	request: Request,
-	deps: EntityCrudDeps,
+	service: ReturnType<typeof createEntityCrudService>,
 	id: string | null,
 ): Promise<CrudResponseResult> {
 	if (id === null) {
 		if (request.method === "GET") {
-			const rows = await deps.db
-				.select()
-				.from(agentsTable)
-				.orderBy(asc(agentsTable.id));
-			return { status: 200, body: rows.map((row) => toAgentRecord(row)) };
+			return mapEntityResult(await service.listAgents());
 		}
 		if (request.method === "POST") {
 			const parsed = await parseJsonBody(request);
@@ -79,24 +74,13 @@ async function handleAgentRequest(
 			if (!validated.ok) {
 				return { status: 400, body: { error: validated.error } };
 			}
-			const [created] = await deps.db
-				.insert(agentsTable)
-				.values(toStoredAgentCreatePayload(validated.value))
-				.returning();
-			return { status: 201, body: toAgentRecord(created) };
+			return mapEntityResult(await service.createAgent(validated.value), 201);
 		}
 		return { status: 405, body: { error: "Method Not Allowed" } };
 	}
 
 	if (request.method === "GET") {
-		const [row] = await deps.db
-			.select()
-			.from(agentsTable)
-			.where(eq(agentsTable.id, id));
-		if (!row) {
-			return { status: 404, body: { error: "Not Found" } };
-		}
-		return { status: 200, body: toAgentRecord(row) };
+		return mapEntityResult(await service.getAgent(id));
 	}
 
 	if (request.method === "PATCH") {
@@ -108,26 +92,11 @@ async function handleAgentRequest(
 		if (!validated.ok) {
 			return { status: 400, body: { error: validated.error } };
 		}
-		const [updated] = await deps.db
-			.update(agentsTable)
-			.set(toStoredAgentUpdatePayload(validated.value))
-			.where(eq(agentsTable.id, id))
-			.returning();
-		if (!updated) {
-			return { status: 404, body: { error: "Not Found" } };
-		}
-		return { status: 200, body: toAgentRecord(updated) };
+		return mapEntityResult(await service.updateAgent(id, validated.value));
 	}
 
 	if (request.method === "DELETE") {
-		const [deleted] = await deps.db
-			.delete(agentsTable)
-			.where(eq(agentsTable.id, id))
-			.returning({ id: agentsTable.id });
-		if (!deleted) {
-			return { status: 404, body: { error: "Not Found" } };
-		}
-		return { status: 204 };
+		return mapEntityResult(await service.deleteAgent(id), 204);
 	}
 
 	return { status: 405, body: { error: "Method Not Allowed" } };
@@ -135,16 +104,12 @@ async function handleAgentRequest(
 
 async function handleSkillRequest(
 	request: Request,
-	deps: EntityCrudDeps,
+	service: ReturnType<typeof createEntityCrudService>,
 	id: string | null,
 ): Promise<CrudResponseResult> {
 	if (id === null) {
 		if (request.method === "GET") {
-			const rows = await deps.db
-				.select()
-				.from(skillsTable)
-				.orderBy(asc(skillsTable.id));
-			return { status: 200, body: rows };
+			return mapEntityResult(await service.listSkills());
 		}
 		if (request.method === "POST") {
 			const parsed = await parseJsonBody(request);
@@ -158,25 +123,13 @@ async function handleSkillRequest(
 			if (!validated.ok) {
 				return { status: 400, body: { error: validated.error } };
 			}
-			const payload = validated.value;
-			const [created] = await deps.db
-				.insert(skillsTable)
-				.values(payload)
-				.returning();
-			return { status: 201, body: created };
+			return mapEntityResult(await service.createSkill(validated.value), 201);
 		}
 		return { status: 405, body: { error: "Method Not Allowed" } };
 	}
 
 	if (request.method === "GET") {
-		const [row] = await deps.db
-			.select()
-			.from(skillsTable)
-			.where(eq(skillsTable.id, id));
-		if (!row) {
-			return { status: 404, body: { error: "Not Found" } };
-		}
-		return { status: 200, body: row };
+		return mapEntityResult(await service.getSkill(id));
 	}
 
 	if (request.method === "PATCH") {
@@ -191,28 +144,27 @@ async function handleSkillRequest(
 		if (!validated.ok) {
 			return { status: 400, body: { error: validated.error } };
 		}
-		const payload = validated.value;
-		const [updated] = await deps.db
-			.update(skillsTable)
-			.set(payload)
-			.where(eq(skillsTable.id, id))
-			.returning();
-		if (!updated) {
-			return { status: 404, body: { error: "Not Found" } };
-		}
-		return { status: 200, body: updated };
+		return mapEntityResult(await service.updateSkill(id, validated.value));
 	}
 
 	if (request.method === "DELETE") {
-		const [deleted] = await deps.db
-			.delete(skillsTable)
-			.where(eq(skillsTable.id, id))
-			.returning({ id: skillsTable.id });
-		if (!deleted) {
-			return { status: 404, body: { error: "Not Found" } };
-		}
-		return { status: 204 };
+		return mapEntityResult(await service.deleteSkill(id), 204);
 	}
 
 	return { status: 405, body: { error: "Method Not Allowed" } };
+}
+
+type CrudBody = Exclude<CrudResponseResult["body"], undefined>;
+
+function mapEntityResult<T extends CrudBody>(
+	result: EntityCrudResult<T>,
+	successStatus = 200,
+): CrudResponseResult {
+	if (result.status === "ok") {
+		return { status: successStatus, body: result.value };
+	}
+	if (result.status === "deleted") {
+		return { status: successStatus };
+	}
+	return { status: 404, body: { error: "Not Found" } };
 }

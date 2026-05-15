@@ -15,6 +15,8 @@ export interface CliStreamSocket {
 	readonly readyState: number;
 	send(message: RawData | string): void;
 	close(): void;
+	on(event: "open" | "close" | "error", listener: () => void): this;
+	on(event: "message", listener: (message: RawData) => void): this;
 	on(event: string, listener: (...args: unknown[]) => void): this;
 }
 

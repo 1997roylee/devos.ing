@@ -12,14 +12,11 @@ import {
 	serverErrorResponse,
 } from "./http/response";
 import { handleTasksRoute } from "./http/tasks-routes";
+import { handleWorkspaceBoardRoute } from "./http/workspace-board-routes";
 import { parseNotificationServerRequest } from "./notifications/notification-server-request";
 import { parseNotificationRequest } from "./notifications/notifications-request";
 import { READ_ONLY_SERVER_PATHS, handleServerRequest } from "./routes";
 import { handleEntityCrudRequest, matchCrudRoute } from "./routes/entity-crud";
-
-const WORKSPACE_PROJECTS_ROUTE = /^\/api\/workspaces\/([^/]+)\/projects\/?$/;
-const WORKSPACE_PROJECT_BOARD_ROUTE =
-	/^\/api\/workspaces\/([^/]+)\/projects\/([^/]+)\/board\/?$/;
 
 export function createHandleRequest(deps: AppDeps): RouteHandler {
 	const handler: RouteHandler = async (request) => {
@@ -72,44 +69,13 @@ export function createHandleRequest(deps: AppDeps): RouteHandler {
 			}
 		}
 
-		const projectMatch = pathname.match(WORKSPACE_PROJECTS_ROUTE);
-		if (projectMatch) {
-			if (request.method !== "GET") {
-				return methodNotAllowedResponse();
-			}
-			if (!deps.boardRepository) {
-				return serverErrorResponse("Board repository not configured");
-			}
-			const workspaceId = decodeURIComponent(projectMatch[1] ?? "");
-			if (workspaceId.length === 0) {
-				return notFoundJsonResponse();
-			}
-			const projects =
-				await deps.boardRepository.listWorkspaceProjects(workspaceId);
-			return jsonSuccess({ workspaceId, projects });
-		}
-
-		const boardMatch = pathname.match(WORKSPACE_PROJECT_BOARD_ROUTE);
-		if (boardMatch) {
-			if (request.method !== "GET") {
-				return methodNotAllowedResponse();
-			}
-			if (!deps.boardRepository) {
-				return serverErrorResponse("Board repository not configured");
-			}
-			const workspaceId = decodeURIComponent(boardMatch[1] ?? "");
-			const projectId = decodeURIComponent(boardMatch[2] ?? "");
-			if (workspaceId.length === 0 || projectId.length === 0) {
-				return notFoundJsonResponse();
-			}
-			const board = await deps.boardRepository.getWorkspaceProjectBoard(
-				workspaceId,
-				projectId,
-			);
-			if (!board) {
-				return notFoundJsonResponse();
-			}
-			return jsonSuccess(board);
+		const workspaceBoardResponse = await handleWorkspaceBoardRoute(
+			request,
+			deps.boardRepository,
+			pathname,
+		);
+		if (workspaceBoardResponse) {
+			return workspaceBoardResponse;
 		}
 
 		const crudRoute = matchCrudRoute(pathname);

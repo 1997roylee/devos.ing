@@ -1,21 +1,15 @@
-import { eq } from "drizzle-orm";
 import type { CliExecutor } from "../app.types";
 import type { ServerDatabase } from "../db";
-import {
-	boardProjectsTable,
-	boardTasksTable,
-	generateBoardTaskKey,
-} from "../db";
+import { createTaskRepository, createTaskService } from "../tasks";
+import type { TaskServiceResult } from "../tasks";
 import {
 	badRequest,
-	isForeignKeyError,
 	methodNotAllowed,
 	notFound,
 	parseObjectJsonBody,
 	readPathId,
 } from "./http-utils";
 import {
-	isNonEmptyObject,
 	parseCreateTaskPayload,
 	parseUpdateTaskPayload,
 } from "./project-task-schemas";
@@ -31,9 +25,10 @@ export async function handleTasksRoute(
 		return handleTaskChatCreateRoute(request, db, cliExecutor);
 	}
 
+	const service = createTaskService(createTaskRepository(db));
 	if (pathname === "/api/tasks") {
 		if (request.method === "GET") {
-			return Response.json(await db.select().from(boardTasksTable));
+			return mapTaskResult(await service.listTasks(), "Invalid task list");
 		}
 		if (request.method === "POST") {
 			const parsedBody = await parseObjectJsonBody(request);
@@ -44,43 +39,11 @@ export async function handleTasksRoute(
 			if (!payload.ok) {
 				return badRequest(payload.error);
 			}
-			if (payload.value.projectId) {
-				const [project] = await db
-					.select({ id: boardProjectsTable.id })
-					.from(boardProjectsTable)
-					.where(eq(boardProjectsTable.id, payload.value.projectId));
-				if (!project) {
-					return badRequest("Foreign key constraint failed");
-				}
-			}
-			const now = new Date().toISOString();
-			try {
-				const [created] = await db
-					.insert(boardTasksTable)
-					.values({
-						id: crypto.randomUUID(),
-						taskKey: payload.value.taskKey ?? (await generateBoardTaskKey(db)),
-						projectId: payload.value.projectId ?? null,
-						title: payload.value.title,
-						content: payload.value.content,
-						priority: payload.value.priority,
-						status: payload.value.status,
-						dueDate: payload.value.dueDate ?? null,
-						creatorId: payload.value.creatorId,
-						linkedPr: payload.value.linkedPr ?? null,
-						linearIssueId: payload.value.linearIssueId ?? null,
-						linearIdentifier: payload.value.linearIdentifier ?? null,
-						linearUrl: payload.value.linearUrl ?? null,
-						createdAt: now,
-						updatedAt: now,
-					})
-					.returning();
-				return Response.json(created, { status: 201 });
-			} catch (error) {
-				return isForeignKeyError(error)
-					? badRequest("Foreign key constraint failed")
-					: badRequest("Invalid task create payload");
-			}
+			return mapTaskResult(
+				await service.createTask(payload.value),
+				"Invalid task create payload",
+				201,
+			);
 		}
 		return methodNotAllowed();
 	}
@@ -94,11 +57,10 @@ export async function handleTasksRoute(
 	}
 
 	if (request.method === "GET") {
-		const [task] = await db
-			.select()
-			.from(boardTasksTable)
-			.where(eq(boardTasksTable.id, id));
-		return task ? Response.json(task) : notFound("Task not found");
+		return mapTaskResult(
+			await service.getTask(id),
+			"Invalid task read payload",
+		);
 	}
 
 	if (request.method === "PATCH") {
@@ -110,45 +72,39 @@ export async function handleTasksRoute(
 		if (!payload.ok) {
 			return badRequest(payload.error);
 		}
-		if (!isNonEmptyObject(payload.value)) {
-			return badRequest("Update payload must include at least one field");
-		}
-		if (payload.value.projectId) {
-			const [project] = await db
-				.select({ id: boardProjectsTable.id })
-				.from(boardProjectsTable)
-				.where(eq(boardProjectsTable.id, payload.value.projectId));
-			if (!project) {
-				return badRequest("Foreign key constraint failed");
-			}
-		}
-		try {
-			const [updated] = await db
-				.update(boardTasksTable)
-				.set({ ...payload.value, updatedAt: new Date().toISOString() })
-				.where(eq(boardTasksTable.id, id))
-				.returning();
-			return updated ? Response.json(updated) : notFound("Task not found");
-		} catch (error) {
-			return isForeignKeyError(error)
-				? badRequest("Foreign key constraint failed")
-				: badRequest("Invalid task update payload");
-		}
+		return mapTaskResult(
+			await service.updateTask(id, payload.value),
+			"Invalid task update payload",
+		);
 	}
 
 	if (request.method === "DELETE") {
-		try {
-			const [deleted] = await db
-				.delete(boardTasksTable)
-				.where(eq(boardTasksTable.id, id))
-				.returning();
-			return deleted ? Response.json(deleted) : notFound("Task not found");
-		} catch (error) {
-			return isForeignKeyError(error)
-				? badRequest("Foreign key constraint failed")
-				: badRequest("Invalid task delete payload");
-		}
+		return mapTaskResult(
+			await service.deleteTask(id),
+			"Invalid task delete payload",
+		);
 	}
 
 	return methodNotAllowed();
+}
+
+function mapTaskResult<T>(
+	result: TaskServiceResult<T>,
+	invalidPayloadError: string,
+	successStatus = 200,
+): Response {
+	if (result.status === "ok") {
+		return Response.json(result.value, { status: successStatus });
+	}
+	if (result.status === "not_found") {
+		return notFound("Task not found");
+	}
+	if (result.status === "foreign_key_error") {
+		return badRequest("Foreign key constraint failed");
+	}
+	return badRequest(
+		invalidPayloadError === "Invalid task update payload"
+			? "Update payload must include at least one field"
+			: invalidPayloadError,
+	);
 }

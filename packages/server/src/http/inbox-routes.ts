@@ -1,8 +1,8 @@
 import type { ServerDatabase } from "../db";
-import { createInboxRepository } from "../inbox";
+import { createInboxRepository, createInboxService } from "../inbox";
+import type { InboxServiceResult } from "../inbox";
 import {
 	badRequest,
-	isForeignKeyError,
 	methodNotAllowed,
 	parseObjectJsonBody,
 } from "./http-utils";
@@ -21,7 +21,7 @@ export async function handleInboxMessagesRoute(
 	if (pathname !== INBOX_MESSAGES_PATH) {
 		return null;
 	}
-	const inboxRepository = createInboxRepository(db);
+	const inboxService = createInboxService(createInboxRepository(db));
 
 	if (request.method === "GET") {
 		const url = new URL(request.url);
@@ -33,7 +33,7 @@ export async function handleInboxMessagesRoute(
 		if (!scope.ok) {
 			return badRequest(scope.error);
 		}
-		return Response.json(await inboxRepository.listInboxMessages(scope.value));
+		return mapInboxResult(await inboxService.listInboxMessages(scope.value));
 	}
 
 	if (request.method === "POST") {
@@ -45,15 +45,25 @@ export async function handleInboxMessagesRoute(
 		if (!payload.ok) {
 			return badRequest(payload.error);
 		}
-		try {
-			const created = await inboxRepository.createInboxMessage(payload.value);
-			return Response.json(created, { status: 201 });
-		} catch (error) {
-			return isForeignKeyError(error)
-				? badRequest("Foreign key constraint failed")
-				: badRequest("Invalid inbox message payload");
-		}
+		return mapInboxResult(
+			await inboxService.createInboxMessage(payload.value),
+			201,
+		);
 	}
 
 	return methodNotAllowed();
+}
+
+function mapInboxResult<T>(
+	result: InboxServiceResult<T>,
+	successStatus = 200,
+): Response {
+	if (result.status === "ok") {
+		return Response.json(result.value, { status: successStatus });
+	}
+	return badRequest(
+		result.status === "foreign_key_error"
+			? "Foreign key constraint failed"
+			: "Invalid inbox message payload",
+	);
 }

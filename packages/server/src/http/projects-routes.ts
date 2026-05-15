@@ -1,16 +1,14 @@
-import { eq } from "drizzle-orm";
 import type { ServerDatabase } from "../db";
-import { boardProjectsTable, projectBoardsTable } from "../db";
+import { createProjectRepository, createProjectService } from "../projects";
+import type { ProjectServiceResult } from "../projects";
 import {
 	badRequest,
-	isForeignKeyError,
 	methodNotAllowed,
 	notFound,
 	parseObjectJsonBody,
 	readPathId,
 } from "./http-utils";
 import {
-	isNonEmptyObject,
 	parseCreateProjectPayload,
 	parseUpdateProjectPayload,
 } from "./project-task-schemas";
@@ -20,9 +18,13 @@ export async function handleProjectsRoute(
 	db: ServerDatabase["db"],
 	pathname: string,
 ): Promise<Response | null> {
+	const service = createProjectService(createProjectRepository(db));
 	if (pathname === "/api/projects") {
 		if (request.method === "GET") {
-			return Response.json(await db.select().from(boardProjectsTable));
+			return mapProjectResult(
+				await service.listProjects(),
+				"Invalid project list",
+			);
 		}
 		if (request.method === "POST") {
 			const parsedBody = await parseObjectJsonBody(request);
@@ -33,34 +35,11 @@ export async function handleProjectsRoute(
 			if (!payload.ok) {
 				return badRequest(payload.error);
 			}
-			const [board] = await db
-				.select({ id: projectBoardsTable.id })
-				.from(projectBoardsTable)
-				.where(eq(projectBoardsTable.id, payload.value.boardId));
-			if (!board) {
-				return badRequest("Foreign key constraint failed");
-			}
-			const now = new Date().toISOString();
-			try {
-				const [created] = await db
-					.insert(boardProjectsTable)
-					.values({
-						id: crypto.randomUUID(),
-						boardId: payload.value.boardId,
-						externalProjectId: payload.value.externalProjectId ?? null,
-						name: payload.value.name,
-						description: payload.value.description ?? null,
-						ownerId: payload.value.ownerId,
-						createdAt: now,
-						updatedAt: now,
-					})
-					.returning();
-				return Response.json(created, { status: 201 });
-			} catch (error) {
-				return isForeignKeyError(error)
-					? badRequest("Foreign key constraint failed")
-					: badRequest("Invalid project create payload");
-			}
+			return mapProjectResult(
+				await service.createProject(payload.value),
+				"Invalid project create payload",
+				201,
+			);
 		}
 		return methodNotAllowed();
 	}
@@ -74,11 +53,10 @@ export async function handleProjectsRoute(
 	}
 
 	if (request.method === "GET") {
-		const [project] = await db
-			.select()
-			.from(boardProjectsTable)
-			.where(eq(boardProjectsTable.id, id));
-		return project ? Response.json(project) : notFound("Project not found");
+		return mapProjectResult(
+			await service.getProject(id),
+			"Invalid project read payload",
+		);
 	}
 
 	if (request.method === "PATCH") {
@@ -90,45 +68,39 @@ export async function handleProjectsRoute(
 		if (!payload.ok) {
 			return badRequest(payload.error);
 		}
-		if (!isNonEmptyObject(payload.value)) {
-			return badRequest("Update payload must include at least one field");
-		}
-		if (payload.value.boardId) {
-			const [board] = await db
-				.select({ id: projectBoardsTable.id })
-				.from(projectBoardsTable)
-				.where(eq(projectBoardsTable.id, payload.value.boardId));
-			if (!board) {
-				return badRequest("Foreign key constraint failed");
-			}
-		}
-		try {
-			const [updated] = await db
-				.update(boardProjectsTable)
-				.set({ ...payload.value, updatedAt: new Date().toISOString() })
-				.where(eq(boardProjectsTable.id, id))
-				.returning();
-			return updated ? Response.json(updated) : notFound("Project not found");
-		} catch (error) {
-			return isForeignKeyError(error)
-				? badRequest("Foreign key constraint failed")
-				: badRequest("Invalid project update payload");
-		}
+		return mapProjectResult(
+			await service.updateProject(id, payload.value),
+			"Invalid project update payload",
+		);
 	}
 
 	if (request.method === "DELETE") {
-		try {
-			const [deleted] = await db
-				.delete(boardProjectsTable)
-				.where(eq(boardProjectsTable.id, id))
-				.returning();
-			return deleted ? Response.json(deleted) : notFound("Project not found");
-		} catch (error) {
-			return isForeignKeyError(error)
-				? badRequest("Foreign key constraint failed")
-				: badRequest("Invalid project delete payload");
-		}
+		return mapProjectResult(
+			await service.deleteProject(id),
+			"Invalid project delete payload",
+		);
 	}
 
 	return methodNotAllowed();
+}
+
+function mapProjectResult<T>(
+	result: ProjectServiceResult<T>,
+	invalidPayloadError: string,
+	successStatus = 200,
+): Response {
+	if (result.status === "ok") {
+		return Response.json(result.value, { status: successStatus });
+	}
+	if (result.status === "not_found") {
+		return notFound("Project not found");
+	}
+	if (result.status === "foreign_key_error") {
+		return badRequest("Foreign key constraint failed");
+	}
+	return badRequest(
+		invalidPayloadError === "Invalid project update payload"
+			? "Update payload must include at least one field"
+			: invalidPayloadError,
+	);
 }

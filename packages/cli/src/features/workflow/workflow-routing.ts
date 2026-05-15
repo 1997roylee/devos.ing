@@ -11,6 +11,16 @@ export function routeProjectsForIssueProjectId(
 	);
 
 	if (!issueProjectId) {
+		if (projects.length === 1) {
+			return {
+				selectedProjectId: projects[0]?.id,
+			};
+		}
+		if (unscopedProjects.length === 1) {
+			return {
+				selectedProjectId: unscopedProjects[0]?.id,
+			};
+		}
 		if (unscopedProjects.length > 1) {
 			return {
 				error:

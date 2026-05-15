@@ -104,6 +104,9 @@ export interface ProjectBoardTaskRecord {
 	dueDate: string | null;
 	creatorId: string;
 	linkedPr: string | null;
+	linearIssueId: string | null;
+	linearIdentifier: string | null;
+	linearUrl: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

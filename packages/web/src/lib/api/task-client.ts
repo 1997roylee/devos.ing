@@ -72,15 +72,35 @@ export function parseProjectBoardTaskRecord(
 		taskKey: readString(row, "taskKey", TASKS_PATH),
 		projectId: readNullableString(row, "projectId", TASKS_PATH),
 		title: readString(row, "title", TASKS_PATH),
-		content: readString(row, "content", TASKS_PATH),
+		content: readTaskContent(row),
 		priority: readNumber(row, "priority", TASKS_PATH),
 		status: readString(row, "status", TASKS_PATH),
 		dueDate: readNullableString(row, "dueDate", TASKS_PATH),
 		creatorId: readString(row, "creatorId", TASKS_PATH),
 		linkedPr: readNullableString(row, "linkedPr", TASKS_PATH),
+		linearIssueId: readOptionalNullableString(row, "linearIssueId"),
+		linearIdentifier: readOptionalNullableString(row, "linearIdentifier"),
+		linearUrl: readOptionalNullableString(row, "linearUrl"),
 		createdAt: readString(row, "createdAt", TASKS_PATH),
 		updatedAt: readString(row, "updatedAt", TASKS_PATH),
 	};
+}
+
+function readTaskContent(record: Record<string, unknown>): string {
+	if (typeof record.content === "string") {
+		return record.content;
+	}
+	if (typeof record.description === "string") {
+		return record.description;
+	}
+	throw new Error(`Invalid ${TASKS_PATH} response field 'content'`);
+}
+
+function readOptionalNullableString(
+	record: Record<string, unknown>,
+	key: string,
+): string | null {
+	return key in record ? readNullableString(record, key, TASKS_PATH) : null;
 }
 
 export interface TaskApiMethods {

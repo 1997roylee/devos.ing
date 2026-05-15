@@ -1,0 +1,175 @@
+import { describe, expect, it } from "bun:test";
+import type { AgentRow, SkillRow } from "../src/db";
+import { createProjectService } from "../src/projects";
+import type { ProjectRepository } from "../src/projects";
+import { createEntityCrudService } from "../src/routes/entity-crud-service";
+import type { EntityCrudRepository } from "../src/routes/entity-crud-service.types";
+import { createTaskService, parseTaskIntakeOutput } from "../src/tasks";
+import type { TaskRepository } from "../src/tasks";
+
+describe("server services", () => {
+	it("keeps project business rules out of controllers", async () => {
+		const createdProjects: unknown[] = [];
+		const service = createProjectService({
+			listProjects: async () => [],
+			getProject: async () => null,
+			boardExists: async (id) => id === "board-1",
+			createProject: async (input) => {
+				createdProjects.push(input);
+				return {
+					...input,
+					description: input.description ?? null,
+					externalProjectId: input.externalProjectId ?? null,
+				};
+			},
+			updateProject: async () => null,
+			deleteProject: async () => null,
+		} satisfies ProjectRepository);
+
+		const fkResult = await service.createProject({
+			boardId: "missing",
+			name: "Project",
+			ownerId: "owner-1",
+		});
+		expect(fkResult.status).toBe("foreign_key_error");
+
+		const created = await service.createProject({
+			boardId: "board-1",
+			name: "Project",
+			ownerId: "owner-1",
+		});
+		expect(created.status).toBe("ok");
+		expect(createdProjects).toHaveLength(1);
+		expect(createdProjects[0]).toMatchObject({
+			boardId: "board-1",
+			description: null,
+			externalProjectId: null,
+			name: "Project",
+			ownerId: "owner-1",
+		});
+	});
+
+	it("creates task defaults and rejects empty task updates", async () => {
+		const createdTasks: unknown[] = [];
+		const service = createTaskService({
+			listTasks: async () => [],
+			getTask: async () => null,
+			projectExists: async () => true,
+			nextTaskKey: async () => "TASK-000123",
+			createTask: async (input) => {
+				createdTasks.push(input);
+				return {
+					...input,
+					projectId: input.projectId ?? null,
+					dueDate: input.dueDate ?? null,
+					linkedPr: input.linkedPr ?? null,
+					linearIssueId: input.linearIssueId ?? null,
+					linearIdentifier: input.linearIdentifier ?? null,
+					linearUrl: input.linearUrl ?? null,
+				};
+			},
+			updateTask: async () => null,
+			deleteTask: async () => null,
+		} satisfies TaskRepository);
+
+		const created = await service.createTask({
+			title: "Task",
+			content: "Body",
+			priority: 1,
+			status: "open",
+			creatorId: "owner-1",
+		});
+		expect(created.status).toBe("ok");
+		expect(createdTasks[0]).toMatchObject({
+			taskKey: "TASK-000123",
+			projectId: null,
+			linearIdentifier: null,
+			linearIssueId: null,
+			linearUrl: null,
+		});
+
+		const emptyUpdate = await service.updateTask("task-1", {});
+		expect(emptyUpdate.status).toBe("invalid_payload");
+	});
+
+	it("maps agent and skill CRUD through the entity service", async () => {
+		const storedAgents: AgentRow[] = [];
+		const skill: SkillRow = {
+			id: "skill-1",
+			name: "Skill",
+			description: "Desc",
+			source: "folder",
+			updatedAt: "2026-05-13T00:00:00.000Z",
+		};
+		const service = createEntityCrudService({
+			listAgents: async () => storedAgents,
+			getAgent: async () => null,
+			createAgent: async (input) => {
+				storedAgents.push(input as AgentRow);
+				return input as AgentRow;
+			},
+			updateAgent: async () => null,
+			deleteAgent: async () => null,
+			listSkills: async () => [skill],
+			getSkill: async () => skill,
+			createSkill: async () => skill,
+			updateSkill: async () => null,
+			deleteSkill: async () => null,
+		} satisfies EntityCrudRepository);
+
+		const created = await service.createAgent({
+			id: "agent-1",
+			name: "Agent",
+			backend: "codex",
+			model: "gpt-5",
+			createdAt: "2026-05-13T00:00:00.000Z",
+		});
+		expect(created.status).toBe("ok");
+		if (created.status === "ok") {
+			expect(created.value).toMatchObject({
+				id: "agent-1",
+				concurrency: 1,
+				owner: "unassigned",
+				skills: [],
+			});
+		}
+		expect((await service.listSkills()).status).toBe("ok");
+		expect(
+			(await service.updateAgent("missing", { model: "gpt-5.1" })).status,
+		).toBe("not_found");
+	});
+
+	it("normalizes task-chat legacy output and rejects stale Linear errors", () => {
+		const parsed = parseTaskIntakeOutput(
+			`${JSON.stringify({
+				status: "created",
+				task: {
+					id: "task-1",
+					taskKey: "TASK-000001",
+					projectId: null,
+					title: "Task",
+					description: "Legacy body",
+					priority: 1,
+					status: "planning",
+					dueDate: null,
+					creatorId: "owner-1",
+					linkedPr: null,
+					linearIssueId: null,
+					linearIdentifier: null,
+					linearUrl: null,
+					createdAt: "2026-05-13T00:00:00.000Z",
+					updatedAt: "2026-05-13T00:00:00.000Z",
+				},
+			})}\n`,
+		);
+		expect(parsed.status).toBe("created");
+		if (parsed.status === "created") {
+			expect(parsed.task.content).toBe("Legacy body");
+		}
+		expect(() =>
+			parseTaskIntakeOutput(
+				'{"status":"linear_error","error":"legacy parser failed"}\n',
+			),
+		).toThrow("legacy Linear error output");
+	});
+});

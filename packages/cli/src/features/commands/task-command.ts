@@ -83,7 +83,7 @@ function writeTaskCreateResult(
 	}
 	process.stdout.write(
 		`${[
-			"Task requirements are still unclear; no Linear issue was created.",
+			"Task requirements are still unclear; no board task was created.",
 			"Remaining questions:",
 			...result.questions.map((question) => `- ${question}`),
 		].join("\n")}\n`,

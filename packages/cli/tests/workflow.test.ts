@@ -2760,6 +2760,26 @@ describe("routeProjectsForIssueProjectId", () => {
 		expect(result.skipReason).toContain("No project configured");
 	});
 
+	it("routes missing issue project id to the only configured project", () => {
+		const result = routeProjectsForIssueProjectId(
+			[createProject("api", "proj_api")],
+			undefined,
+		);
+		expect(result).toEqual({
+			selectedProjectId: "api",
+		});
+	});
+
+	it("routes missing issue project id to the only unscoped project", () => {
+		const result = routeProjectsForIssueProjectId(
+			[createProject("api", "proj_api"), createProject("web")],
+			undefined,
+		);
+		expect(result).toEqual({
+			selectedProjectId: "web",
+		});
+	});
+
 	it("fails when multiple projects share same linear.projectId", () => {
 		const result = routeProjectsForIssueProjectId(
 			[createProject("api", "proj_a"), createProject("web", "proj_a")],

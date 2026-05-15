@@ -12,7 +12,7 @@ export async function streamTaskCreate(
 	input: StreamTaskCreateInput,
 ): Promise<TaskCreateResponse> {
 	const apiClient = createWebApiClient();
-	input.onLog("system", "Creating Linear issue.");
+	input.onLog("system", "Creating board task.");
 	return apiClient.createTask({
 		request: input.request,
 		projectId: input.projectId,

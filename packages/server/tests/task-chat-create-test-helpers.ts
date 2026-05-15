@@ -5,6 +5,7 @@ import {
 	boardProjectsTable,
 	projectBoardsTable,
 } from "../src/db";
+import type { BoardTaskRow } from "../src/db/board-tasks.types";
 
 export function createTaskChatCreateTestApp(
 	db: ServerDatabase["db"],
@@ -44,16 +45,16 @@ export async function seedTaskChatProject(
 	});
 }
 
-export function createdTaskChatIntake(
-	overrides: Partial<ReturnType<typeof createdTaskChatBoardTask>> = {},
-) {
+export function createdTaskChatIntake(overrides: Partial<BoardTaskRow> = {}) {
 	return {
 		status: "created",
 		task: createdTaskChatBoardTask(overrides),
 	};
 }
 
-export function createdTaskChatBoardTask(overrides = {}) {
+export function createdTaskChatBoardTask(
+	overrides: Partial<BoardTaskRow> = {},
+): BoardTaskRow {
 	return {
 		id: "task-1",
 		taskKey: "TASK-000001",

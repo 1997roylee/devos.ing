@@ -71,8 +71,10 @@ describe("chat task create route", () => {
 		const board = await createBoardRepository(
 			testDatabase.db,
 		).getWorkspaceProjectBoard("owner-1", "project-1");
+		expect(board).not.toBeNull();
 		expect(
-			board.statusColumns.find((column) => column.status === "planning")?.tasks,
+			board?.statusColumns.find((column) => column.status === "planning")
+				?.tasks,
 		).toHaveLength(0);
 		expect(calls).toEqual([
 			{
@@ -133,7 +135,9 @@ describe("chat task create route", () => {
 					request,
 					commandResult: {
 						code: 0,
-						stdout: `${JSON.stringify(createdTaskChatIntake())}\n`,
+						stdout: `${JSON.stringify(
+							createdTaskChatIntake({ projectId: null }),
+						)}\n`,
 						stderr: "",
 					},
 				};
@@ -173,6 +177,79 @@ describe("chat task create route", () => {
 				json: true,
 			},
 		]);
+	});
+
+	it("normalizes legacy task description output to board task content", async () => {
+		testDatabase = await createDrizzleServerTestDatabase();
+		const legacyTask = {
+			...createdTaskChatBoardTask({ content: undefined }),
+			description: "Legacy task body.",
+		};
+		const app = createTaskChatCreateTestApp(
+			testDatabase.db,
+			async (request) => ({
+				status: "succeeded",
+				request,
+				commandResult: {
+					code: 0,
+					stdout: `${JSON.stringify({
+						status: "created",
+						task: legacyTask,
+					})}\n`,
+					stderr: "",
+				},
+			}),
+		);
+
+		const response = await app(
+			new Request("http://localhost/api/tasks/chat-create", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					request: "Create something legacy shaped",
+				}),
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as {
+			status: string;
+			task: BoardTaskRow;
+		};
+		expect(body.status).toBe("created");
+		expect(body.task.content).toBe("Legacy task body.");
+	});
+
+	it("returns db_error for stale Linear-shaped task errors", async () => {
+		testDatabase = await createDrizzleServerTestDatabase();
+		const app = createTaskChatCreateTestApp(
+			testDatabase.db,
+			async (request) => ({
+				status: "succeeded",
+				request,
+				commandResult: {
+					code: 0,
+					stdout: '{"status":"linear_error","error":"legacy parser failed"}\n',
+					stderr: "",
+				},
+			}),
+		);
+
+		const response = await app(
+			new Request("http://localhost/api/tasks/chat-create", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					request: "Create something stale",
+				}),
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as { status: string; error: string };
+		expect(body.status).toBe("db_error");
+		expect(body.error).toContain("legacy Linear error output");
+		expect(body.error).not.toContain("invalid_union");
 	});
 
 	it("returns db_error when CLI task creation fails", async () => {

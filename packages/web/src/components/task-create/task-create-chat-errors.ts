@@ -1,4 +1,4 @@
-import type { TaskCreateResponse } from "@/lib/api";
+import type { TaskCreateResponse } from "../../lib/api";
 
 export function formatTaskCreateError(
 	response: Exclude<TaskCreateResponse, { status: "created" | "needs_info" }>,

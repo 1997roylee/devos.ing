@@ -56,6 +56,7 @@ describe("web board client parser", () => {
 						tasks: [
 							{
 								id: "task-1",
+								taskKey: "TASK-000001",
 								projectId: "project-1",
 								title: "Task",
 								content: "content",

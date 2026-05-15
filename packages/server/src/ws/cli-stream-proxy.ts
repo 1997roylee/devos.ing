@@ -83,7 +83,7 @@ export function proxyClientToDaemon(
 	});
 }
 
-function sendProxyError(client: WebSocket, error: string): void {
+function sendProxyError(client: CliStreamSocket, error: string): void {
 	if (client.readyState !== WebSocket.OPEN) {
 		return;
 	}

@@ -55,8 +55,8 @@ export async function startServer(
 				resendClient: createResendClient(process.env.RESEND_API_KEY ?? ""),
 			}),
 			repositories: createReadRepositories(serverDatabase),
-			logger,
 		}),
+		{ logger },
 	);
 	const taskPolling = startInternalTaskPollingScheduler({
 		config,

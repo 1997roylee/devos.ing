@@ -38,6 +38,7 @@ import {
 	dedupeIssuesByKey,
 	processIssueQueueBounded,
 } from "./workflow-queue";
+import { routeProjectsForIssueProjectId } from "./workflow-routing";
 import {
 	type WorkflowLinearClient,
 	type WorkflowRuntime,
@@ -57,6 +58,7 @@ import type {
 } from "./workflow.types";
 
 export { buildRunLeaseOwnerId } from "./workflow-lease";
+export { routeProjectsForIssueProjectId } from "./workflow-routing";
 import type {
 	CodexUsageRecord,
 	PollingConfig,
@@ -72,7 +74,6 @@ import { issueBranchName } from "../../integrations/github";
 import { sortIssuesByPriority } from "../../integrations/linear";
 export type {
 	IssueJobLogFields,
-	IssueProjectRoutingResult,
 	PollingSettings,
 	ReviewOnlyQueueBuildResult,
 	WorkflowIssue,
@@ -256,40 +257,6 @@ async function routeProjectContextsForTargetIssue(
 		"Routed target issue to project by Linear project id",
 	);
 	return selected;
-}
-
-export function routeProjectsForIssueProjectId(
-	projects: ResolvedProjectConfig[],
-	issueProjectId: string | undefined,
-): IssueProjectRoutingResult {
-	if (!issueProjectId) {
-		if (projects.length > 1) {
-			return {
-				error:
-					"Target task has no project id and multiple projects are configured. Re-run with --project <PROJECT_ID>.",
-			};
-		}
-		return {
-			selectedProjectId: projects[0]?.id,
-		};
-	}
-
-	const explicitMatches = projects.filter(
-		(project) => project.id === issueProjectId,
-	);
-	if (explicitMatches.length > 1) {
-		return {
-			error: `Multiple projects are configured with id='${issueProjectId}'. Re-run with --project <PROJECT_ID>.`,
-		};
-	}
-	if (explicitMatches.length === 1) {
-		return {
-			selectedProjectId: explicitMatches[0]?.id,
-		};
-	}
-	return {
-		skipReason: `No project configured for task project id='${issueProjectId}'.`,
-	};
 }
 
 export function shouldStopPolling(
