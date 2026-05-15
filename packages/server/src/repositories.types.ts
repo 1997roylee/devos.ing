@@ -20,9 +20,19 @@ export interface JobRecord {
 export interface AgentRecord {
 	id: string;
 	name: string;
+	description: string;
+	logo: string;
+	runtime: string;
 	backend: string;
 	model: string;
+	concurrency: number;
+	owner: string;
 	createdAt: string;
+	updatedAt: string;
+	skills: string[];
+	recentWork: string[];
+	activity: string[];
+	instructions: string;
 }
 
 export interface SkillRecord {
@@ -70,6 +80,9 @@ export interface BoardTaskRecord {
 	dueDate: string | null;
 	creatorId: string;
 	linkedPr: string | null;
+	linearIssueId: string | null;
+	linearIdentifier: string | null;
+	linearUrl: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

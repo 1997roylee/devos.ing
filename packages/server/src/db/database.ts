@@ -3,6 +3,7 @@ import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import type { ServerDatabase } from "./database.types";
+import { runMigrations } from "./migrations";
 import * as schema from "./schema";
 
 const CREATE_SCHEMA_SQL = `
@@ -17,9 +18,19 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE TABLE IF NOT EXISTS agents (
 	id text PRIMARY KEY,
 	name text NOT NULL,
+	description text NOT NULL,
+	logo text NOT NULL,
+	runtime text NOT NULL,
 	backend text NOT NULL,
 	model text NOT NULL,
-	created_at timestamp NOT NULL
+	concurrency integer NOT NULL,
+	owner text NOT NULL,
+	created_at timestamp NOT NULL,
+	updated_at timestamp NOT NULL,
+	skills text NOT NULL,
+	recent_work text NOT NULL,
+	activity text NOT NULL,
+	instructions text NOT NULL
 );
 CREATE TABLE IF NOT EXISTS skills (
 	id text PRIMARY KEY,
@@ -75,6 +86,9 @@ CREATE TABLE IF NOT EXISTS board_tasks (
 	due_date timestamp,
 	creator_id text NOT NULL,
 	linked_pr text,
+	linear_issue_id text,
+	linear_identifier text,
+	linear_url text,
 	created_at timestamp NOT NULL,
 	updated_at timestamp NOT NULL
 );
@@ -140,10 +154,31 @@ CREATE TABLE IF NOT EXISTS token_usage (
 	total_tokens integer NOT NULL,
 	recorded_at timestamp NOT NULL
 );
+CREATE TABLE IF NOT EXISTS inbox_messages (
+	id text PRIMARY KEY,
+	workspace_id text NOT NULL,
+	user_id text NOT NULL,
+	run_id text NOT NULL,
+	source text NOT NULL,
+	kind text NOT NULL,
+	body text NOT NULL,
+	task_id text REFERENCES board_tasks(id),
+	agent_id text REFERENCES agents(id),
+	metadata text,
+	created_at timestamp NOT NULL
+);
+CREATE INDEX IF NOT EXISTS inbox_messages_scope_created_at_idx
+ON inbox_messages(workspace_id, user_id, run_id, created_at);
 ALTER TABLE token_usage
 ADD COLUMN IF NOT EXISTS task_id text REFERENCES board_tasks(id);
 ALTER TABLE token_usage
 ADD COLUMN IF NOT EXISTS task_execution_log_id text REFERENCES task_execution_logs(id);
+ALTER TABLE board_tasks
+ADD COLUMN IF NOT EXISTS linear_issue_id text;
+ALTER TABLE board_tasks
+ADD COLUMN IF NOT EXISTS linear_identifier text;
+ALTER TABLE board_tasks
+ADD COLUMN IF NOT EXISTS linear_url text;
 `;
 
 export async function initializeServerDatabase(
@@ -153,6 +188,7 @@ export async function initializeServerDatabase(
 	await mkdir(path.dirname(resolvedPath), { recursive: true });
 	const client = new PGlite(resolvedPath);
 	await client.exec(CREATE_SCHEMA_SQL);
+	await runMigrations(client);
 	const db = drizzle({ client, schema });
 	return {
 		client,

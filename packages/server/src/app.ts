@@ -1,5 +1,6 @@
 import type { AppDeps, RouteHandler } from "./app.types";
 import { handleCliRoute } from "./http/cli-routes";
+import { handleInboxMessagesRoute } from "./http/inbox-routes";
 import { handleProjectsRoute } from "./http/projects-routes";
 import { withRequestLogging } from "./http/request-logger";
 import {
@@ -58,6 +59,17 @@ export function createHandleRequest(deps: AppDeps): RouteHandler {
 			);
 			if (taskResponse) {
 				return taskResponse;
+			}
+		}
+
+		if (deps.db) {
+			const inboxResponse = await handleInboxMessagesRoute(
+				request,
+				deps.db,
+				pathname,
+			);
+			if (inboxResponse) {
+				return inboxResponse;
 			}
 		}
 
