@@ -99,7 +99,7 @@ function toWebHeaders(request: ExpressRequest): Headers {
 	return headers;
 }
 
-async function sendWebResponse(
+export async function sendWebResponse(
 	response: ExpressResponse,
 	webResponse: Response,
 ): Promise<void> {

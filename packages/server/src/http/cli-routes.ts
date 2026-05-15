@@ -38,7 +38,6 @@ export async function handleCliRoute(
 				path: pathname,
 				action: parsed.request.action,
 				requestKeys: Object.keys(parsed.request).sort(),
-				stream: parsed.stream,
 			},
 			"CLI dispatch executed",
 		);

@@ -34,6 +34,115 @@ describe("CLI server routes", () => {
 		expect((await response.json()).status).toBe("succeeded");
 	});
 
+	it("streams dispatch events when requested", async () => {
+		const calls: unknown[] = [];
+		const app = createHandleRequest(
+			createDeps({
+				executeStream: async (request, emit) => {
+					calls.push(request);
+					emit({
+						type: "start",
+						request,
+						invocation: { command: "npx", args: ["devos", "projects"] },
+					});
+					emit({ type: "stdout", text: "ok\n" });
+					emit({ type: "stderr", text: "warn\n" });
+					const result = {
+						status: "succeeded" as const,
+						request,
+						invocation: { command: "npx", args: ["devos", "projects"] },
+						commandResult: { code: 0, stdout: "ok\n", stderr: "warn\n" },
+					};
+					emit({ type: "complete", result });
+					return result;
+				},
+			}),
+		);
+
+		const response = await app(
+			new Request("http://localhost/api/cli/dispatch", {
+				method: "POST",
+				headers: {
+					accept: "text/event-stream",
+					"content-type": "application/json",
+				},
+				body: JSON.stringify({ action: "projects", stream: true }),
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		expect(response.headers.get("content-type")).toContain("text/event-stream");
+		expect(calls).toEqual([{ action: "projects" }]);
+		expect(parseSseEvents(await response.text())).toEqual([
+			{
+				event: "start",
+				data: {
+					request: { action: "projects" },
+					invocation: { command: "npx", args: ["devos", "projects"] },
+				},
+			},
+			{ event: "stdout", data: { text: "ok\n" } },
+			{ event: "stderr", data: { text: "warn\n" } },
+			{
+				event: "complete",
+				data: {
+					result: {
+						status: "succeeded",
+						request: { action: "projects" },
+						invocation: { command: "npx", args: ["devos", "projects"] },
+						commandResult: { code: 0, stdout: "ok\n", stderr: "warn\n" },
+					},
+				},
+			},
+		]);
+	});
+
+	it("streams rejected dispatch results without raw command execution", async () => {
+		const app = createHandleRequest(
+			createDeps({
+				executeStream: async (request, emit) => {
+					const result = {
+						status: "rejected" as const,
+						request,
+						error: "Unsupported CLI action: unknown-action",
+					};
+					emit({ type: "error", error: result.error });
+					emit({ type: "complete", result });
+					return result;
+				},
+			}),
+		);
+
+		const response = await app(
+			new Request("http://localhost/api/cli/dispatch", {
+				method: "POST",
+				headers: {
+					accept: "text/event-stream",
+					"content-type": "application/json",
+				},
+				body: JSON.stringify({ action: "unknown-action", stream: true }),
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		expect(parseSseEvents(await response.text())).toEqual([
+			{
+				event: "error",
+				data: { error: "Unsupported CLI action: unknown-action" },
+			},
+			{
+				event: "complete",
+				data: {
+					result: {
+						status: "rejected",
+						request: { action: "unknown-action" },
+						error: "Unsupported CLI action: unknown-action",
+					},
+				},
+			},
+		]);
+	});
+
 	it("dispatches non-interactive task create payloads", async () => {
 		const calls: unknown[] = [];
 		const app = createHandleRequest(
@@ -379,6 +488,7 @@ describe("CLI server routes", () => {
 
 function createDeps(overrides?: {
 	execute?: AppDeps["cliExecutor"]["execute"];
+	executeStream?: AppDeps["cliExecutor"]["executeStream"];
 	sendNotification?: TestNotificationSender["sendNotification"];
 	history?: AppDeps["cliExecutor"]["getHistory"] extends () => infer T
 		? T
@@ -393,6 +503,16 @@ function createDeps(overrides?: {
 					status: "succeeded",
 					request,
 				})),
+			executeStream:
+				overrides?.executeStream ??
+				(async (request, emit) => {
+					const result = {
+						status: "succeeded" as const,
+						request,
+					};
+					emit({ type: "complete", result });
+					return result;
+				}),
 			getHistory: () => overrides?.history ?? [],
 		},
 		notificationSender: {
@@ -402,4 +522,22 @@ function createDeps(overrides?: {
 			send: async () => ({ status: "ok" }),
 		},
 	};
+}
+
+function parseSseEvents(text: string): Array<{ event: string; data: unknown }> {
+	return text
+		.trim()
+		.split("\n\n")
+		.filter(Boolean)
+		.map((block) => {
+			const lines = block.split("\n");
+			const event = lines
+				.find((line) => line.startsWith("event: "))
+				?.slice("event: ".length);
+			const data = lines
+				.filter((line) => line.startsWith("data: "))
+				.map((line) => line.slice("data: ".length))
+				.join("\n");
+			return { event: event ?? "", data: JSON.parse(data) as unknown };
+		});
 }
