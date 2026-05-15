@@ -36,6 +36,15 @@ paths:
       responses:
         '200':
           description: CLI dispatch result.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-sent events for opt-in streamed dispatch.
         '400':
           $ref: '#/components/responses/TypedError'
   /api/token-usage:
@@ -399,6 +408,9 @@ components:
         action:
           type: string
           minLength: 1
+        stream:
+          type: boolean
+          description: Return Server-Sent Events when true.
       additionalProperties: true
     AgentCreateRequest:
       type: object
