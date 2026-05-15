@@ -1,28 +1,19 @@
 import { asc, eq } from "drizzle-orm";
 import type { ServerDatabase } from "../db";
-import { agentsTable, skillsTable } from "../db";
+import { skillsTable } from "../db";
+import { handleAgentRequest } from "./agent-crud";
 import {
 	parseJsonBody,
 	validateCreatePayload,
 	validateUpdatePayload,
 } from "./entity-crud-validators";
 import type {
-	AgentCreatePayload,
-	AgentUpdatePayload,
 	CrudResponseResult,
 	CrudRouteMatch,
 	SkillCreatePayload,
 	SkillUpdatePayload,
 } from "./entity-crud.types";
 
-const AGENT_CREATE_FIELDS = [
-	"id",
-	"name",
-	"backend",
-	"model",
-	"createdAt",
-] as const;
-const AGENT_UPDATE_FIELDS = ["name", "backend", "model", "createdAt"] as const;
 const SKILL_CREATE_FIELDS = [
 	"id",
 	"name",
@@ -58,90 +49,6 @@ export async function handleEntityCrudRequest(
 		return handleAgentRequest(request, deps, route.id);
 	}
 	return handleSkillRequest(request, deps, route.id);
-}
-
-async function handleAgentRequest(
-	request: Request,
-	deps: EntityCrudDeps,
-	id: string | null,
-): Promise<CrudResponseResult> {
-	if (id === null) {
-		if (request.method === "GET") {
-			const rows = await deps.db
-				.select()
-				.from(agentsTable)
-				.orderBy(asc(agentsTable.id));
-			return { status: 200, body: rows };
-		}
-		if (request.method === "POST") {
-			const parsed = await parseJsonBody(request);
-			if (!parsed.ok) {
-				return { status: 400, body: { error: parsed.error } };
-			}
-			const validated = validateCreatePayload<AgentCreatePayload>(
-				parsed.value,
-				AGENT_CREATE_FIELDS,
-			);
-			if (!validated.ok) {
-				return { status: 400, body: { error: validated.error } };
-			}
-			const payload = validated.value;
-			const [created] = await deps.db
-				.insert(agentsTable)
-				.values(payload)
-				.returning();
-			return { status: 201, body: created };
-		}
-		return { status: 405, body: { error: "Method Not Allowed" } };
-	}
-
-	if (request.method === "GET") {
-		const [row] = await deps.db
-			.select()
-			.from(agentsTable)
-			.where(eq(agentsTable.id, id));
-		if (!row) {
-			return { status: 404, body: { error: "Not Found" } };
-		}
-		return { status: 200, body: row };
-	}
-
-	if (request.method === "PATCH") {
-		const parsed = await parseJsonBody(request);
-		if (!parsed.ok) {
-			return { status: 400, body: { error: parsed.error } };
-		}
-		const validated = validateUpdatePayload<AgentUpdatePayload>(
-			parsed.value,
-			AGENT_UPDATE_FIELDS,
-		);
-		if (!validated.ok) {
-			return { status: 400, body: { error: validated.error } };
-		}
-		const payload = validated.value;
-		const [updated] = await deps.db
-			.update(agentsTable)
-			.set(payload)
-			.where(eq(agentsTable.id, id))
-			.returning();
-		if (!updated) {
-			return { status: 404, body: { error: "Not Found" } };
-		}
-		return { status: 200, body: updated };
-	}
-
-	if (request.method === "DELETE") {
-		const [deleted] = await deps.db
-			.delete(agentsTable)
-			.where(eq(agentsTable.id, id))
-			.returning({ id: agentsTable.id });
-		if (!deleted) {
-			return { status: 404, body: { error: "Not Found" } };
-		}
-		return { status: 204 };
-	}
-
-	return { status: 405, body: { error: "Method Not Allowed" } };
 }
 
 async function handleSkillRequest(

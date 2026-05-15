@@ -1,19 +1,11 @@
-import type { AgentRow, SkillRow } from "../db";
+import type { SkillRow } from "../db";
+import type {
+	AgentCreatePayload,
+	AgentProfile,
+	AgentUpdatePayload,
+} from "./agent-profile.types";
 
-export interface AgentCreatePayload {
-	id: string;
-	name: string;
-	backend: string;
-	model: string;
-	createdAt: string;
-}
-
-export interface AgentUpdatePayload {
-	name?: string;
-	backend?: string;
-	model?: string;
-	createdAt?: string;
-}
+export type { AgentCreatePayload, AgentUpdatePayload };
 
 export interface SkillCreatePayload {
 	id: string;
@@ -37,5 +29,10 @@ export interface CrudRouteMatch {
 
 export interface CrudResponseResult {
 	status: number;
-	body?: AgentRow | SkillRow | AgentRow[] | SkillRow[] | { error: string };
+	body?:
+		| AgentProfile
+		| SkillRow
+		| AgentProfile[]
+		| SkillRow[]
+		| { error: string };
 }

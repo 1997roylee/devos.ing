@@ -59,10 +59,19 @@ describe("read repositories", () => {
 		expect(await repositories.listAgents()).toEqual([
 			{
 				id: "agent-1",
-				name: "codex-main",
-				backend: "codex",
+				title: "Codex Main",
+				description: "Primary implementation agent",
+				logo: "bot",
+				runtime: "codex",
 				model: "gpt-5",
+				concurrency: 1,
+				owner: "owner-1",
 				createdAt: "2026-05-12T00:02:00.000Z",
+				updatedAt: "2026-05-12T00:02:00.000Z",
+				skills: ["typescript"],
+				recentWork: ["ROY-129"],
+				activity: ["planned ROY-129"],
+				instructions: "Follow project workflow instructions.",
 			},
 		]);
 		expect(await repositories.listSkills()).toEqual([

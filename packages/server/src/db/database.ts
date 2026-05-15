@@ -16,10 +16,21 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 CREATE TABLE IF NOT EXISTS agents (
 	id text PRIMARY KEY,
-	name text NOT NULL,
-	backend text NOT NULL,
+	name text,
+	backend text,
+	title text NOT NULL,
+	description text NOT NULL,
+	logo text NOT NULL,
+	runtime text NOT NULL,
 	model text NOT NULL,
-	created_at timestamp NOT NULL
+	concurrency integer NOT NULL,
+	owner text NOT NULL,
+	created_at timestamp NOT NULL,
+	updated_at timestamp NOT NULL,
+	skills text NOT NULL,
+	recent_work text NOT NULL,
+	activity text NOT NULL,
+	instructions text NOT NULL
 );
 CREATE TABLE IF NOT EXISTS skills (
 	id text PRIMARY KEY,
@@ -144,6 +155,19 @@ ALTER TABLE token_usage
 ADD COLUMN IF NOT EXISTS task_id text REFERENCES board_tasks(id);
 ALTER TABLE token_usage
 ADD COLUMN IF NOT EXISTS task_execution_log_id text REFERENCES task_execution_logs(id);
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS title text NOT NULL DEFAULT 'Untitled agent';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS description text NOT NULL DEFAULT 'No description provided';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS logo text NOT NULL DEFAULT '';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS runtime text NOT NULL DEFAULT 'codex';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS concurrency integer NOT NULL DEFAULT 1;
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS owner text NOT NULL DEFAULT 'unassigned';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS updated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS skills text NOT NULL DEFAULT '[]';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS recent_work text NOT NULL DEFAULT '[]';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS activity text NOT NULL DEFAULT '[]';
+ALTER TABLE agents ADD COLUMN IF NOT EXISTS instructions text NOT NULL DEFAULT 'No instructions provided';
+ALTER TABLE agents ALTER COLUMN name DROP NOT NULL;
+ALTER TABLE agents ALTER COLUMN backend DROP NOT NULL;
 `;
 
 export async function initializeServerDatabase(

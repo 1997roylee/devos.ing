@@ -403,13 +403,42 @@ components:
     AgentCreateRequest:
       type: object
       additionalProperties: false
-      required: [id, name, backend, model, createdAt]
+      required:
+        - id
+        - title
+        - description
+        - logo
+        - runtime
+        - model
+        - concurrency
+        - owner
+        - createdAt
+        - updatedAt
+        - skills
+        - recentWork
+        - activity
+        - instructions
       properties:
         id: { type: string, minLength: 1 }
-        name: { type: string, minLength: 1 }
-        backend: { type: string, minLength: 1 }
+        title: { type: string, minLength: 1 }
+        description: { type: string, minLength: 1 }
+        logo: { type: string, minLength: 1 }
+        runtime: { type: string, minLength: 1 }
         model: { type: string, minLength: 1 }
+        concurrency: { type: integer, minimum: 1 }
+        owner: { type: string, minLength: 1 }
         createdAt: { type: string, minLength: 1 }
+        updatedAt: { type: string, minLength: 1 }
+        skills:
+          type: array
+          items: { type: string }
+        recentWork:
+          type: array
+          items: { type: string }
+        activity:
+          type: array
+          items: { type: string }
+        instructions: { type: string, minLength: 1 }
     AgentUpdateRequest:
       allOf:
         - $ref: '#/components/schemas/AgentPatchFields'
@@ -418,10 +447,25 @@ components:
       type: object
       additionalProperties: false
       properties:
-        name: { type: string, minLength: 1 }
-        backend: { type: string, minLength: 1 }
+        title: { type: string, minLength: 1 }
+        description: { type: string, minLength: 1 }
+        logo: { type: string, minLength: 1 }
+        runtime: { type: string, minLength: 1 }
         model: { type: string, minLength: 1 }
+        concurrency: { type: integer, minimum: 1 }
+        owner: { type: string, minLength: 1 }
         createdAt: { type: string, minLength: 1 }
+        updatedAt: { type: string, minLength: 1 }
+        skills:
+          type: array
+          items: { type: string }
+        recentWork:
+          type: array
+          items: { type: string }
+        activity:
+          type: array
+          items: { type: string }
+        instructions: { type: string, minLength: 1 }
     SkillCreateRequest:
       type: object
       additionalProperties: false

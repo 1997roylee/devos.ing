@@ -11,6 +11,7 @@ import {
 	parseListResponse,
 	readNumber,
 	readString,
+	readStringArray,
 } from "./response-utils";
 
 export function parseHealthResponse(payload: unknown): HealthResponse {
@@ -54,10 +55,19 @@ export function parseAgentRecord(payload: unknown): AgentRecord {
 	const row = assertObjectRecord(payload, "/api/agents");
 	return {
 		id: readString(row, "id", "/api/agents"),
-		name: readString(row, "name", "/api/agents"),
-		backend: readString(row, "backend", "/api/agents"),
+		title: readString(row, "title", "/api/agents"),
+		description: readString(row, "description", "/api/agents"),
+		logo: readString(row, "logo", "/api/agents"),
+		runtime: readString(row, "runtime", "/api/agents"),
 		model: readString(row, "model", "/api/agents"),
+		concurrency: readNumber(row, "concurrency", "/api/agents"),
+		owner: readString(row, "owner", "/api/agents"),
 		createdAt: readString(row, "createdAt", "/api/agents"),
+		updatedAt: readString(row, "updatedAt", "/api/agents"),
+		skills: readStringArray(row, "skills", "/api/agents"),
+		recentWork: readStringArray(row, "recentWork", "/api/agents"),
+		activity: readStringArray(row, "activity", "/api/agents"),
+		instructions: readString(row, "instructions", "/api/agents"),
 	};
 }
 

@@ -8,7 +8,9 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 import type {
+	AgentCreateRequest,
 	AgentRecord,
+	AgentUpdateRequest,
 	CommandHistoryRecord,
 	JobRecord,
 	ProjectBoardRecord,
@@ -71,6 +73,51 @@ export function useAgentsQuery(
 		queryKey: serverStateQueryKeys.agents,
 		queryFn: () => apiClient.listAgents(),
 		enabled: options?.enabled,
+	});
+}
+
+export function useCreateAgentMutation(): UseMutationResult<
+	AgentRecord,
+	Error,
+	AgentCreateRequest
+> {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationKey: ["server-state", "agents", "create"],
+		mutationFn: (input) => apiClient.createAgent(input),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: serverStateQueryKeys.agents });
+		},
+	});
+}
+
+export function useUpdateAgentMutation(): UseMutationResult<
+	AgentRecord,
+	Error,
+	{ id: string; input: AgentUpdateRequest }
+> {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationKey: ["server-state", "agents", "update"],
+		mutationFn: ({ id, input }) => apiClient.updateAgent(id, input),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: serverStateQueryKeys.agents });
+		},
+	});
+}
+
+export function useDeleteAgentMutation(): UseMutationResult<
+	void,
+	Error,
+	string
+> {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationKey: ["server-state", "agents", "delete"],
+		mutationFn: (id) => apiClient.deleteAgent(id),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: serverStateQueryKeys.agents });
+		},
 	});
 }
 

@@ -30,6 +30,7 @@ The commands below read from the resolved runtime project config (from `devos.co
 - `projects[].linear`: Linear credentials, status IDs, and routing metadata.
 - `projects[].github`: repository owner/name/base branch and PR/merge behavior.
 - `projects[].workflow`: polling, concurrency, and isolated worktree behavior.
+- `projects[].server.database.databasePath`: canonical database used for agent profiles.
 - `projects[].skills`: skills root and stage skill files (`plan`, `implement`, `reviewTest`, `githubComment`).
 
 Command-specific configuration dependencies:
@@ -52,6 +53,9 @@ Command-specific configuration dependencies:
 - `skills` (`list`, `add`, `update`, `remove`):
   - Operates on the selected project's `skills.root`.
   - `--project` changes which configured project's skills root is targeted.
+- `agents` (`list`, `show`, `add`, `update`, `remove`):
+  - Operates on the selected project's server database agent profiles.
+  - JSON/YAML agent files are not used as the canonical profile source.
 
 ## Command Reference
 

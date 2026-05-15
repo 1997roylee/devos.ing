@@ -34,6 +34,18 @@ export function readNumber(
 	return value;
 }
 
+export function readStringArray(
+	record: Record<string, unknown>,
+	key: string,
+	endpoint: string,
+): string[] {
+	const value = record[key];
+	if (Array.isArray(value) && value.every((item) => typeof item === "string")) {
+		return value;
+	}
+	throw new Error(`Invalid ${endpoint} response field '${key}'`);
+}
+
 export function readNullableString(
 	record: Record<string, unknown>,
 	key: string,
@@ -78,6 +90,9 @@ export async function requestJson(
 	});
 	if (!response.ok) {
 		throw new Error(`${path} request failed with status ${response.status}`);
+	}
+	if (response.status === 204) {
+		return undefined;
 	}
 	return (await response.json()) as unknown;
 }

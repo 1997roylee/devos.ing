@@ -16,10 +16,19 @@ describe("db boundary export", () => {
 
 		const typedRow: AgentRow = {
 			id: "agent-1",
-			name: "codex",
-			backend: "codex",
+			title: "Codex",
+			description: "Primary implementation agent",
+			logo: "bot",
+			runtime: "codex",
 			model: "gpt-5",
+			concurrency: 1,
+			owner: "owner-1",
 			createdAt: "2026-05-13 00:00:00",
+			updatedAt: "2026-05-13 00:00:00",
+			skills: "[]",
+			recentWork: "[]",
+			activity: "[]",
+			instructions: "Follow instructions.",
 		};
 		expect(typedRow.id).toBe("agent-1");
 

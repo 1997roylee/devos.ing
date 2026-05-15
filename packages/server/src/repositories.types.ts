@@ -19,10 +19,19 @@ export interface JobRecord {
 
 export interface AgentRecord {
 	id: string;
-	name: string;
-	backend: string;
+	title: string;
+	description: string;
+	logo: string;
+	runtime: string;
 	model: string;
+	concurrency: number;
+	owner: string;
 	createdAt: string;
+	updatedAt: string;
+	skills: string[];
+	recentWork: string[];
+	activity: string[];
+	instructions: string;
 }
 
 export interface SkillRecord {

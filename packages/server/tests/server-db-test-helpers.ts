@@ -63,10 +63,19 @@ export async function seedServerTestDatabase(
 	});
 	await database.db.insert(agentsTable).values({
 		id: "agent-1",
-		name: "codex-main",
-		backend: "codex",
+		title: "Codex Main",
+		description: "Primary implementation agent",
+		logo: "bot",
+		runtime: "codex",
 		model: "gpt-5",
+		concurrency: 1,
+		owner: "owner-1",
 		createdAt: "2026-05-12T00:02:00.000Z",
+		updatedAt: "2026-05-12T00:02:00.000Z",
+		skills: JSON.stringify(["typescript"]),
+		recentWork: JSON.stringify(["ROY-129"]),
+		activity: JSON.stringify(["planned ROY-129"]),
+		instructions: "Follow project workflow instructions.",
 	});
 	await database.db.insert(skillsTable).values({
 		id: "skill-1",

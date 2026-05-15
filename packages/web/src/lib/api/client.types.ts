@@ -29,11 +29,24 @@ export interface JobRecord {
 
 export interface AgentRecord {
 	id: string;
-	name: string;
-	backend: string;
+	title: string;
+	description: string;
+	logo: string;
+	runtime: string;
 	model: string;
+	concurrency: number;
+	owner: string;
 	createdAt: string;
+	updatedAt: string;
+	skills: string[];
+	recentWork: string[];
+	activity: string[];
+	instructions: string;
 }
+
+export type AgentCreateRequest = AgentRecord;
+
+export type AgentUpdateRequest = Partial<Omit<AgentRecord, "id">>;
 
 export interface SkillRecord {
 	id: string;
@@ -145,6 +158,16 @@ export interface ApiClient {
 	listTokenUsage(options?: HealthRequestOptions): Promise<TokenUsageRecord[]>;
 	listJobs(options?: HealthRequestOptions): Promise<JobRecord[]>;
 	listAgents(options?: HealthRequestOptions): Promise<AgentRecord[]>;
+	createAgent(
+		request: AgentCreateRequest,
+		options?: HealthRequestOptions,
+	): Promise<AgentRecord>;
+	updateAgent(
+		agentId: string,
+		request: AgentUpdateRequest,
+		options?: HealthRequestOptions,
+	): Promise<AgentRecord>;
+	deleteAgent(agentId: string, options?: HealthRequestOptions): Promise<void>;
 	listSkills(options?: HealthRequestOptions): Promise<SkillRecord[]>;
 	listCommandHistory(
 		options?: HealthRequestOptions,

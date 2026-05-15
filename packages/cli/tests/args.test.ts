@@ -269,6 +269,101 @@ describe("parseArgs", () => {
 		});
 	});
 
+	it("parses agents add command", () => {
+		expect(
+			parseArgs([
+				"bun",
+				"devos",
+				"agents",
+				"add",
+				"--id",
+				"agent-1",
+				"--title",
+				"Codex Main",
+				"--description",
+				"Primary implementation agent",
+				"--logo",
+				"bot",
+				"--runtime",
+				"codex",
+				"--model",
+				"gpt-5",
+				"--concurrency",
+				"2",
+				"--owner",
+				"owner-1",
+				"--skills",
+				"typescript,server",
+				"--recent-work",
+				"ROY-229",
+				"--activity",
+				"created profile",
+				"--instructions",
+				"Follow workflow instructions.",
+			]),
+		).toEqual({
+			kind: "agents",
+			command: {
+				action: "add",
+				projectId: undefined,
+				input: {
+					id: "agent-1",
+					title: "Codex Main",
+					description: "Primary implementation agent",
+					logo: "bot",
+					runtime: "codex",
+					model: "gpt-5",
+					concurrency: 2,
+					owner: "owner-1",
+					createdAt: undefined,
+					updatedAt: undefined,
+					skills: ["typescript", "server"],
+					recentWork: ["ROY-229"],
+					activity: ["created profile"],
+					instructions: "Follow workflow instructions.",
+				},
+			},
+		});
+	});
+
+	it("parses agents update command", () => {
+		expect(
+			parseArgs([
+				"bun",
+				"devos",
+				"agents",
+				"update",
+				"agent-1",
+				"--model",
+				"gpt-5.1",
+				"--concurrency",
+				"3",
+			]),
+		).toEqual({
+			kind: "agents",
+			command: {
+				action: "update",
+				id: "agent-1",
+				projectId: undefined,
+				input: {
+					title: undefined,
+					description: undefined,
+					logo: undefined,
+					runtime: undefined,
+					model: "gpt-5.1",
+					concurrency: 3,
+					owner: undefined,
+					createdAt: undefined,
+					updatedAt: undefined,
+					skills: undefined,
+					recentWork: undefined,
+					activity: undefined,
+					instructions: undefined,
+				},
+			},
+		});
+	});
+
 	it("parses task create command", () => {
 		expect(
 			parseArgs([

@@ -67,7 +67,7 @@ Current GET routes:
 
 - `/api/token-usage` -> `listTokenUsage()`
 - `/api/jobs` -> `listJobs()`
-- `/api/agents` -> `listAgents()`
+- `/api/agents` -> `listAgents()` full database-backed agent profiles
 - `/api/skills` -> `listSkills()`
 - `/api/command-history` -> `listCommandHistory()`
 
@@ -108,7 +108,7 @@ Database-backed read models:
 
 - `token_usage` table for `/api/token-usage`
 - `jobs` table for `/api/jobs`
-- `agents` table for `/api/agents`
+- `agents` table for canonical agent profiles used by `/api/agents`, UI editing, and CLI management
 - `skills` table for `/api/skills`
 - `command_history` table for `/api/command-history`
 

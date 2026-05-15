@@ -1,5 +1,6 @@
 import { readFlagValue, readOptionalPositiveInt } from "./args-utils";
 import type { CliCommand } from "./args.types";
+import { parseAgentsCommand } from "./features/agents/args";
 import { parseSkillsCommand } from "./features/skills/args";
 import { parseTaskCommand } from "./features/task-intake/args";
 
@@ -71,6 +72,13 @@ export function parseArgs(argv: string[]): CliCommand {
 
 	if (command === "projects") {
 		return { kind: "projects" };
+	}
+
+	if (command === "agents") {
+		return {
+			kind: "agents",
+			command: parseAgentsCommand(rest.slice(1)),
+		};
 	}
 
 	if (command === "skills") {

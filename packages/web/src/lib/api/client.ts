@@ -4,11 +4,17 @@ import type {
 	ApiClientOptions,
 	HealthRequestOptions,
 } from "./client.types";
-import { requestJson } from "./response-utils";
-import { parseHealthResponse, parseServerList } from "./server-state-client";
+import { encodePathSegment, requestJson } from "./response-utils";
+import {
+	parseAgentRecord,
+	parseHealthResponse,
+	parseServerList,
+} from "./server-state-client";
 import { createTaskApiMethods } from "./task-client";
 
 type RequestMethod = "GET" | "POST" | "PATCH" | "DELETE";
+
+const parseAgentPayload = parseAgentRecord;
 
 export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 	const baseUrl = options.baseUrl ?? "";
@@ -49,6 +55,31 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 				requestOptions,
 			);
 			return parseServerList.agents(payload);
+		},
+		async createAgent(request, requestOptions) {
+			const payload = await requestWithBase(
+				"/api/agents",
+				"POST",
+				requestOptions,
+				request,
+			);
+			return parseAgentPayload(payload);
+		},
+		async updateAgent(agentId, request, requestOptions) {
+			const payload = await requestWithBase(
+				`/api/agents/${encodePathSegment(agentId)}`,
+				"PATCH",
+				requestOptions,
+				request,
+			);
+			return parseAgentPayload(payload);
+		},
+		async deleteAgent(agentId, requestOptions) {
+			await requestWithBase(
+				`/api/agents/${encodePathSegment(agentId)}`,
+				"DELETE",
+				requestOptions,
+			);
 		},
 		async listSkills(requestOptions) {
 			const payload = await requestWithBase(

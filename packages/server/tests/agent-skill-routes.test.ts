@@ -24,10 +24,19 @@ describe("agent and skill CRUD routes", () => {
 		const app = await createApp();
 		const payload: AgentCreatePayload = {
 			id: "agent-1",
-			name: "codex-main",
-			backend: "codex",
+			title: "Codex Main",
+			description: "Primary implementation agent",
+			logo: "bot",
+			runtime: "codex",
 			model: "gpt-5",
+			concurrency: 1,
+			owner: "owner-1",
 			createdAt: "2026-05-12 00:02:00",
+			updatedAt: "2026-05-12 00:02:00",
+			skills: ["typescript"],
+			recentWork: ["ROY-129"],
+			activity: ["planned ROY-129"],
+			instructions: "Follow project workflow instructions.",
 		};
 
 		const createResponse = await app(
@@ -47,12 +56,16 @@ describe("agent and skill CRUD routes", () => {
 		expect(await readResponse.json()).toEqual(payload);
 
 		const updateResponse = await app(
-			jsonRequest("PATCH", "/api/agents/agent-1", { model: "gpt-5.1" }),
+			jsonRequest("PATCH", "/api/agents/agent-1", {
+				model: "gpt-5.1",
+				concurrency: 2,
+			}),
 		);
 		expect(updateResponse.status).toBe(200);
 		expect(await updateResponse.json()).toEqual({
 			...payload,
 			model: "gpt-5.1",
+			concurrency: 2,
 		});
 
 		const deleteResponse = await app(
@@ -128,14 +141,23 @@ describe("agent and skill CRUD routes", () => {
 		const missingField = await app(
 			jsonRequest("POST", "/api/agents", {
 				id: "agent-1",
-				name: "codex-main",
-				backend: "codex",
+				title: "Codex Main",
+				description: "Primary implementation agent",
+				logo: "bot",
+				runtime: "codex",
 				model: "gpt-5",
+				concurrency: 1,
+				owner: "owner-1",
+				createdAt: "2026-05-12 00:02:00",
+				updatedAt: "2026-05-12 00:02:00",
+				skills: ["typescript"],
+				recentWork: ["ROY-129"],
+				activity: ["planned ROY-129"],
 			}),
 		);
 		expect(missingField.status).toBe(400);
 		expect(await missingField.json()).toEqual({
-			error: "Malformed request: missing required field 'createdAt'",
+			error: "Malformed request: missing required field 'instructions'",
 		});
 
 		const wrongType = await app(
@@ -179,7 +201,7 @@ describe("agent and skill CRUD routes", () => {
 		expect(await missingRead.json()).toEqual({ error: "Not Found" });
 
 		const missingPatch = await app(
-			jsonRequest("PATCH", "/api/agents/missing", { model: "gpt-5.1" }),
+			jsonRequest("PATCH", "/api/agents/missing", { concurrency: 2 }),
 		);
 		expect(missingPatch.status).toBe(404);
 		expect(await missingPatch.json()).toEqual({ error: "Not Found" });

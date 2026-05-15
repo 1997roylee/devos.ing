@@ -5,7 +5,7 @@ Core server workflow schema lives in `packages/server/src/db/` and is initialize
 ## Existing operational tables
 
 - `jobs`: workflow jobs by project/issue/stage/state.
-- `agents`: agent identity records.
+- `agents`: canonical agent profile records with title, description, logo, runtime, model, concurrency, owner, timestamps, skills, recent work, activity, and instructions.
 - `skills`: skill catalog snapshots.
 - `command_history`: executed CLI command audit.
 

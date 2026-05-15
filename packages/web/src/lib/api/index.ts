@@ -2,6 +2,8 @@ export { createApiClient } from "./client";
 export { createWebApiClient } from "./web-client";
 export type {
 	AgentRecord,
+	AgentCreateRequest,
+	AgentUpdateRequest,
 	ApiClient,
 	ApiClientOptions,
 	CommandHistoryRecord,

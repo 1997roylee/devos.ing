@@ -5,6 +5,7 @@ import { runSetupCheck, runSetupWizard } from "../../features/setup";
 import { createAgentAdapter } from "../../integrations/agent-adapters";
 import { LinearClient } from "../../integrations/linear";
 import { formatWorkflowStageDisplay } from "../../utils/status";
+import { handleAgentsCommand } from "../agents/command-handler";
 import {
 	addSkill,
 	listSkills,
@@ -69,6 +70,11 @@ export async function handleCommand(
 				].join("\t")}\n`,
 			);
 		}
+		return;
+	}
+
+	if (command.kind === "agents") {
+		await handleAgentsCommand(command.command, config);
 		return;
 	}
 
@@ -223,6 +229,7 @@ export function printHelp(): void {
 			"  devos run --all-projects [--issue <LINEAR_KEY_OR_URL>] [--poll] [--no-exit-when-idle]",
 			"  devos status --project <PROJECT_ID> --issue <LINEAR_KEY>",
 			"  devos projects",
+			"  devos agents list|show|add|update|remove [--project <PROJECT_ID>]",
 			"  devos task create [<REQUEST>] [--request <TEXT|->] [--project <PROJECT_ID>] [--non-interactive] [--max-clarification-rounds <N>] [--clarifications-json <JSON>]",
 			"  devos skills list [--project <PROJECT_ID>]",
 			"  devos skills add --title <TITLE> --description <TEXT> --content <TEXT> [--project <PROJECT_ID>]",
