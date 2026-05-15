@@ -1,6 +1,12 @@
 "use client";
 
-import { type ReactElement, useEffect, useMemo, useState } from "react";
+import {
+	type ReactElement,
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+} from "react";
 
 import { WebJobBoard } from "@/components/web-shell/web-job-board";
 import type {
@@ -22,20 +28,38 @@ const navItems: SidebarNavItem[] = [
 	{ key: "settings", label: "Settings" },
 ];
 
-function nextMode(
+const compactSidebarQuery = "(max-width: 900px)";
+
+function visibleSidebarMode(isCompactViewport: boolean): SidebarDisplayMode {
+	return isCompactViewport ? "collapsed" : "expanded";
+}
+
+function normalizeSidebarMode(
 	mode: SidebarDisplayMode,
 	isCompactViewport: boolean,
 ): SidebarDisplayMode {
+	if (isCompactViewport && mode === "expanded") {
+		return "collapsed";
+	}
+	return mode;
+}
+
+function nextSidebarMode(
+	mode: SidebarDisplayMode,
+	isCompactViewport: boolean,
+): SidebarDisplayMode {
+	const normalizedMode = normalizeSidebarMode(mode, isCompactViewport);
+
 	if (isCompactViewport) {
-		if (mode === "hidden") {
+		if (normalizedMode === "hidden") {
 			return "collapsed";
 		}
 		return "hidden";
 	}
-	if (mode === "expanded") {
+	if (normalizedMode === "expanded") {
 		return "collapsed";
 	}
-	if (mode === "collapsed") {
+	if (normalizedMode === "collapsed") {
 		return "hidden";
 	}
 	return "expanded";
@@ -52,9 +76,11 @@ export function WebOperatorShell(): ReactElement {
 	const showFloatingToggle = sidebarMode === "hidden";
 
 	useEffect(() => {
-		const mediaQuery = window.matchMedia("(max-width: 900px)");
+		const mediaQuery = window.matchMedia(compactSidebarQuery);
 		const syncViewport = (): void => {
-			setIsCompactViewport(mediaQuery.matches);
+			const isCompact = mediaQuery.matches;
+			setIsCompactViewport(isCompact);
+			setSidebarMode((current) => normalizeSidebarMode(current, isCompact));
 		};
 		syncViewport();
 		mediaQuery.addEventListener("change", syncViewport);
@@ -63,11 +89,13 @@ export function WebOperatorShell(): ReactElement {
 		};
 	}, []);
 
-	useEffect(() => {
-		if (isCompactViewport && sidebarMode === "expanded") {
-			setSidebarMode("collapsed");
-		}
-	}, [isCompactViewport, sidebarMode]);
+	const showSidebar = useCallback(() => {
+		setSidebarMode(visibleSidebarMode(isCompactViewport));
+	}, [isCompactViewport]);
+
+	const toggleSidebarMode = useCallback(() => {
+		setSidebarMode((current) => nextSidebarMode(current, isCompactViewport));
+	}, [isCompactViewport]);
 
 	const viewportColumns = useMemo(() => {
 		return canShowSidebar ? "auto minmax(0, 1fr)" : "minmax(0, 1fr)";
@@ -76,7 +104,8 @@ export function WebOperatorShell(): ReactElement {
 	return (
 		<main
 			style={{
-				minHeight: "100vh",
+				height: "100dvh",
+				maxHeight: "100dvh",
 				display: "grid",
 				gridTemplateColumns: viewportColumns,
 				background: "#0f1013",
@@ -88,7 +117,7 @@ export function WebOperatorShell(): ReactElement {
 				<button
 					type="button"
 					aria-label="Show sidebar"
-					onClick={() => setSidebarMode("expanded")}
+					onClick={showSidebar}
 					style={{
 						position: "fixed",
 						top: "0.75rem",
@@ -115,9 +144,7 @@ export function WebOperatorShell(): ReactElement {
 						setActiveNavKey("issues");
 						setCreateIssueRequest((value) => value + 1);
 					}}
-					onToggleMode={() =>
-						setSidebarMode((current) => nextMode(current, isCompactViewport))
-					}
+					onToggleMode={toggleSidebarMode}
 				/>
 			) : null}
 			<WebJobBoard

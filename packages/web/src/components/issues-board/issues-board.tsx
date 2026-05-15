@@ -126,7 +126,7 @@ export function IssuesBoard({
 	}
 
 	return (
-		<section className="min-h-screen overflow-hidden bg-[#0f1013] text-zinc-100">
+		<section className="h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#0f1013] text-zinc-100">
 			<BoardHeader
 				activeTab={activeTab}
 				onTabChange={setActiveTab}

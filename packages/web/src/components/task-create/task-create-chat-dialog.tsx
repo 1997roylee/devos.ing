@@ -105,7 +105,7 @@ export function TaskCreateChatDialog({
 			<dialog
 				aria-labelledby="task-create-chat-title"
 				aria-modal="true"
-				className="grid max-h-[92vh] w-full max-w-2xl gap-4 overflow-auto rounded-lg border border-zinc-800 bg-[#18191d] p-5 text-zinc-100 shadow-2xl"
+				className="grid max-h-[100dvh] w-full max-w-2xl gap-4 overflow-auto rounded-lg border border-zinc-800 bg-[#18191d] p-5 text-zinc-100 shadow-2xl"
 				open
 			>
 				<header className="flex items-start justify-between gap-4">

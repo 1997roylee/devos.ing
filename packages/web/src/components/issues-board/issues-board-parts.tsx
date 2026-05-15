@@ -126,7 +126,7 @@ export function BoardContent({
 		return <BoardState label="No columns selected" />;
 	}
 	return (
-		<div className="flex h-[calc(100vh-10.5rem)] gap-4 overflow-x-auto px-5 py-4">
+		<div className="flex h-[calc(100dvh-10.5rem)] gap-4 overflow-x-auto px-5 py-4">
 			{columns.map((column) => (
 				<IssueColumn
 					column={column}

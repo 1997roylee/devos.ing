@@ -73,7 +73,7 @@ export function WebSidebar({
 	return (
 		<aside
 			aria-label="Primary navigation"
-			className="grid min-h-screen border-r border-zinc-900 bg-[#15161a] text-zinc-400"
+			className="grid h-[100dvh] max-h-[100dvh] border-r border-zinc-900 bg-[#15161a] text-zinc-400"
 			style={{
 				width: isHidden ? "0" : isExpanded ? "17.5rem" : "4.5rem",
 				opacity: isHidden ? 0 : 1,

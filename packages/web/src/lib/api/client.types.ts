@@ -134,6 +134,33 @@ export type TaskCreateResponse =
 			rawOutput: string;
 	  };
 
+export interface CliDispatchStreamRequest {
+	action: string;
+	[key: string]: unknown;
+}
+
+export type CliDispatchStreamEvent =
+	| {
+			type: "start";
+			request: CliDispatchStreamRequest;
+			invocation: { command: string; args: string[] };
+	  }
+	| { type: "stdout"; text: string }
+	| { type: "stderr"; text: string }
+	| { type: "error"; error: string }
+	| {
+			type: "complete";
+			result: {
+				status: "succeeded" | "failed" | "rejected";
+				request: CliDispatchStreamRequest;
+				invocation?: { command: string; args: string[] };
+				commandResult?: { code: number; stdout: string; stderr: string };
+				error?: string;
+			};
+	  };
+
+export type CliDispatchStreamHandler = (event: CliDispatchStreamEvent) => void;
+
 export interface ApiClientOptions {
 	baseUrl?: string;
 	fetchFn?: typeof fetch;
@@ -162,6 +189,11 @@ export interface ApiClient {
 		request: TaskCreateRequest,
 		options?: HealthRequestOptions,
 	): Promise<TaskCreateResponse>;
+	streamCliDispatch(
+		request: CliDispatchStreamRequest,
+		onEvent: CliDispatchStreamHandler,
+		options?: HealthRequestOptions,
+	): Promise<void>;
 	createBoardTask(
 		request: TaskMutationRequest,
 		options?: HealthRequestOptions,
