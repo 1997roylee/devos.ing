@@ -15,6 +15,7 @@ export function parseTaskCommand(args: string[]): TaskCommand {
 	const nonInteractive = actionArgs.includes("--non-interactive")
 		? true
 		: undefined;
+	const json = actionArgs.includes("--json") ? true : undefined;
 	const clarificationsJson = readFlagValue(actionArgs, "--clarifications-json");
 	const maxClarificationRounds = readOptionalPositiveInt(
 		actionArgs,
@@ -27,6 +28,7 @@ export function parseTaskCommand(args: string[]): TaskCommand {
 		nonInteractive,
 		maxClarificationRounds,
 		clarificationAnswers: parseClarificationAnswers(clarificationsJson),
+		json,
 	};
 }
 
@@ -88,6 +90,9 @@ function readPositionalRequest(args: string[]): string | undefined {
 			token === "--max-clarification-rounds"
 		) {
 			index += 1;
+			continue;
+		}
+		if (token === "--json" || token === "--non-interactive") {
 			continue;
 		}
 		if (token === "--answers-json") {

@@ -29,5 +29,9 @@ export interface RunTaskIntakeOptions {
 }
 
 export type TaskIntakeRunResult =
-	| { status: "created"; issue: CreatedLinearIssueRef }
+	| {
+			status: "created";
+			issue: CreatedLinearIssueRef;
+			task: TaskIntakeTask;
+	  }
 	| { status: "needs_info"; questions: string[] };

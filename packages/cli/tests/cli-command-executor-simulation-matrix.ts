@@ -150,6 +150,7 @@ export const CLI_COMMAND_SIMULATION_MATRIX: SimulationCase[] = [
 			nonInteractive: true,
 			maxClarificationRounds: 2,
 			clarificationAnswers: [{ question: "Who?", answer: "CLI users" }],
+			json: true,
 		},
 		expectedArgs: [
 			"devos",
@@ -162,6 +163,7 @@ export const CLI_COMMAND_SIMULATION_MATRIX: SimulationCase[] = [
 			"--non-interactive",
 			"--max-clarification-rounds",
 			"2",
+			"--json",
 			"--clarifications-json",
 			'[{"question":"Who?","answer":"CLI users"}]',
 		],

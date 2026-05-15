@@ -14,6 +14,7 @@ const IMPLEMENTED_ROUTES = [
 	["DELETE", "/api/projects/{id}"],
 	["GET", "/api/tasks"],
 	["POST", "/api/tasks"],
+	["POST", "/api/tasks/chat-create"],
 	["GET", "/api/tasks/{id}"],
 	["PATCH", "/api/tasks/{id}"],
 	["DELETE", "/api/tasks/{id}"],

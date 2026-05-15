@@ -82,6 +82,7 @@ export interface TaskCreateActionRequest {
 	nonInteractive?: boolean;
 	maxClarificationRounds?: number;
 	clarificationAnswers?: Array<{ question: string; answer: string }>;
+	json?: boolean;
 }
 
 export type SupportedCliCommandRequest =

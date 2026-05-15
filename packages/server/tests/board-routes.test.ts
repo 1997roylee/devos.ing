@@ -126,6 +126,10 @@ function createDeps(overrides?: {
 				status: "succeeded",
 				request,
 			}),
+			executeStream: async (request) => ({
+				status: "succeeded",
+				request,
+			}),
 			getHistory: () => [],
 		},
 		boardRepository: {

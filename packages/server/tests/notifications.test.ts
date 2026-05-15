@@ -191,6 +191,10 @@ function createDeps(overrides?: {
 				status: "succeeded" as const,
 				request: { action: "none" as const },
 			}),
+			executeStream: async () => ({
+				status: "succeeded" as const,
+				request: { action: "none" as const },
+			}),
 			getHistory: () => [],
 		},
 		notificationService: {

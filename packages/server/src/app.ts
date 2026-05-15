@@ -51,7 +51,12 @@ export function createHandleRequest(deps: AppDeps): RouteHandler {
 		}
 
 		if (deps.db) {
-			const taskResponse = await handleTasksRoute(request, deps.db, pathname);
+			const taskResponse = await handleTasksRoute(
+				request,
+				deps.db,
+				deps.cliExecutor,
+				pathname,
+			);
 			if (taskResponse) {
 				return taskResponse;
 			}

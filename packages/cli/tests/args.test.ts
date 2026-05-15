@@ -296,6 +296,7 @@ describe("parseArgs", () => {
 				nonInteractive: undefined,
 				maxClarificationRounds: undefined,
 				clarificationAnswers: undefined,
+				json: undefined,
 			},
 		});
 	});
@@ -312,6 +313,7 @@ describe("parseArgs", () => {
 				nonInteractive: undefined,
 				maxClarificationRounds: undefined,
 				clarificationAnswers: undefined,
+				json: undefined,
 			},
 		});
 	});
@@ -326,6 +328,7 @@ describe("parseArgs", () => {
 				nonInteractive: undefined,
 				maxClarificationRounds: undefined,
 				clarificationAnswers: undefined,
+				json: undefined,
 			},
 		});
 	});
@@ -352,6 +355,7 @@ describe("parseArgs", () => {
 				nonInteractive: undefined,
 				maxClarificationRounds: undefined,
 				clarificationAnswers: undefined,
+				json: undefined,
 			},
 		});
 	});
@@ -380,6 +384,7 @@ describe("parseArgs", () => {
 				nonInteractive: true,
 				maxClarificationRounds: 2,
 				clarificationAnswers: [{ question: "Who?", answer: "CLI users" }],
+				json: undefined,
 			},
 		});
 	});

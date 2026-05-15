@@ -48,7 +48,7 @@ export async function runTaskIntake(
 		);
 		if (decision.result === "CLEAR") {
 			const issue = await linear.createBacklogTask(decision.task);
-			return { status: "created", issue };
+			return { status: "created", issue, task: decision.task };
 		}
 		if (clarificationRounds >= maxClarificationRounds) {
 			return { status: "needs_info", questions: decision.questions };

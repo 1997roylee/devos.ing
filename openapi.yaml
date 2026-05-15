@@ -129,6 +129,20 @@ paths:
           description: Created task.
         '400':
           $ref: '#/components/responses/TypedError'
+  /api/tasks/chat-create:
+    post:
+      tags: [Board]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskChatCreateRequest'
+      responses:
+        '200':
+          description: Structured chat task creation result.
+        '400':
+          $ref: '#/components/responses/TypedError'
   /api/tasks/{id}:
     parameters:
       - $ref: '#/components/parameters/Id'
@@ -554,15 +568,22 @@ components:
         linkedPr:
           type: string
           nullable: true
-        linearIssueId:
-          type: string
-          nullable: true
-        linearIdentifier:
-          type: string
-          nullable: true
-        linearUrl:
-          type: string
-          nullable: true
+    TaskChatCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [request, projectId]
+      properties:
+        request: { type: string, minLength: 1 }
+        projectId: { type: string, minLength: 1 }
+        answers:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [question, answer]
+            properties:
+              question: { type: string, minLength: 1 }
+              answer: { type: string, minLength: 1 }
     TaskUpdateRequest:
       allOf:
         - $ref: '#/components/schemas/TaskPatchFields'

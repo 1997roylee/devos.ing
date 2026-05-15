@@ -30,6 +30,7 @@ export type TaskCommand = {
 	nonInteractive?: boolean;
 	maxClarificationRounds?: number;
 	clarificationAnswers?: Array<{ question: string; answer: string }>;
+	json?: boolean;
 };
 
 export type CliCommand =

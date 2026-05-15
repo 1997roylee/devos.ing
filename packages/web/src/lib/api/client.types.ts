@@ -135,12 +135,14 @@ export interface TaskCreateAnswer {
 
 export interface TaskCreateRequest {
 	request: string;
-	projectId?: string;
+	projectId: string;
 	answers?: TaskCreateAnswer[];
 }
 
 export interface CreatedTaskRef {
+	id: string;
 	identifier: string;
+	title: string;
 	url: string;
 }
 
@@ -148,17 +150,26 @@ export type TaskCreateResponse =
 	| {
 			status: "created";
 			issue: CreatedTaskRef;
-			rawOutput: string;
+			task: ProjectBoardTaskRecord;
 	  }
 	| {
 			status: "needs_info";
 			questions: string[];
-			rawOutput: string;
 	  }
 	| {
-			status: "error";
+			status: "linear_error";
 			error: string;
-			rawOutput: string;
+	  }
+	| {
+			status: "db_error";
+			error: string;
+			issue: CreatedTaskRef;
+	  }
+	| {
+			status: "link_error";
+			error: string;
+			issue: CreatedTaskRef;
+			task: ProjectBoardTaskRecord;
 	  };
 
 export interface CliDispatchStreamRequest {

@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 import { useMemo, useState } from "react";
 
 import { useCreateTaskMutation } from "@/lib/api/queries";
+import { formatTaskCreateError } from "./task-create-chat-errors";
 
 interface ClarificationAnswer {
 	question: string;
@@ -13,16 +14,20 @@ interface ClarificationAnswer {
 export function TaskCreatePanel(): ReactElement {
 	const createTask = useCreateTaskMutation();
 	const [request, setRequest] = useState<string>("");
-	const [projectId, setProjectId] = useState<string>("");
+	const [projectId, setProjectId] = useState<string>("default");
 	const [answers, setAnswers] = useState<ClarificationAnswer[]>([]);
 	const [activeQuestions, setActiveQuestions] = useState<string[]>([]);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-	const canSubmitInitial = request.trim().length > 0 && !createTask.isPending;
+	const canSubmitInitial =
+		request.trim().length > 0 &&
+		projectId.trim().length > 0 &&
+		!createTask.isPending;
 	const canSubmitClarifications =
 		activeQuestions.length > 0 &&
 		answers.length === activeQuestions.length &&
 		answers.every((answer) => answer.answer.trim().length > 0) &&
+		projectId.trim().length > 0 &&
 		!createTask.isPending;
 
 	const statusText = useMemo(() => {
@@ -49,7 +54,7 @@ export function TaskCreatePanel(): ReactElement {
 		try {
 			const response = await createTask.mutateAsync({
 				request: nextRequest,
-				projectId: projectId.trim() || undefined,
+				projectId: projectId.trim(),
 				answers: nextAnswers,
 			});
 			if (response.status === "needs_info") {
@@ -67,7 +72,7 @@ export function TaskCreatePanel(): ReactElement {
 				setAnswers([]);
 				return;
 			}
-			setErrorMessage(response.error);
+			setErrorMessage(formatTaskCreateError(response));
 		} catch (error) {
 			setErrorMessage(
 				error instanceof Error ? error.message : "Failed to create task",
@@ -131,7 +136,7 @@ export function TaskCreatePanel(): ReactElement {
 				htmlFor="task-create-project-id"
 				style={{ display: "block", marginBottom: "0.5rem" }}
 			>
-				Project ID (optional)
+				Project ID
 			</label>
 			<input
 				id="task-create-project-id"

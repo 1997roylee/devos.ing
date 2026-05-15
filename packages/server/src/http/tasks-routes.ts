@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import type { CliExecutor } from "../app.types";
 import type { ServerDatabase } from "../db";
 import { boardProjectsTable, boardTasksTable } from "../db";
 import {
@@ -14,12 +15,18 @@ import {
 	parseCreateTaskPayload,
 	parseUpdateTaskPayload,
 } from "./project-task-schemas";
+import { handleTaskChatCreateRoute } from "./task-chat-create";
 
 export async function handleTasksRoute(
 	request: Request,
 	db: ServerDatabase["db"],
+	cliExecutor: CliExecutor,
 	pathname: string,
 ): Promise<Response | null> {
+	if (pathname === "/api/tasks/chat-create") {
+		return handleTaskChatCreateRoute(request, db, cliExecutor);
+	}
+
 	if (pathname === "/api/tasks") {
 		if (request.method === "GET") {
 			return Response.json(await db.select().from(boardTasksTable));

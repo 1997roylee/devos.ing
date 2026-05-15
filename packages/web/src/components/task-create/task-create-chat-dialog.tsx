@@ -10,6 +10,7 @@ import type {
 	TaskCreateChatDialogProps,
 	TaskCreateChatState,
 } from "./task-create-chat-dialog.types";
+import { formatTaskCreateError } from "./task-create-chat-errors";
 
 function createInitialState(defaultProjectId: string): TaskCreateChatState {
 	return {
@@ -32,10 +33,13 @@ export function TaskCreateChatDialog({
 		createInitialState(defaultProjectId),
 	);
 	const canSubmitRequest =
-		state.request.trim().length > 0 && !createTask.isPending;
+		state.request.trim().length > 0 &&
+		state.projectId.trim().length > 0 &&
+		!createTask.isPending;
 	const canSubmitAnswers =
 		state.answers.length > 0 &&
 		state.answers.every((answer) => answer.answer.trim().length > 0) &&
+		state.projectId.trim().length > 0 &&
 		!createTask.isPending;
 
 	const statusText = useMemo(() => {
@@ -56,7 +60,7 @@ export function TaskCreateChatDialog({
 		try {
 			const response = await createTask.mutateAsync({
 				request: state.request.trim(),
-				projectId: state.projectId.trim() || undefined,
+				projectId: state.projectId.trim(),
 				answers: nextAnswers.length > 0 ? nextAnswers : undefined,
 			});
 			if (response.status === "needs_info") {
@@ -81,7 +85,10 @@ export function TaskCreateChatDialog({
 				}));
 				return;
 			}
-			setState((current) => ({ ...current, errorMessage: response.error }));
+			setState((current) => ({
+				...current,
+				errorMessage: formatTaskCreateError(response),
+			}));
 		} catch (error) {
 			setState((current) => ({
 				...current,
@@ -185,6 +192,9 @@ export function TaskCreateChatDialog({
 						>
 							{state.result.issue.identifier}
 						</a>
+						<span className="text-emerald-200/80">
+							Board task {state.result.task.id}
+						</span>
 					</div>
 				) : null}
 				{state.errorMessage ? (

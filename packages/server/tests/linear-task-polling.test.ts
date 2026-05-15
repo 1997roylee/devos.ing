@@ -20,6 +20,7 @@ describe("startLinearTaskPollingScheduler", () => {
 						requests.push(request);
 						return succeededResult(request);
 					},
+					executeStream: async (request) => succeededResult(request),
 					getHistory: () => [],
 				},
 				logger: createLogger(),
@@ -74,6 +75,7 @@ describe("startLinearTaskPollingScheduler", () => {
 						await running;
 						return succeededResult(request);
 					},
+					executeStream: async (request) => succeededResult(request),
 					getHistory: () => [],
 				},
 				logger: createLogger(),
@@ -116,6 +118,7 @@ describe("startLinearTaskPollingScheduler", () => {
 						}
 						return succeededResult(request);
 					},
+					executeStream: async (request) => succeededResult(request),
 					getHistory: () => [],
 				},
 				logger: createLogger(),

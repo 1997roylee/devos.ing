@@ -201,6 +201,7 @@ function createApp(db: ServerDatabase["db"]) {
 	return createHandleRequest({
 		cliExecutor: {
 			execute: async (request) => ({ status: "succeeded", request }),
+			executeStream: async (request) => ({ status: "succeeded", request }),
 			getHistory: () => [],
 		},
 		db,

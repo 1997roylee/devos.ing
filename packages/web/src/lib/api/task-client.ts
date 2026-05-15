@@ -1,4 +1,5 @@
 import type {
+	CreatedTaskRef,
 	HealthRequestOptions,
 	ProjectBoardTaskRecord,
 	TaskCreateRequest,
@@ -14,65 +15,68 @@ import {
 	requestJson,
 } from "./response-utils";
 
-function parseCreatedTaskRef(output: string): TaskCreateResponse {
-	const createdMatch = output.match(
-		/Created Linear task\s+([A-Za-z]+-\d+):\s+(\S+)/,
-	);
-	if (createdMatch) {
+export function parseTaskCreateResponse(payload: unknown): TaskCreateResponse {
+	const row = assertObjectRecord(payload, "/api/tasks/chat-create");
+	const status = row.status;
+	if (status === "created") {
 		return {
-			status: "created",
-			issue: { identifier: createdMatch[1], url: createdMatch[2] },
-			rawOutput: output,
+			status,
+			issue: parseCreatedTaskRef(row.issue),
+			task: parseProjectBoardTaskRecord(row.task),
 		};
 	}
-	const questions = parseNeedsInfoQuestions(output);
-	if (questions.length > 0) {
-		return { status: "needs_info", questions, rawOutput: output };
+	if (status === "needs_info") {
+		const questions = row.questions;
+		if (!Array.isArray(questions)) {
+			throw new Error(
+				"Invalid /api/tasks/chat-create response field 'questions'",
+			);
+		}
+		return {
+			status,
+			questions: questions.map((question) => {
+				if (typeof question !== "string") {
+					throw new Error(
+						"Invalid /api/tasks/chat-create response field 'questions'",
+					);
+				}
+				return question;
+			}),
+		};
 	}
+	if (status === "linear_error") {
+		return {
+			status,
+			error: readString(row, "error", "/api/tasks/chat-create"),
+		};
+	}
+	if (status === "db_error") {
+		return {
+			status,
+			error: readString(row, "error", "/api/tasks/chat-create"),
+			issue: parseCreatedTaskRef(row.issue),
+		};
+	}
+	if (status === "link_error") {
+		return {
+			status,
+			error: readString(row, "error", "/api/tasks/chat-create"),
+			issue: parseCreatedTaskRef(row.issue),
+			task: parseProjectBoardTaskRecord(row.task),
+		};
+	}
+	throw new Error("Invalid /api/tasks/chat-create response field 'status'");
+}
+
+function parseCreatedTaskRef(payload: unknown): CreatedTaskRef {
+	const endpoint = "/api/tasks/chat-create";
+	const row = assertObjectRecord(payload, endpoint);
 	return {
-		status: "error",
-		error: "Task create completed without a parseable result",
-		rawOutput: output,
+		id: readString(row, "id", endpoint),
+		identifier: readString(row, "identifier", endpoint),
+		title: readString(row, "title", endpoint),
+		url: readString(row, "url", endpoint),
 	};
-}
-
-function parseNeedsInfoQuestions(output: string): string[] {
-	const questions: string[] = [];
-	let inQuestionsSection = false;
-	for (const line of output.split("\n")) {
-		const trimmed = line.trim();
-		if (!inQuestionsSection && trimmed === "Remaining questions:") {
-			inQuestionsSection = true;
-			continue;
-		}
-		if (inQuestionsSection && trimmed.startsWith("- ")) {
-			questions.push(trimmed.slice(2).trim());
-		} else if (inQuestionsSection && trimmed.length > 0) {
-			break;
-		}
-	}
-	return questions.filter(Boolean);
-}
-
-export function parseTaskCreateResponse(payload: unknown): TaskCreateResponse {
-	const row = assertObjectRecord(payload, "/api/cli/dispatch");
-	const status = row.status;
-	if (status !== "succeeded" && status !== "failed" && status !== "rejected") {
-		throw new Error("Invalid /api/cli/dispatch response field 'status'");
-	}
-	const output =
-		typeof row.commandResult === "object" &&
-		row.commandResult !== null &&
-		"stdout" in row.commandResult &&
-		typeof row.commandResult.stdout === "string"
-			? row.commandResult.stdout
-			: "";
-	if (status !== "succeeded") {
-		const error =
-			typeof row.error === "string" ? row.error : "Task create failed";
-		return { status: "error", error, rawOutput: output };
-	}
-	return parseCreatedTaskRef(output);
 }
 
 export function parseProjectBoardTaskRecord(
@@ -96,7 +100,7 @@ export function parseProjectBoardTaskRecord(
 }
 
 export interface TaskApiMethods {
-	createTaskFromCli(
+	createTaskFromChat(
 		request: TaskCreateRequest,
 		options?: HealthRequestOptions,
 	): Promise<TaskCreateResponse>;
@@ -124,18 +128,12 @@ export function createTaskApiMethods(
 	) => Promise<unknown>,
 ): TaskApiMethods {
 	return {
-		async createTaskFromCli(request, options) {
-			const { answers, ...taskRequest } = request;
+		async createTaskFromChat(request, options) {
 			const payload = await requestWithBase(
-				"/api/cli/dispatch",
+				"/api/tasks/chat-create",
 				"POST",
 				options,
-				{
-					action: "task",
-					taskAction: "create",
-					...taskRequest,
-					clarificationAnswers: answers,
-				},
+				request,
 			);
 			return parseTaskCreateResponse(payload);
 		},

@@ -21,6 +21,7 @@ describe("CLI dispatch logging", () => {
 					calls.push(request);
 					return { status: "succeeded", request };
 				},
+				executeStream: async (request) => ({ status: "succeeded", request }),
 				getHistory: () => [],
 			},
 		});
@@ -62,6 +63,7 @@ describe("CLI dispatch logging", () => {
 					calls += 1;
 					return { status: "succeeded", request };
 				},
+				executeStream: async (request) => ({ status: "succeeded", request }),
 				getHistory: () => [],
 			},
 		});
@@ -94,6 +96,10 @@ function createDeps(): AppDeps {
 	return {
 		cliExecutor: {
 			execute: async (request) => ({
+				status: "succeeded",
+				request,
+			}),
+			executeStream: async (request) => ({
 				status: "succeeded",
 				request,
 			}),

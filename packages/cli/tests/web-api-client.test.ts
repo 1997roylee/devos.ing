@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { createApiClient } from "../../web/src/lib/api/client";
 
 describe("web api client task create", () => {
-	it("serializes clarification answers in dispatch payload", async () => {
+	it("serializes clarification answers in chat task create payload", async () => {
 		const calls: Array<{ url: string; body: unknown }> = [];
 		const fetchFn = (async (input: URL | RequestInfo, init?: RequestInit) => {
 			calls.push({
@@ -11,9 +11,25 @@ describe("web api client task create", () => {
 			});
 			return new Response(
 				JSON.stringify({
-					status: "succeeded",
-					commandResult: {
-						stdout: "Created Linear task ROY-1: https://linear.example/ROY-1",
+					status: "created",
+					issue: {
+						id: "lin-1",
+						identifier: "ROY-1",
+						title: "Create a task",
+						url: "https://linear.example/ROY-1",
+					},
+					task: {
+						id: "task-1",
+						projectId: "default",
+						title: "Create a task",
+						content: "Task body",
+						priority: 1,
+						status: "open",
+						dueDate: null,
+						creatorId: "owner-1",
+						linkedPr: "https://linear.example/ROY-1",
+						createdAt: "2026-05-13T00:00:00.000Z",
+						updatedAt: "2026-05-13T00:00:00.000Z",
 					},
 				}),
 				{ status: 200, headers: { "content-type": "application/json" } },
@@ -32,15 +48,11 @@ describe("web api client task create", () => {
 
 		expect(calls).toEqual([
 			{
-				url: "http://localhost:3000/api/cli/dispatch",
+				url: "http://localhost:3000/api/tasks/chat-create",
 				body: {
-					action: "task",
-					taskAction: "create",
 					request: "Create a task",
 					projectId: "default",
-					clarificationAnswers: [
-						{ question: "Who is this for?", answer: "CLI users" },
-					],
+					answers: [{ question: "Who is this for?", answer: "CLI users" }],
 				},
 			},
 		]);

@@ -610,6 +610,14 @@ function resolveTaskArgs(
 				"Malformed task create request: nonInteractive must be true when provided",
 		};
 	}
+	const jsonValidation = validateOptionalBooleanField(
+		request.json,
+		"task create",
+		"json",
+	);
+	if (jsonValidation.status !== "ok") {
+		return jsonValidation;
+	}
 	const maxClarificationRoundsValidation = validateOptionalPositiveIntegerField(
 		request.maxClarificationRounds,
 		"task create",
@@ -631,6 +639,7 @@ function resolveTaskArgs(
 		"--max-clarification-rounds",
 		maxClarificationRoundsValidation.value,
 	);
+	appendBooleanFlag(args, "--json", jsonValidation.value);
 	if (clarificationAnswersValidation.value) {
 		args.push(
 			"--clarifications-json",

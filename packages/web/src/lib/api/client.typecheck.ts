@@ -17,6 +17,7 @@ const healthResponsePromise: Promise<HealthResponse> = client.getHealth();
 const webHealthResponsePromise: Promise<HealthResponse> = webClient.getHealth();
 const taskCreateRequest: TaskCreateRequest = {
 	request: "Create a task from web UI",
+	projectId: "project-1",
 };
 const taskCreateResponsePromise: Promise<TaskCreateResponse> =
 	webClient.createTask(taskCreateRequest);
