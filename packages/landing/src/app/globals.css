@@ -118,6 +118,39 @@ pre,
 	animation: float-soft 5s ease-in-out infinite;
 }
 
+.deco-bob {
+	animation: bob 4s ease-in-out infinite;
+}
+
+.deco-bob-slow {
+	animation: bob-slow 5s ease-in-out infinite;
+}
+
+.deco-blink {
+	transform-origin: center;
+	animation: blink 3.5s steps(1, end) infinite;
+}
+
+.deco-led {
+	animation: led 1.2s steps(1, end) infinite;
+}
+
+.deco-spin-l {
+	transform-box: fill-box;
+	transform-origin: 5px 7px;
+	animation: spin 2.5s linear infinite;
+}
+
+.deco-spin-r {
+	transform-box: fill-box;
+	transform-origin: 12px 7px;
+	animation: spin 2.5s linear infinite reverse;
+}
+
+.deco-tape {
+	animation: tape 0.3s steps(2, end) infinite;
+}
+
 @keyframes ticker {
 	to {
 		transform: translateX(-33%);
@@ -135,12 +168,78 @@ pre,
 	}
 }
 
+@keyframes bob {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+
+	50% {
+		transform: translateY(-10px);
+	}
+}
+
+@keyframes bob-slow {
+	0%,
+	100% {
+		transform: translateY(0) rotate(-2deg);
+	}
+
+	50% {
+		transform: translateY(-6px) rotate(2deg);
+	}
+}
+
+@keyframes blink {
+	0%,
+	92%,
+	100% {
+		opacity: 1;
+	}
+
+	94%,
+	98% {
+		opacity: 0;
+	}
+}
+
+@keyframes led {
+	0%,
+	49% {
+		fill: var(--neon-pink);
+	}
+
+	50%,
+	100% {
+		fill: var(--neon-cyan);
+	}
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes tape {
+	to {
+		transform: translateX(-2px);
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	html {
 		scroll-behavior: auto;
 	}
 
 	.ticker,
+	.deco-bob,
+	.deco-bob-slow,
+	.deco-blink,
+	.deco-led,
+	.deco-spin-l,
+	.deco-spin-r,
+	.deco-tape,
 	.float-soft {
 		animation: none;
 	}

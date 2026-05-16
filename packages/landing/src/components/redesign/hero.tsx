@@ -1,12 +1,14 @@
 import { ArrowRight, Play } from "lucide-react";
 import type { ReactElement } from "react";
 
+import { FloatingDecor } from "@/components/redesign/hero-illustrations";
 import { ProductPreview } from "@/components/redesign/product-preview";
 
 export function Hero(): ReactElement {
 	return (
 		<section className="relative overflow-hidden border-foreground border-b-2">
 			<HeroBackdrop />
+			<FloatingDecor />
 			<div className="relative mx-auto max-w-7xl px-4 pt-16 pb-16 sm:px-6 md:pt-28 md:pb-28">
 				<div className="mb-8 flex justify-center px-2">
 					<a
@@ -87,14 +89,6 @@ function HeroBackdrop(): ReactElement {
 				))}
 			</div>
 			<div className="absolute inset-0 scanlines opacity-50" />
-			<div className="float-soft absolute top-32 left-8 hidden border-2 border-foreground bg-card p-4 shadow-retro-pink lg:block">
-				<div className="font-pixel text-4xl text-[var(--neon-cyan)]">01</div>
-				<div className="font-mono text-xs">planner online</div>
-			</div>
-			<div className="float-soft absolute top-28 right-8 hidden border-2 border-foreground bg-card p-4 shadow-retro-cyan lg:block">
-				<div className="font-pixel text-4xl text-[var(--neon-pink)]">AI</div>
-				<div className="font-mono text-xs">loop active</div>
-			</div>
 		</div>
 	);
 }
