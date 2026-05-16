@@ -1,16 +1,13 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { createHandleRequest } from "../src/app";
-import {
-	type ServerDatabase,
-	boardProjectsTable,
-	boardTasksTable,
-	projectBoardsTable,
-	taskTagsTable,
-} from "../src/db";
+import { boardTasksTable, taskTagsTable } from "../src/db";
 import {
 	type DrizzleServerTestDatabase,
 	createDrizzleServerTestDatabase,
 } from "./server-db-test-helpers";
+import {
+	createTaskRouteTestApp,
+	seedTaskRouteProject,
+} from "./task-route-test-helpers";
 
 let testDatabase: DrizzleServerTestDatabase | undefined;
 
@@ -24,8 +21,8 @@ afterEach(async () => {
 describe("task routes", () => {
 	it("supports task CRUD/list", async () => {
 		testDatabase = await createDrizzleServerTestDatabase();
-		const app = createApp(testDatabase.db);
-		await seedProject(testDatabase.db, "project-1");
+		const app = createTaskRouteTestApp(testDatabase.db);
+		await seedTaskRouteProject(testDatabase.db, "project-1");
 
 		const createResponse = await app(
 			new Request("http://localhost/api/tasks", {
@@ -102,8 +99,8 @@ describe("task routes", () => {
 
 	it("returns consistent errors for invalid payloads, missing records, and FK failures", async () => {
 		testDatabase = await createDrizzleServerTestDatabase();
-		const app = createApp(testDatabase.db);
-		await seedProject(testDatabase.db, "project-1");
+		const app = createTaskRouteTestApp(testDatabase.db);
+		await seedTaskRouteProject(testDatabase.db, "project-1");
 
 		const invalid = await app(
 			new Request("http://localhost/api/tasks", {
@@ -179,8 +176,8 @@ describe("task routes", () => {
 
 	it("returns JSON not-found errors for missing IDs and FK-protected deletes", async () => {
 		testDatabase = await createDrizzleServerTestDatabase();
-		const app = createApp(testDatabase.db);
-		await seedProject(testDatabase.db, "project-1");
+		const app = createTaskRouteTestApp(testDatabase.db);
+		await seedTaskRouteProject(testDatabase.db, "project-1");
 
 		const [task] = await testDatabase.db
 			.insert(boardTasksTable)
@@ -233,35 +230,3 @@ describe("task routes", () => {
 		});
 	});
 });
-
-function createApp(db: ServerDatabase["db"]) {
-	return createHandleRequest({
-		cliExecutor: {
-			execute: async (request) => ({ status: "succeeded", request }),
-			executeStream: async (request) => ({ status: "succeeded", request }),
-			getHistory: () => [],
-		},
-		db,
-	});
-}
-
-async function seedProject(db: ServerDatabase["db"], projectId: string) {
-	await db.insert(projectBoardsTable).values({
-		id: "board-1",
-		name: "Board",
-		description: "Test board",
-		ownerId: "owner-1",
-		createdAt: "2026-05-13T00:00:00.000Z",
-		updatedAt: "2026-05-13T00:00:00.000Z",
-	});
-	await db.insert(boardProjectsTable).values({
-		id: projectId,
-		boardId: "board-1",
-		externalProjectId: null,
-		name: "Project",
-		description: null,
-		ownerId: "owner-1",
-		createdAt: "2026-05-13T00:00:00.000Z",
-		updatedAt: "2026-05-13T00:00:00.000Z",
-	});
-}

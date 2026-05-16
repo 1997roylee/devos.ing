@@ -1,4 +1,5 @@
 import {
+	type BoardTaskRow,
 	boardTasksTable,
 	generateBoardTaskKey,
 	initializeServerDatabase,
@@ -39,10 +40,21 @@ export function createBoardTaskWorkflowStore(
 		},
 		async updateTask(taskId, values) {
 			await withDatabase(databasePath, async (db) => {
+				const [existing] = await db
+					.select()
+					.from(boardTasksTable)
+					.where(eq(boardTasksTable.id, taskId));
+				const now = new Date().toISOString();
 				await db
 					.update(boardTasksTable)
-					.set({ ...values, updatedAt: new Date().toISOString() })
+					.set({ ...values, updatedAt: now })
 					.where(eq(boardTasksTable.id, taskId));
+				if (existing) {
+					const body = describeTaskUpdate(existing, values);
+					if (body) {
+						await insertSystemComment(db, taskId, body, now);
+					}
+				}
 			});
 		},
 		async createTask(input) {
@@ -95,10 +107,24 @@ async function linkPullRequest(
 	const prNumber = input.pullRequest.number ?? parsePrNumber(prUrl);
 	await withDatabase(databasePath, async (db) => {
 		const now = new Date().toISOString();
+		const [existing] = await db
+			.select()
+			.from(boardTasksTable)
+			.where(eq(boardTasksTable.id, input.taskId));
 		await db
 			.update(boardTasksTable)
 			.set({ ...(prUrl ? { linkedPr: prUrl } : {}), updatedAt: now })
 			.where(eq(boardTasksTable.id, input.taskId));
+		if (existing && prUrl && existing.linkedPr !== prUrl) {
+			await insertSystemComment(
+				db,
+				input.taskId,
+				`changed linked PR from ${formatValue(
+					existing.linkedPr,
+				)} to ${formatValue(prUrl)}`,
+				now,
+			);
+		}
 		if (!prNumber) {
 			return;
 		}
@@ -121,6 +147,58 @@ async function linkPullRequest(
 				set: { prUrl: prUrl ?? null },
 			});
 	});
+}
+
+async function insertSystemComment(
+	db: Awaited<ReturnType<typeof initializeServerDatabase>>["db"],
+	taskId: string,
+	body: string,
+	createdAt: string,
+): Promise<void> {
+	await db.insert(taskCommentsTable).values({
+		id: crypto.randomUUID(),
+		taskId,
+		authorId: "system",
+		authorType: "system",
+		comment: body,
+		createdAt,
+	});
+}
+
+function describeTaskUpdate(
+	existing: BoardTaskRow,
+	values: Partial<BoardTaskRow>,
+): string | null {
+	const lines = Object.entries(values).flatMap(([field, value]) => {
+		if (
+			field === "updatedAt" ||
+			!(field in existing) ||
+			existing[field as keyof BoardTaskRow] === value
+		) {
+			return [];
+		}
+		return [
+			`changed ${fieldLabel(field)} from ${formatValue(
+				existing[field as keyof BoardTaskRow],
+			)} to ${formatValue(value)}`,
+		];
+	});
+	return lines.length > 0 ? lines.join("\n") : null;
+}
+
+function fieldLabel(field: string): string {
+	return field === "content"
+		? "description"
+		: field.replace(/[A-Z]/g, (match) => ` ${match.toLowerCase()}`);
+}
+
+function formatValue(value: unknown): string {
+	if (value === null || value === undefined || value === "") {
+		return "`empty`";
+	}
+	const text = String(value).replace(/\s+/g, " ").trim();
+	const truncated = text.length > 120 ? `${text.slice(0, 117)}...` : text;
+	return `\`${truncated}\``;
 }
 
 async function withDatabase<T>(

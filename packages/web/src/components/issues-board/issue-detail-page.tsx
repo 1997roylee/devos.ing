@@ -6,6 +6,7 @@ import type { ReactElement } from "react";
 
 import { useBoardTaskQuery } from "@/lib/api/queries";
 
+import { IssueActivityPanel } from "./issue-activity";
 import { IssueDetailEditor } from "./issue-detail-editor";
 
 export function IssueDetailPage(): ReactElement {
@@ -59,7 +60,12 @@ function renderDetailContent(
 	if (!taskQuery.data) {
 		return <DetailState label="Task not found" />;
 	}
-	return <IssueDetailEditor task={taskQuery.data} />;
+	return (
+		<>
+			<IssueDetailEditor task={taskQuery.data} />
+			<IssueActivityPanel task={taskQuery.data} />
+		</>
+	);
 }
 
 function DetailState({ label }: { label: string }): ReactElement {

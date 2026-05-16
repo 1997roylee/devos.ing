@@ -56,6 +56,17 @@ describe("server services", () => {
 		const service = createTaskService({
 			listTasks: async () => [],
 			getTask: async (id) => storedTasks.get(id) ?? null,
+			getTaskActivity: async (id) => {
+				const task = storedTasks.get(id);
+				return task
+					? {
+							task,
+							comments: [],
+							executionLogs: [],
+							executionSteps: [],
+						}
+					: null;
+			},
 			projectExists: async (id) => id === "project-1",
 			nextTaskKey: async () => "TASK-000123",
 			createTask: async (input) => {
@@ -74,6 +85,7 @@ describe("server services", () => {
 			},
 			updateTask: async () => null,
 			deleteTask: async () => null,
+			addTaskComment: async () => {},
 		} satisfies TaskRepository);
 
 		const created = await service.createTask({

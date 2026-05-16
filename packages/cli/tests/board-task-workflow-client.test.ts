@@ -65,8 +65,15 @@ describe("BoardTaskWorkflowClient", () => {
 		await client.markStage("task-1", "implementing");
 
 		const task = await readTask(databasePath, "task-1");
+		const comments = await readComments(databasePath);
 		expect(task?.status).toBe("implementing");
 		expect(task?.updatedAt).not.toBe("2026-05-12T00:00:00.000Z");
+		expect(comments).toContainEqual(
+			expect.objectContaining({
+				authorType: "system",
+				comment: "changed status from `planning` to `implementing`",
+			}),
+		);
 	});
 
 	it("persists task comments and bumps task freshness", async () => {
@@ -100,11 +107,14 @@ describe("BoardTaskWorkflowClient", () => {
 
 		const task = await readTask(databasePath, "task-1");
 		const prs = await readPullRequests(databasePath);
+		const comments = await readComments(databasePath);
 		expect(task?.linkedPr).toBe(pullRequest.url);
 		expect(prs).toHaveLength(1);
 		expect(prs[0]?.repository).toBe("acme/project");
 		expect(prs[0]?.prNumber).toBe("42");
 		expect(prs[0]?.prUrl).toBe(pullRequest.url);
+		expect(comments).toHaveLength(1);
+		expect(comments[0]?.comment).toContain("changed linked PR");
 	});
 
 	it("returns review-only tasks with persisted pull request refs", async () => {

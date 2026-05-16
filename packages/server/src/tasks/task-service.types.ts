@@ -1,12 +1,18 @@
 import type { BoardTaskRow, NewBoardTaskRow } from "../db/board-tasks.types";
+import type { NewTaskCommentRow } from "../db/task-comments.types";
 import type {
 	CreateTaskPayload,
 	UpdateTaskPayload,
 } from "../http/project-task-api.types";
+import type {
+	TaskActivityResponse,
+	TaskActivitySourceRows,
+} from "./task-activity.types";
 
 export interface TaskRepository {
 	listTasks(): Promise<BoardTaskRow[]>;
 	getTask(id: string): Promise<BoardTaskRow | null>;
+	getTaskActivity(id: string): Promise<TaskActivitySourceRows | null>;
 	projectExists(id: string): Promise<boolean>;
 	nextTaskKey(): Promise<string>;
 	createTask(input: NewBoardTaskRow): Promise<BoardTaskRow>;
@@ -15,6 +21,7 @@ export interface TaskRepository {
 		input: Partial<NewBoardTaskRow>,
 	): Promise<BoardTaskRow | null>;
 	deleteTask(id: string): Promise<BoardTaskRow | null>;
+	addTaskComment(input: NewTaskCommentRow): Promise<void>;
 }
 
 export type TaskServiceResult<T> =
@@ -26,6 +33,7 @@ export type TaskServiceResult<T> =
 export interface TaskService {
 	listTasks(): Promise<TaskServiceResult<BoardTaskRow[]>>;
 	getTask(id: string): Promise<TaskServiceResult<BoardTaskRow>>;
+	getTaskActivity(id: string): Promise<TaskServiceResult<TaskActivityResponse>>;
 	createTask(
 		input: CreateTaskPayload,
 	): Promise<TaskServiceResult<BoardTaskRow>>;

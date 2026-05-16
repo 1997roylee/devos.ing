@@ -2,6 +2,7 @@ import type {
 	CliCommandStreamHandler,
 	CliCommandStreamRequest,
 } from "./command-stream-client.types";
+import type { TaskActivityResponse } from "./task-activity.types";
 
 export type HealthStatus = "ok";
 
@@ -188,6 +189,10 @@ export interface ApiClient {
 		taskId: string,
 		options?: HealthRequestOptions,
 	): Promise<ProjectBoardTaskRecord>;
+	listTaskActivity(
+		taskId: string,
+		options?: HealthRequestOptions,
+	): Promise<TaskActivityResponse>;
 	listWorkspaceProjects(
 		workspaceId: string,
 		options?: HealthRequestOptions,

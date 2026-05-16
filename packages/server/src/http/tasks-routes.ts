@@ -1,7 +1,6 @@
 import type { CliExecutor } from "../app.types";
 import type { ServerDatabase } from "../db";
 import { createTaskRepository, createTaskService } from "../tasks";
-import type { TaskServiceResult } from "../tasks";
 import {
 	badRequest,
 	methodNotAllowed,
@@ -14,6 +13,7 @@ import {
 	parseUpdateTaskPayload,
 } from "./project-task-schemas";
 import { handleTaskChatCreateRoute } from "./task-chat-create";
+import { mapTaskResult, readTaskActivityPath } from "./task-route-utils";
 
 export async function handleTasksRoute(
 	request: Request,
@@ -51,6 +51,17 @@ export async function handleTasksRoute(
 		return notFound("Task not found");
 	}
 
+	const activityTaskId = readTaskActivityPath(pathname);
+	if (activityTaskId) {
+		if (request.method === "GET") {
+			return mapTaskResult(
+				await service.getTaskActivity(activityTaskId),
+				"Invalid task activity payload",
+			);
+		}
+		return methodNotAllowed();
+	}
+
 	const id = readPathId(pathname, "/api/tasks/");
 	if (!id) {
 		return null;
@@ -86,25 +97,4 @@ export async function handleTasksRoute(
 	}
 
 	return methodNotAllowed();
-}
-
-function mapTaskResult<T>(
-	result: TaskServiceResult<T>,
-	invalidPayloadError: string,
-	successStatus = 200,
-): Response {
-	if (result.status === "ok") {
-		return Response.json(result.value, { status: successStatus });
-	}
-	if (result.status === "not_found") {
-		return notFound("Task not found");
-	}
-	if (result.status === "foreign_key_error") {
-		return badRequest("Foreign key constraint failed");
-	}
-	return badRequest(
-		invalidPayloadError === "Invalid task update payload"
-			? "Update payload must include at least one field"
-			: invalidPayloadError,
-	);
 }

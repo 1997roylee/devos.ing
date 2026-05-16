@@ -13,6 +13,8 @@ import {
 	readNumber,
 	readString,
 } from "./response-utils";
+import { parseTaskActivityResponse } from "./task-activity-client";
+import type { TaskActivityResponse } from "./task-activity.types";
 
 const TASKS_PATH = "/api/tasks";
 const TASK_CHAT_CREATE_PATH = "/api/tasks/chat-create";
@@ -111,6 +113,10 @@ export interface TaskApiMethods {
 		taskId: string,
 		options?: HealthRequestOptions,
 	): Promise<ProjectBoardTaskRecord>;
+	listTaskActivity(
+		taskId: string,
+		options?: HealthRequestOptions,
+	): Promise<TaskActivityResponse>;
 	createTaskFromChat(
 		request: TaskCreateRequest,
 		options?: HealthRequestOptions,
@@ -145,6 +151,14 @@ export function createTaskApiMethods(
 		async getBoardTask(taskId, options) {
 			const payload = await requestWithBase(taskPath(taskId), "GET", options);
 			return parseProjectBoardTaskRecord(payload);
+		},
+		async listTaskActivity(taskId, options) {
+			const payload = await requestWithBase(
+				taskActivityPath(taskId),
+				"GET",
+				options,
+			);
+			return parseTaskActivityResponse(payload);
 		},
 		async createTaskFromChat(request, options) {
 			const payload = await requestWithBase(
@@ -186,4 +200,8 @@ export function createTaskApiMethods(
 
 function taskPath(taskId: string): string {
 	return `${TASKS_PATH}/${encodePathSegment(taskId)}`;
+}
+
+function taskActivityPath(taskId: string): string {
+	return `${taskPath(taskId)}/activity`;
 }

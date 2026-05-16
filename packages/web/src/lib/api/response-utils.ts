@@ -1,5 +1,19 @@
 import type { HealthRequestOptions } from "./client.types";
 
+export class ApiRequestError extends Error {
+	constructor(
+		readonly path: string,
+		readonly status: number,
+	) {
+		super(`${path} request failed with status ${status}`);
+		this.name = "ApiRequestError";
+	}
+}
+
+export function isApiRequestError(error: unknown): error is ApiRequestError {
+	return error instanceof ApiRequestError;
+}
+
 export function assertObjectRecord(
 	payload: unknown,
 	endpoint: string,
@@ -92,7 +106,7 @@ export async function requestJson(
 		body: body === undefined ? undefined : JSON.stringify(body),
 	});
 	if (!response.ok) {
-		throw new Error(`${path} request failed with status ${response.status}`);
+		throw new ApiRequestError(path, response.status);
 	}
 	return (await response.json()) as unknown;
 }

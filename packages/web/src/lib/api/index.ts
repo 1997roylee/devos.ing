@@ -1,4 +1,5 @@
 export { createApiClient } from "./client";
+export { ApiRequestError, isApiRequestError } from "./response-utils";
 export { createWebApiClient } from "./web-client";
 export type {
 	AgentRecord,
@@ -22,6 +23,12 @@ export type {
 	WorkspaceProjectRecord,
 	WorkspaceProjectsResponse,
 } from "./client.types";
+export type {
+	TaskActivityKind,
+	TaskActivityRecord,
+	TaskActivityResponse,
+	TaskActivityStepRecord,
+} from "./task-activity.types";
 export type {
 	CliCommandStreamEvent,
 	CliCommandStreamHandler,
