@@ -158,6 +158,9 @@ export async function handleImplementingStage(
 			);
 		}
 	}
+	if (state.pullRequest) {
+		await linear.linkPullRequest?.(state.issue.id, state.pullRequest);
+	}
 
 	state.bugs = [];
 	const nextStage: WorkflowStage = hasExistingPr ? "reviewing" : "pr_created";

@@ -486,10 +486,11 @@ async function fetchReviewOnlyIssues(
 			continue;
 		}
 		try {
-			discoveredPullRequestsByIssueKey.set(
-				key,
-				await runtime.findOpenPullRequestForIssue(config, key),
-			);
+			const discovered = await runtime.findOpenPullRequestForIssue(config, key);
+			discoveredPullRequestsByIssueKey.set(key, discovered);
+			if (discovered) {
+				await linear.linkPullRequest?.(issue.id, discovered);
+			}
 		} catch (error) {
 			discoveredPullRequestsByIssueKey.set(key, undefined);
 			logger.warn(

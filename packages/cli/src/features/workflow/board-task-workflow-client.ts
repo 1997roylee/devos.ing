@@ -1,17 +1,16 @@
-import {
-	boardTasksTable,
-	generateBoardTaskKey,
-	initializeServerDatabase,
-	taskCommentsTable,
-} from "devos-server/db";
-import { eq } from "drizzle-orm";
 import type { CreatedLinearIssueRef } from "../../integrations/linear";
 import type {
 	ParentIssueRef,
 	PlannedSplitTask,
+	PullRequestRef,
 	ResolvedProjectConfig,
 	WorkflowStage,
 } from "../types";
+import { createBoardTaskWorkflowStore } from "./board-task-workflow-store";
+import type {
+	BoardTaskWorkflowRecord,
+	BoardTaskWorkflowStore,
+} from "./board-task-workflow-store.types";
 import type { WorkflowIssue, WorkflowLinearClient } from "./workflow.types";
 
 const READY_STATUS = "planning";
@@ -25,28 +24,32 @@ export function createBoardTaskWorkflowClient(
 }
 
 class BoardTaskWorkflowClient implements WorkflowLinearClient {
-	constructor(private readonly config: ResolvedProjectConfig) {}
+	private readonly store: BoardTaskWorkflowStore;
+
+	constructor(private readonly config: ResolvedProjectConfig) {
+		this.store = createBoardTaskWorkflowStore(config);
+	}
 
 	async fetchWork(taskKey?: string): Promise<WorkflowIssue[]> {
-		const tasks = await this.readTasks();
+		const tasks = await this.store.listTasks();
 		return tasks
-			.filter((task) => task.projectId === this.config.id)
-			.filter((task) => (taskKey ? task.taskKey === taskKey : true))
-			.filter((task) => (taskKey ? true : task.status === READY_STATUS))
+			.filter(({ task }) => task.projectId === this.config.id)
+			.filter(({ task }) => (taskKey ? task.taskKey === taskKey : true))
+			.filter(({ task }) => (taskKey ? true : task.status === READY_STATUS))
 			.map(mapTaskToWorkflowIssue);
 	}
 
 	async fetchIssueByIdentifier(taskKey: string): Promise<WorkflowIssue | null> {
-		const task = (await this.readTasks()).find(
-			(row) => row.taskKey === taskKey,
+		const task = (await this.store.listTasks()).find(
+			({ task: row }) => row.taskKey === taskKey,
 		);
 		return task ? mapTaskToWorkflowIssue(task) : null;
 	}
 
 	async fetchReviewOnlyWork(): Promise<WorkflowIssue[]> {
-		return (await this.readTasks())
-			.filter((task) => task.projectId === this.config.id)
-			.filter((task) => REVIEW_STATUSES.has(task.status))
+		return (await this.store.listTasks())
+			.filter(({ task }) => task.projectId === this.config.id)
+			.filter(({ task }) => REVIEW_STATUSES.has(task.status))
 			.map(mapTaskToWorkflowIssue);
 	}
 
@@ -55,11 +58,11 @@ class BoardTaskWorkflowClient implements WorkflowLinearClient {
 	}
 
 	async markStage(issueId: string, stage: string): Promise<void> {
-		await this.updateTask(issueId, { status: stage });
+		await this.store.updateTask(issueId, { status: stage });
 	}
 
 	async markCanceled(issueId: string): Promise<void> {
-		await this.updateTask(issueId, { status: "blocked" });
+		await this.store.updateTask(issueId, { status: "blocked" });
 	}
 
 	async updateIssueDetails(
@@ -67,7 +70,7 @@ class BoardTaskWorkflowClient implements WorkflowLinearClient {
 		title: string,
 		description: string,
 	): Promise<void> {
-		await this.updateTask(issueId, { title, content: description });
+		await this.store.updateTask(issueId, { title, content: description });
 	}
 
 	async createBacklogTask(input: {
@@ -98,21 +101,18 @@ class BoardTaskWorkflowClient implements WorkflowLinearClient {
 	async clearWorkflowStageLabels(_issueId: string): Promise<void> {}
 
 	async comment(issueId: string, body: string): Promise<void> {
-		const database = await initializeServerDatabase(
-			this.config.server.database.databasePath,
-		);
-		try {
-			await database.db.insert(taskCommentsTable).values({
-				id: crypto.randomUUID(),
-				taskId: issueId,
-				authorId: "devos",
-				authorType: "agent",
-				comment: body,
-				createdAt: new Date().toISOString(),
-			});
-		} finally {
-			await database.close();
-		}
+		await this.store.addComment(issueId, body);
+	}
+
+	async linkPullRequest(
+		issueId: string,
+		pullRequest: PullRequestRef,
+	): Promise<void> {
+		await this.store.linkPullRequest({
+			taskId: issueId,
+			repository: `${this.config.repo.owner}/${this.config.repo.name}`,
+			pullRequest,
+		});
 	}
 
 	private async createTask(
@@ -120,74 +120,27 @@ class BoardTaskWorkflowClient implements WorkflowLinearClient {
 		content: string,
 		status: string,
 	): Promise<CreatedLinearIssueRef> {
-		const database = await initializeServerDatabase(
-			this.config.server.database.databasePath,
-		);
-		try {
-			const now = new Date().toISOString();
-			const [created] = await database.db
-				.insert(boardTasksTable)
-				.values({
-					id: crypto.randomUUID(),
-					taskKey: await generateBoardTaskKey(database.db),
-					projectId: this.config.id,
-					title,
-					content,
-					priority: 1,
-					status,
-					dueDate: null,
-					creatorId: DEFAULT_CREATOR_ID,
-					linkedPr: null,
-					linearIssueId: null,
-					linearIdentifier: null,
-					linearUrl: null,
-					createdAt: now,
-					updatedAt: now,
-				})
-				.returning();
-			if (!created) {
-				throw new Error("Board task was not created");
-			}
-			return toCreatedRef(created.id, created.taskKey, created.title);
-		} finally {
-			await database.close();
-		}
-	}
-
-	private async readTasks(): Promise<
-		Array<typeof boardTasksTable.$inferSelect>
-	> {
-		const database = await initializeServerDatabase(
-			this.config.server.database.databasePath,
-		);
-		try {
-			return await database.db.select().from(boardTasksTable);
-		} finally {
-			await database.close();
-		}
-	}
-
-	private async updateTask(
-		issueId: string,
-		values: Partial<typeof boardTasksTable.$inferInsert>,
-	): Promise<void> {
-		const database = await initializeServerDatabase(
-			this.config.server.database.databasePath,
-		);
-		try {
-			await database.db
-				.update(boardTasksTable)
-				.set({ ...values, updatedAt: new Date().toISOString() })
-				.where(eq(boardTasksTable.id, issueId));
-		} finally {
-			await database.close();
-		}
+		const created = await this.store.createTask({
+			projectId: this.config.id,
+			title,
+			content,
+			priority: 1,
+			status,
+			dueDate: null,
+			creatorId: DEFAULT_CREATOR_ID,
+			linkedPr: null,
+			linearIssueId: null,
+			linearIdentifier: null,
+			linearUrl: null,
+		});
+		return toCreatedRef(created.id, created.taskKey, created.title);
 	}
 }
 
 function mapTaskToWorkflowIssue(
-	task: typeof boardTasksTable.$inferSelect,
+	record: BoardTaskWorkflowRecord,
 ): WorkflowIssue {
+	const { task, pullRequest } = record;
 	return {
 		id: task.id,
 		identifier: task.taskKey,
@@ -199,6 +152,7 @@ function mapTaskToWorkflowIssue(
 		priority: { value: task.priority, name: `P${task.priority}` },
 		labels: [],
 		state: { id: task.status, name: task.status },
+		pullRequest,
 	};
 }
 

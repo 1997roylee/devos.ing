@@ -25,7 +25,7 @@ import type {
 	IssueDetailSaveState,
 } from "./issues-board.types";
 
-const AUTOSAVE_DELAY_MS = 700;
+const AUTOSAVE_DELAY_MS = 3000;
 
 export function IssueDetailEditor({
 	task,

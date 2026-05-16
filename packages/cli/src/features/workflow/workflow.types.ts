@@ -93,6 +93,7 @@ export interface WorkflowLinearClient {
 	applyStageLabel(issueId: string, stage: WorkflowStage): Promise<void>;
 	clearWorkflowStageLabels(issueId: string): Promise<void>;
 	comment(issueId: string, body: string): Promise<void>;
+	linkPullRequest?(issueId: string, pullRequest: PullRequestRef): Promise<void>;
 }
 
 export interface WorkflowRuntime {
