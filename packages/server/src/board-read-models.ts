@@ -5,14 +5,15 @@ import type {
 	ProjectBoardTaskRecord,
 	WorkspaceProjectRecord,
 } from "./app.types";
-import type { ServerDatabase } from "./db/database.types";
+import type { ServerDb } from "./db";
 import {
 	boardProjectsTable,
 	boardTasksTable,
 	projectBoardsTable,
+	taskAssigneesTable,
 } from "./db/schema";
 
-type ServerDb = ServerDatabase["db"];
+const LEGACY_PR_CREATED_STATUS = "pr_created";
 
 export function createBoardReadModels(db: ServerDb): BoardReadModels {
 	return {
@@ -84,6 +85,10 @@ export function createBoardReadModels(db: ServerDb): BoardReadModels {
 							.from(boardTasksTable)
 							.where(inArray(boardTasksTable.projectId, projectIds))
 							.orderBy(boardTasksTable.id);
+			const assigneeByTaskId = await readHumanAssignees(
+				db,
+				tasks.map((task) => task.id),
+			);
 
 			return {
 				id: board.id,
@@ -110,9 +115,10 @@ export function createBoardReadModels(db: ServerDb): BoardReadModels {
 						title: task.title,
 						content: task.content,
 						priority: task.priority,
-						status: task.status,
+						status: normalizeBoardStatus(task.status),
 						dueDate: task.dueDate,
 						creatorId: task.creatorId,
+						assigneeId: assigneeByTaskId.get(task.id) ?? null,
 						linkedPr: task.linkedPr,
 						linearIssueId: task.linearIssueId,
 						linearIdentifier: task.linearIdentifier,
@@ -124,4 +130,26 @@ export function createBoardReadModels(db: ServerDb): BoardReadModels {
 			};
 		},
 	};
+}
+
+function normalizeBoardStatus(status: string): string {
+	return status === LEGACY_PR_CREATED_STATUS ? "reviewing" : status;
+}
+
+async function readHumanAssignees(
+	db: ServerDb,
+	taskIds: string[],
+): Promise<Map<string, string>> {
+	if (taskIds.length === 0) {
+		return new Map();
+	}
+	const assignees = await db
+		.select()
+		.from(taskAssigneesTable)
+		.where(inArray(taskAssigneesTable.taskId, taskIds));
+	return new Map(
+		assignees
+			.filter((assignee) => assignee.assigneeType === "human")
+			.map((assignee) => [assignee.taskId, assignee.assigneeId]),
+	);
 }

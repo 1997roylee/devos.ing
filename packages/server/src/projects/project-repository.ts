@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { ServerDatabase } from "../db";
 import { boardProjectsTable, projectBoardsTable } from "../db";
-import type { NewBoardProjectRow } from "../db/board-projects.types";
+import type { NewBoardProjectRow } from "../db";
 import type { ProjectRepository } from "./project-service.types";
 
 export function createProjectRepository(

@@ -1,6 +1,5 @@
 import type { WorkflowProgressEvent } from "devos/features/server";
-import type { BoardProjectRow } from "../db/board-projects.types";
-import type { BoardTaskRow } from "../db/board-tasks.types";
+import type { BoardProjectRow, BoardTaskRow } from "../db";
 import type { InboxMessageRecord } from "../inbox";
 
 export type RealtimeIssueEventType =

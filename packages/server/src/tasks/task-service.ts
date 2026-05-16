@@ -1,10 +1,11 @@
 import { isForeignKeyError } from "../http/http-utils";
 import type { UpdateTaskPayload } from "../http/project-task-api.types";
+import { composeTaskActivity } from "./task-activity-compose";
 import type {
-	TaskActivityRecord,
-	TaskActivitySourceRows,
-} from "./task-activity.types";
-import type { TaskRepository, TaskService } from "./task-service.types";
+	BoardTaskApiRecord,
+	TaskRepository,
+	TaskService,
+} from "./task-service.types";
 
 const UPDATE_ACTIVITY_FIELDS: Array<keyof UpdateTaskPayload> = [
 	"taskKey",
@@ -14,12 +15,14 @@ const UPDATE_ACTIVITY_FIELDS: Array<keyof UpdateTaskPayload> = [
 	"priority",
 	"status",
 	"creatorId",
+	"assigneeId",
 	"dueDate",
 	"linkedPr",
 	"linearIssueId",
 	"linearIdentifier",
 	"linearUrl",
 ];
+const LEGACY_PR_CREATED_STATUS = "pr_created";
 
 export function createTaskService(repository: TaskRepository): TaskService {
 	return {
@@ -45,23 +48,26 @@ export function createTaskService(repository: TaskRepository): TaskService {
 			}
 			const now = new Date().toISOString();
 			try {
-				const created = await repository.createTask({
-					id: crypto.randomUUID(),
-					taskKey: input.taskKey ?? (await repository.nextTaskKey()),
-					projectId: input.projectId ?? null,
-					title: input.title,
-					content: input.content,
-					priority: input.priority,
-					status: input.status,
-					dueDate: input.dueDate ?? null,
-					creatorId: input.creatorId,
-					linkedPr: input.linkedPr ?? null,
-					linearIssueId: input.linearIssueId ?? null,
-					linearIdentifier: input.linearIdentifier ?? null,
-					linearUrl: input.linearUrl ?? null,
-					createdAt: now,
-					updatedAt: now,
-				});
+				const created = await repository.createTask(
+					{
+						id: crypto.randomUUID(),
+						taskKey: input.taskKey ?? (await repository.nextTaskKey()),
+						projectId: input.projectId ?? null,
+						title: input.title,
+						content: input.content,
+						priority: input.priority,
+						status: normalizeTaskStatus(input.status),
+						dueDate: input.dueDate ?? null,
+						creatorId: input.creatorId,
+						linkedPr: input.linkedPr ?? null,
+						linearIssueId: input.linearIssueId ?? null,
+						linearIdentifier: input.linearIdentifier ?? null,
+						linearUrl: input.linearUrl ?? null,
+						createdAt: now,
+						updatedAt: now,
+					},
+					input.assigneeId ?? null,
+				);
 				return { status: "ok", value: created };
 			} catch (error) {
 				return mapMutationError(error);
@@ -80,6 +86,7 @@ export function createTaskService(repository: TaskRepository): TaskService {
 				const created = await repository.createTask({
 					...task,
 					projectId: projectId ?? null,
+					status: normalizeTaskStatus(task.status),
 				});
 				return { status: "ok", value: created };
 			} catch (error) {
@@ -101,10 +108,21 @@ export function createTaskService(repository: TaskRepository): TaskService {
 				if (!existing) {
 					return { status: "not_found" };
 				}
-				const updated = await repository.updateTask(id, {
-					...input,
-					updatedAt: new Date().toISOString(),
-				});
+				const { assigneeId, ...taskInput } = input;
+				const normalizedTaskInput = {
+					...taskInput,
+					...(taskInput.status
+						? { status: normalizeTaskStatus(taskInput.status) }
+						: {}),
+				};
+				const updated = await repository.updateTask(
+					id,
+					{
+						...normalizedTaskInput,
+						updatedAt: new Date().toISOString(),
+					},
+					assigneeId,
+				);
 				if (updated) {
 					const body = describeTaskUpdate(existing, updated, input);
 					if (body) {
@@ -138,70 +156,9 @@ export function createTaskService(repository: TaskRepository): TaskService {
 	};
 }
 
-function composeTaskActivity(rows: TaskActivitySourceRows) {
-	const stepsByLog = new Map(
-		rows.executionLogs.map((log) => [
-			log.id,
-			rows.executionSteps
-				.filter((step) => step.executionLogId === log.id)
-				.sort((left, right) => left.stepNumber - right.stepNumber)
-				.map((step) => ({
-					id: step.id,
-					stepNumber: step.stepNumber,
-					action: step.action,
-					status: step.status,
-					detail: step.detail,
-					recordedAt: step.recordedAt,
-				})),
-		]),
-	);
-	const activities: TaskActivityRecord[] = [
-		{
-			id: `${rows.task.id}:created`,
-			kind: "created",
-			actorId: rows.task.creatorId,
-			actorType: "human",
-			title: "created this issue",
-			body: "",
-			status: rows.task.status,
-			createdAt: rows.task.createdAt,
-		},
-		...rows.comments.map((comment) => ({
-			id: comment.id,
-			kind: "comment" as const,
-			actorId: comment.authorId,
-			actorType: comment.authorType,
-			title:
-				comment.authorType === "system"
-					? "updated this issue"
-					: "commented on this issue",
-			body: comment.comment,
-			status: null,
-			createdAt: comment.createdAt,
-		})),
-		...rows.executionLogs.map((log) => ({
-			id: log.id,
-			kind: "execution" as const,
-			actorId: "devos",
-			actorType: "agent",
-			title: "recorded execution output",
-			body: log.log,
-			status: log.status,
-			createdAt: log.startedAt,
-			steps: stepsByLog.get(log.id) ?? [],
-		})),
-	];
-	return {
-		taskId: rows.task.id,
-		activities: activities.sort((left, right) =>
-			left.createdAt.localeCompare(right.createdAt),
-		),
-	};
-}
-
 function describeTaskUpdate(
-	existing: TaskActivitySourceRows["task"],
-	updated: TaskActivitySourceRows["task"],
+	existing: BoardTaskApiRecord,
+	updated: BoardTaskApiRecord,
 	input: UpdateTaskPayload,
 ): string | null {
 	const lines = UPDATE_ACTIVITY_FIELDS.flatMap((field) => {
@@ -230,6 +187,10 @@ function formatValue(value: string | number | null | undefined): string {
 	const text = String(value).replace(/\s+/g, " ").trim();
 	const truncated = text.length > 120 ? `${text.slice(0, 117)}...` : text;
 	return `\`${truncated}\``;
+}
+
+function normalizeTaskStatus(status: string): string {
+	return status === LEGACY_PR_CREATED_STATUS ? "reviewing" : status;
 }
 
 function mapMutationError(error: unknown) {

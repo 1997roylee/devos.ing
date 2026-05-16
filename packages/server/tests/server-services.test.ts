@@ -1,12 +1,11 @@
 import { describe, expect, it } from "bun:test";
-import type { AgentRow, SkillRow } from "../src/db";
-import type { BoardTaskRow } from "../src/db/board-tasks.types";
+import type { AgentRow, BoardTaskRow, SkillRow } from "../src/db";
 import { createProjectService } from "../src/projects";
 import type { ProjectRepository } from "../src/projects";
 import { createEntityCrudService } from "../src/routes/entity-crud-service";
 import type { EntityCrudRepository } from "../src/routes/entity-crud-service.types";
 import { createTaskService, parseTaskIntakeOutput } from "../src/tasks";
-import type { TaskRepository } from "../src/tasks";
+import type { BoardTaskApiRecord, TaskRepository } from "../src/tasks";
 
 describe("server services", () => {
 	it("keeps project business rules out of controllers", async () => {
@@ -52,7 +51,7 @@ describe("server services", () => {
 
 	it("creates task defaults and rejects empty task updates", async () => {
 		const createdTasks: unknown[] = [];
-		const storedTasks = new Map<string, BoardTaskRow>();
+		const storedTasks = new Map<string, BoardTaskApiRecord>();
 		const service = createTaskService({
 			listTasks: async () => [],
 			getTask: async (id) => storedTasks.get(id) ?? null,
@@ -69,9 +68,10 @@ describe("server services", () => {
 			},
 			projectExists: async (id) => id === "project-1",
 			nextTaskKey: async () => "TASK-000123",
-			createTask: async (input) => {
+			createTask: async (input, assigneeId) => {
 				const created = {
 					...input,
+					assigneeId: assigneeId ?? null,
 					projectId: input.projectId ?? null,
 					dueDate: input.dueDate ?? null,
 					linkedPr: input.linkedPr ?? null,

@@ -1,27 +1,34 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { ServerDatabase } from "../db";
 import {
 	boardProjectsTable,
 	boardTasksTable,
 	generateBoardTaskKey,
+	taskAssigneesTable,
 	taskCommentsTable,
 	taskExecutionLogsTable,
 	taskExecutionStepsTable,
 } from "../db";
-import type { NewBoardTaskRow } from "../db/board-tasks.types";
-import type { TaskRepository } from "./task-service.types";
+import type { BoardTaskRow, NewBoardTaskRow } from "../db";
+import type { BoardTaskApiRecord, TaskRepository } from "./task-service.types";
+
+const HUMAN_ASSIGNEE_TYPE = "human";
 
 export function createTaskRepository(db: ServerDatabase["db"]): TaskRepository {
 	return {
 		async listTasks() {
-			return db.select().from(boardTasksTable);
+			const tasks = await db.select().from(boardTasksTable);
+			return withAssignees(db, tasks);
 		},
 		async getTask(id) {
 			const [task] = await db
 				.select()
 				.from(boardTasksTable)
 				.where(eq(boardTasksTable.id, id));
-			return task ?? null;
+			if (!task) {
+				return null;
+			}
+			return withAssignee(db, task);
 		},
 		async getTaskActivity(id) {
 			const [task] = await db
@@ -59,35 +66,143 @@ export function createTaskRepository(db: ServerDatabase["db"]): TaskRepository {
 		async nextTaskKey() {
 			return generateBoardTaskKey(db);
 		},
-		async createTask(input) {
-			const [created] = await db
-				.insert(boardTasksTable)
-				.values(input)
-				.returning();
-			return created;
+		async createTask(input, assigneeId) {
+			return db.transaction(async (tx) => {
+				const [created] = await tx
+					.insert(boardTasksTable)
+					.values(input)
+					.returning();
+				await setTaskAssignee(tx, created.id, assigneeId);
+				return { ...created, assigneeId: assigneeId ?? null };
+			});
 		},
-		async updateTask(id, input: Partial<NewBoardTaskRow>) {
-			const [updated] = await db
-				.update(boardTasksTable)
-				.set(input)
-				.where(eq(boardTasksTable.id, id))
-				.returning();
-			return updated ?? null;
+		async updateTask(id, input: Partial<NewBoardTaskRow>, assigneeId) {
+			return db.transaction(async (tx) => {
+				const [updated] = await tx
+					.update(boardTasksTable)
+					.set(input)
+					.where(eq(boardTasksTable.id, id))
+					.returning();
+				if (!updated) {
+					return null;
+				}
+				await setTaskAssignee(tx, id, assigneeId);
+				const currentAssigneeId =
+					assigneeId === undefined
+						? await readTaskAssignee(tx, id)
+						: assigneeId;
+				return { ...updated, assigneeId: currentAssigneeId ?? null };
+			});
 		},
 		async deleteTask(id) {
 			return db.transaction(async (tx) => {
+				const existing = await readTaskForDelete(tx, id);
+				if (!existing) {
+					return null;
+				}
+				await tx
+					.delete(taskAssigneesTable)
+					.where(eq(taskAssigneesTable.taskId, id));
 				await tx
 					.delete(taskCommentsTable)
 					.where(eq(taskCommentsTable.taskId, id));
-				const [deleted] = await tx
-					.delete(boardTasksTable)
-					.where(eq(boardTasksTable.id, id))
-					.returning();
-				return deleted ?? null;
+				await tx.delete(boardTasksTable).where(eq(boardTasksTable.id, id));
+				return existing;
 			});
 		},
 		async addTaskComment(input) {
 			await db.insert(taskCommentsTable).values(input);
 		},
 	};
+}
+
+type DbExecutor = Pick<ServerDatabase["db"], "delete" | "insert" | "select">;
+
+async function withAssignees(
+	db: DbExecutor,
+	tasks: BoardTaskRow[],
+): Promise<BoardTaskApiRecord[]> {
+	if (tasks.length === 0) {
+		return [];
+	}
+	const taskIds = tasks.map((task) => task.id);
+	const assignees = await db
+		.select()
+		.from(taskAssigneesTable)
+		.where(inArray(taskAssigneesTable.taskId, taskIds));
+	const assigneeByTaskId = new Map<string, string>();
+	for (const assignee of assignees) {
+		if (assignee.assigneeType === HUMAN_ASSIGNEE_TYPE) {
+			assigneeByTaskId.set(assignee.taskId, assignee.assigneeId);
+		}
+	}
+	return tasks.map((task) => ({
+		...task,
+		assigneeId: assigneeByTaskId.get(task.id) ?? null,
+	}));
+}
+
+async function withAssignee(
+	db: DbExecutor,
+	task: BoardTaskRow,
+): Promise<BoardTaskApiRecord> {
+	return {
+		...task,
+		assigneeId: await readTaskAssignee(db, task.id),
+	};
+}
+
+async function readTaskForDelete(
+	db: DbExecutor,
+	taskId: string,
+): Promise<BoardTaskApiRecord | null> {
+	const [task] = await db
+		.select()
+		.from(boardTasksTable)
+		.where(eq(boardTasksTable.id, taskId));
+	return task ? withAssignee(db, task) : null;
+}
+
+async function readTaskAssignee(
+	db: DbExecutor,
+	taskId: string,
+): Promise<string | null> {
+	const [assignee] = await db
+		.select()
+		.from(taskAssigneesTable)
+		.where(
+			and(
+				eq(taskAssigneesTable.taskId, taskId),
+				eq(taskAssigneesTable.assigneeType, HUMAN_ASSIGNEE_TYPE),
+			),
+		);
+	return assignee?.assigneeId ?? null;
+}
+
+async function setTaskAssignee(
+	db: DbExecutor,
+	taskId: string,
+	assigneeId: string | null | undefined,
+): Promise<void> {
+	if (assigneeId === undefined) {
+		return;
+	}
+	await db
+		.delete(taskAssigneesTable)
+		.where(
+			and(
+				eq(taskAssigneesTable.taskId, taskId),
+				eq(taskAssigneesTable.assigneeType, HUMAN_ASSIGNEE_TYPE),
+			),
+		);
+	if (!assigneeId) {
+		return;
+	}
+	await db.insert(taskAssigneesTable).values({
+		id: crypto.randomUUID(),
+		taskId,
+		assigneeId,
+		assigneeType: HUMAN_ASSIGNEE_TYPE,
+		createdAt: new Date().toISOString(),
+	});
 }

@@ -4,6 +4,7 @@ import {
 	boardProjectsTable,
 	boardTasksTable,
 	projectBoardsTable,
+	taskAssigneesTable,
 } from "../db";
 import {
 	type BoardRepository,
@@ -13,6 +14,12 @@ import {
 	type WorkspaceProjectBoard,
 	type WorkspaceProjectSummary,
 } from "./board.types";
+
+const LEGACY_PR_CREATED_STATUS = "pr_created";
+const BOARD_STATUS_QUERY_VALUES = [
+	...REQUIRED_BOARD_STATUSES,
+	LEGACY_PR_CREATED_STATUS,
+];
 
 export function createBoardRepository(
 	db: ServerDatabase["db"],
@@ -88,29 +95,62 @@ export function createBoardRepository(
 				.where(
 					and(
 						eq(boardTasksTable.projectId, project.id),
-						inArray(boardTasksTable.status, [...REQUIRED_BOARD_STATUSES]),
+						inArray(boardTasksTable.status, BOARD_STATUS_QUERY_VALUES),
 					),
 				)
 				.orderBy(asc(boardTasksTable.createdAt), asc(boardTasksTable.id));
 
+			const tasks = await attachAssignees(db, taskRows);
 			return {
 				project,
-				statusColumns: buildStatusColumns(taskRows),
+				statusColumns: buildStatusColumns(tasks),
 			} satisfies WorkspaceProjectBoard;
 		},
 	};
 }
 
+async function attachAssignees(
+	db: ServerDatabase["db"],
+	tasks: Omit<BoardTaskSummary, "assigneeId">[],
+): Promise<BoardTaskSummary[]> {
+	if (tasks.length === 0) {
+		return [];
+	}
+	const assignees = await db
+		.select()
+		.from(taskAssigneesTable)
+		.where(
+			inArray(
+				taskAssigneesTable.taskId,
+				tasks.map((task) => task.id),
+			),
+		);
+	const assigneeByTaskId = new Map(
+		assignees
+			.filter((assignee) => assignee.assigneeType === "human")
+			.map((assignee) => [assignee.taskId, assignee.assigneeId]),
+	);
+	return tasks.map((task) => ({
+		...task,
+		assigneeId: assigneeByTaskId.get(task.id) ?? null,
+	}));
+}
+
 function buildStatusColumns(tasks: BoardTaskSummary[]): BoardStatusColumn[] {
 	const byStatus = new Map<string, BoardTaskSummary[]>();
 	for (const task of tasks) {
-		const items = byStatus.get(task.status) ?? [];
-		items.push(task);
-		byStatus.set(task.status, items);
+		const status = normalizeBoardStatus(task.status);
+		const items = byStatus.get(status) ?? [];
+		items.push({ ...task, status });
+		byStatus.set(status, items);
 	}
 
 	return REQUIRED_BOARD_STATUSES.map((status) => ({
 		status,
 		tasks: byStatus.get(status) ?? [],
 	}));
+}
+
+function normalizeBoardStatus(status: string): string {
+	return status === LEGACY_PR_CREATED_STATUS ? "reviewing" : status;
 }

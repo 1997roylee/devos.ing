@@ -119,6 +119,7 @@ describe("server routes", () => {
 				status: "todo",
 				dueDate: null,
 				creatorId: "owner-1",
+				assigneeId: null,
 				linkedPr: null,
 				linearIssueId: null,
 				linearIdentifier: null,

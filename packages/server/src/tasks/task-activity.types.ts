@@ -1,7 +1,9 @@
-import type { BoardTaskRow } from "../db/board-tasks.types";
-import type { TaskCommentRow } from "../db/task-comments.types";
-import type { TaskExecutionLogRow } from "../db/task-execution-logs.types";
-import type { TaskExecutionStepRow } from "../db/task-execution-steps.types";
+import type {
+	BoardTaskRow,
+	TaskCommentRow,
+	TaskExecutionLogRow,
+	TaskExecutionStepRow,
+} from "../db";
 
 export type TaskActivityKind = "comment" | "created" | "execution";
 

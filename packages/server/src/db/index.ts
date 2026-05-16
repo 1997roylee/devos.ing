@@ -8,6 +8,7 @@ export * from "./schema";
 export type * from "./schema.types";
 export type {
 	InitializeServerDatabaseOptions,
+	ServerDb,
 	ServerDatabase,
 	ServerDatabaseInitializationPhase,
 } from "./database.types";

@@ -12,7 +12,7 @@ import type {
 	InternalTaskPollingSchedulerOptions,
 } from "./polling.types";
 
-const READY_STATUS = "planning";
+const READY_STATUS = "todo";
 
 export function startInternalTaskPollingScheduler(
 	options: InternalTaskPollingSchedulerOptions,

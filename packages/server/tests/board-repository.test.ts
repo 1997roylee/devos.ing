@@ -69,7 +69,7 @@ describe("board repository", () => {
 			buildTask({
 				id: "task-2",
 				projectId: "project-1",
-				status: "reviewing",
+				status: "todo",
 				createdAt: "2026-05-14 00:03:00",
 			}),
 			buildTask({
@@ -77,6 +77,12 @@ describe("board repository", () => {
 				projectId: "project-1",
 				status: "unknown_status",
 				createdAt: "2026-05-14 00:04:00",
+			}),
+			buildTask({
+				id: "task-4",
+				projectId: "project-1",
+				status: "pr_created",
+				createdAt: "2026-05-14 00:05:00",
 			}),
 		]);
 
@@ -93,13 +99,22 @@ describe("board repository", () => {
 				.length,
 		).toBe(1);
 		expect(
-			board?.statusColumns.find((column) => column.status === "reviewing")
-				?.tasks.length,
+			board?.statusColumns.find((column) => column.status === "todo")?.tasks
+				.length,
 		).toBe(1);
 		expect(
 			board?.statusColumns.find((column) => column.status === "testing")?.tasks
 				.length,
 		).toBe(0);
+		expect(
+			board?.statusColumns.some(
+				(column) => (column.status as string) === "pr_created",
+			),
+		).toBe(false);
+		expect(
+			board?.statusColumns.find((column) => column.status === "reviewing")
+				?.tasks[0]?.status,
+		).toBe("reviewing");
 		expect(
 			board?.statusColumns.find((column) => column.status === "planning")
 				?.tasks[0]?.linearIdentifier,
@@ -169,7 +184,9 @@ function buildTask(input: {
 				? "TASK-000001"
 				: input.id === "task-2"
 					? "TASK-000002"
-					: "TASK-000003",
+					: input.id === "task-3"
+						? "TASK-000003"
+						: "TASK-000004",
 		projectId: input.projectId,
 		title: `Task ${input.id}`,
 		content: "Task content",

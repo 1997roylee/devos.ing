@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { createBoardRepository } from "../src/board";
-import { boardTasksTable } from "../src/db";
-import type { BoardTaskRow } from "../src/db/board-tasks.types";
+import { type BoardTaskRow, boardTasksTable } from "../src/db";
 import {
 	type DrizzleServerTestDatabase,
 	createDrizzleServerTestDatabase,
@@ -14,6 +13,8 @@ import {
 } from "./task-chat-create-test-helpers";
 
 let testDatabase: DrizzleServerTestDatabase | undefined;
+
+type BoardTaskApiRow = BoardTaskRow & { assigneeId: string | null };
 
 afterEach(async () => {
 	if (testDatabase) {
@@ -60,7 +61,7 @@ describe("chat task create route", () => {
 		expect(response.status).toBe(200);
 		const body = (await response.json()) as {
 			status: string;
-			task: BoardTaskRow;
+			task: BoardTaskApiRow;
 		};
 		expect(body.status).toBe("created");
 		expect(body.task.taskKey).toBe("TASK-000001");
@@ -69,8 +70,9 @@ describe("chat task create route", () => {
 		expect(body.task.status).toBe("planning");
 		expect(body.task.linkedPr).toBeNull();
 		expect(body.task.projectId).toBe("project-1");
+		expect(body.task.assigneeId).toBeNull();
 		const tasks = await testDatabase.db.select().from(boardTasksTable);
-		expect(tasks).toEqual([body.task]);
+		expect(tasks).toEqual([withoutAssigneeId(body.task)]);
 		const board = await createBoardRepository(
 			testDatabase.db,
 		).getWorkspaceProjectBoard("owner-1", "project-1");
@@ -162,14 +164,15 @@ describe("chat task create route", () => {
 		expect(response.status).toBe(200);
 		const body = (await response.json()) as {
 			status: string;
-			task: BoardTaskRow;
+			task: BoardTaskApiRow;
 		};
 		expect(body.status).toBe("created");
 		expect(body.task.projectId).toBeNull();
 		expect(body.task.status).toBe("planning");
 		expect(body.task.linkedPr).toBeNull();
+		expect(body.task.assigneeId).toBeNull();
 		const tasks = await testDatabase.db.select().from(boardTasksTable);
-		expect(tasks).toEqual([body.task]);
+		expect(tasks).toEqual([withoutAssigneeId(body.task)]);
 		expect(calls).toEqual([
 			{
 				action: "task",
@@ -218,13 +221,14 @@ describe("chat task create route", () => {
 		expect(response.status).toBe(200);
 		const body = (await response.json()) as {
 			status: string;
-			task: BoardTaskRow;
+			task: BoardTaskApiRow;
 		};
 		expect(body.status).toBe("created");
 		expect(body.task.content).toBe("Legacy task body.");
 		expect(body.task.projectId).toBeNull();
+		expect(body.task.assigneeId).toBeNull();
 		const tasks = await testDatabase.db.select().from(boardTasksTable);
-		expect(tasks).toEqual([body.task]);
+		expect(tasks).toEqual([withoutAssigneeId(body.task)]);
 	});
 
 	it("does not duplicate a task when chat intake already inserted it", async () => {
@@ -268,7 +272,7 @@ describe("chat task create route", () => {
 		expect(response.status).toBe(200);
 		expect(await response.json()).toEqual({
 			status: "created",
-			task: persistedExistingTask,
+			task: { ...persistedExistingTask, assigneeId: null },
 		});
 		const tasks = await testDatabase.db.select().from(boardTasksTable);
 		expect(tasks).toEqual([persistedExistingTask]);
@@ -364,3 +368,8 @@ describe("chat task create route", () => {
 		});
 	});
 });
+
+function withoutAssigneeId(task: BoardTaskApiRow): BoardTaskRow {
+	const { assigneeId: _assigneeId, ...row } = task;
+	return row;
+}

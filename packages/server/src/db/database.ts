@@ -2,7 +2,6 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import { CREATE_SCHEMA_SQL } from "./bootstrap-schema";
 import type {
 	InitializeServerDatabaseOptions,
 	ServerDatabase,
@@ -16,18 +15,6 @@ interface InitializationErrorInput {
 	databasePath: string;
 	phase: ServerDatabaseInitializationPhase;
 }
-
-interface ServerDatabaseInitializationDependencies {
-	clientFactory?: ServerDatabaseClientFactory;
-	migrationRunner?: ServerDatabaseMigrationRunner;
-}
-
-type ServerDatabaseClientFactory = (
-	databasePath: string,
-	options: InitializeServerDatabaseOptions,
-) => PGlite;
-
-type ServerDatabaseMigrationRunner = (client: PGlite) => Promise<void>;
 
 export class ServerDatabaseInitializationError extends Error {
 	readonly databasePath: string;
@@ -50,14 +37,6 @@ export async function initializeServerDatabase(
 	databasePath: string,
 	options: InitializeServerDatabaseOptions = {},
 ): Promise<ServerDatabase> {
-	return initializeServerDatabaseWithDependencies(databasePath, options);
-}
-
-export async function initializeServerDatabaseWithDependencies(
-	databasePath: string,
-	options: InitializeServerDatabaseOptions = {},
-	dependencies: ServerDatabaseInitializationDependencies = {},
-): Promise<ServerDatabase> {
 	const resolvedPath = path.resolve(databasePath);
 	let client: PGlite | undefined;
 	let phase: ServerDatabaseInitializationPhase = "create_directory";
@@ -66,16 +45,13 @@ export async function initializeServerDatabaseWithDependencies(
 		await mkdir(path.dirname(resolvedPath), { recursive: true });
 
 		phase = "create_client";
-		client = createServerDatabaseClient(resolvedPath, options, dependencies);
+		client = new PGlite(resolvedPath, { debug: options.pgliteDebug });
 
 		phase = "wait_ready";
 		await client.waitReady;
 
-		phase = "bootstrap_schema";
-		await client.exec(CREATE_SCHEMA_SQL);
-
 		phase = "run_migrations";
-		await (dependencies.migrationRunner ?? runMigrations)(client);
+		await runMigrations(client);
 
 		phase = "bind_drizzle";
 		const initializedClient = client;
@@ -95,17 +71,6 @@ export async function initializeServerDatabaseWithDependencies(
 			phase,
 		});
 	}
-}
-
-function createServerDatabaseClient(
-	databasePath: string,
-	options: InitializeServerDatabaseOptions,
-	dependencies: ServerDatabaseInitializationDependencies,
-): PGlite {
-	if (dependencies.clientFactory) {
-		return dependencies.clientFactory(databasePath, options);
-	}
-	return new PGlite(databasePath, { debug: options.pgliteDebug });
 }
 
 async function closePartialClient(client: PGlite | undefined): Promise<void> {

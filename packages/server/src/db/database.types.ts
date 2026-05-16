@@ -7,7 +7,6 @@ export type ServerDatabaseInitializationPhase =
 	| "create_directory"
 	| "create_client"
 	| "wait_ready"
-	| "bootstrap_schema"
 	| "run_migrations"
 	| "bind_drizzle";
 
@@ -20,3 +19,5 @@ export interface ServerDatabase {
 	db: ReturnType<typeof drizzle<typeof schema>>;
 	close(): Promise<void>;
 }
+
+export type ServerDb = ServerDatabase["db"];

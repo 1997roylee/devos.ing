@@ -1,7 +1,4 @@
-import type {
-	BoardProjectRow,
-	NewBoardProjectRow,
-} from "../db/board-projects.types";
+import type { BoardProjectRow, NewBoardProjectRow } from "../db";
 import type {
 	CreateProjectPayload,
 	UpdateProjectPayload,

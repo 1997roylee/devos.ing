@@ -32,6 +32,7 @@ describe("request schemas", () => {
 				priority: 1,
 				status: "todo",
 				creatorId: "user-1",
+				assigneeId: "user-2",
 				linearIssueId: "lin-1",
 				linearIdentifier: "ROY-233",
 				linearUrl: "https://linear.app/roy/issue/ROY-233/task",

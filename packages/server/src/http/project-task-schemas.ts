@@ -34,6 +34,7 @@ const createTaskSchema = z.object({
 	priority: z.number().int(),
 	status: nonEmptyString,
 	creatorId: nonEmptyString,
+	assigneeId: optionalNullableString,
 	dueDate: optionalTimestamp,
 	linkedPr: optionalNullableString,
 	linearIssueId: optionalNullableString,

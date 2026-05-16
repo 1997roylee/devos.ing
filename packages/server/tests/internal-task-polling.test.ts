@@ -30,7 +30,7 @@ describe("startInternalTaskPollingScheduler", () => {
 	it("streams daemon output into task execution logs", async () => {
 		testDatabase = await createDrizzleServerTestDatabase();
 		const db = testDatabase.db;
-		await seedProjectTask(db, "planning");
+		await seedProjectTask(db, "todo");
 		const intervalCalls: number[] = [];
 		let release: (() => void) | undefined;
 		const running = new Promise<void>((resolve) => {
@@ -101,10 +101,10 @@ describe("startInternalTaskPollingScheduler", () => {
 		scheduler.stop();
 	});
 
-	it("marks rejected daemon runs failed and blocks still-planning tasks", async () => {
+	it("marks rejected daemon runs failed and blocks still-ready tasks", async () => {
 		testDatabase = await createDrizzleServerTestDatabase();
 		const db = testDatabase.db;
-		await seedProjectTask(db, "planning");
+		await seedProjectTask(db, "todo");
 
 		startInternalTaskPollingScheduler(
 			{
@@ -138,7 +138,7 @@ describe("startInternalTaskPollingScheduler", () => {
 	it("skips overlapping ticks while a polling cycle is active", async () => {
 		testDatabase = await createDrizzleServerTestDatabase();
 		const db = testDatabase.db;
-		await seedProjectTask(db, "planning");
+		await seedProjectTask(db, "todo");
 		let tick: (() => void) | undefined;
 		let release: (() => void) | undefined;
 		const running = new Promise<void>((resolve) => {

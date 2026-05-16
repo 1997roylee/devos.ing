@@ -36,15 +36,18 @@ describe("task routes", () => {
 					priority: 1,
 					status: "open",
 					creatorId: "owner-1",
+					assigneeId: "owner-2",
 				}),
 			}),
 		);
 		expect(createResponse.status).toBe(201);
 		const created = (await createResponse.json()) as {
+			assigneeId: string | null;
 			id: string;
 			title: string;
 		};
 		expect(created.title).toBe("Task 1");
+		expect(created.assigneeId).toBe("owner-2");
 
 		const unassignedResponse = await app(
 			new Request("http://localhost/api/tasks", {
@@ -77,17 +80,47 @@ describe("task routes", () => {
 			}),
 		);
 		expect(readResponse.status).toBe(200);
+		expect(
+			((await readResponse.json()) as { assigneeId: string | null }).assigneeId,
+		).toBe("owner-2");
 
 		const updateResponse = await app(
 			new Request(`http://localhost/api/tasks/${created.id}`, {
 				method: "PATCH",
 				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ status: "done", priority: 2 }),
+				body: JSON.stringify({
+					status: "done",
+					priority: 2,
+					assigneeId: "owner-3",
+				}),
 			}),
 		);
 		expect(updateResponse.status).toBe(200);
-		expect(((await updateResponse.json()) as { status: string }).status).toBe(
-			"done",
+		expect(await updateResponse.json()).toMatchObject({
+			assigneeId: "owner-3",
+			status: "done",
+		});
+
+		const clearAssigneeResponse = await app(
+			new Request(`http://localhost/api/tasks/${created.id}`, {
+				method: "PATCH",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ assigneeId: null }),
+			}),
+		);
+		expect(clearAssigneeResponse.status).toBe(200);
+		expect(await clearAssigneeResponse.json()).toMatchObject({
+			assigneeId: null,
+		});
+
+		const activityResponse = await app(
+			new Request(`http://localhost/api/tasks/${created.id}/activity`, {
+				method: "GET",
+			}),
+		);
+		expect(activityResponse.status).toBe(200);
+		expect(JSON.stringify(await activityResponse.json())).toContain(
+			"changed assignee id",
 		);
 
 		const deleteResponse = await app(

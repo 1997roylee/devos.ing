@@ -80,6 +80,7 @@ export interface BoardTaskRecord {
 	status: string;
 	dueDate: string | null;
 	creatorId: string;
+	assigneeId: string | null;
 	linkedPr: string | null;
 	linearIssueId: string | null;
 	linearIdentifier: string | null;

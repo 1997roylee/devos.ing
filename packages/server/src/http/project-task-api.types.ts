@@ -22,6 +22,7 @@ export interface CreateTaskPayload {
 	priority: number;
 	status: string;
 	creatorId: string;
+	assigneeId?: string | null;
 	dueDate?: string | null;
 	linkedPr?: string | null;
 	linearIssueId?: string | null;
@@ -37,6 +38,7 @@ export interface UpdateTaskPayload {
 	priority?: number;
 	status?: string;
 	creatorId?: string;
+	assigneeId?: string | null;
 	dueDate?: string | null;
 	linkedPr?: string | null;
 	linearIssueId?: string | null;

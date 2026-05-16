@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
 	type AgentRow,
 	type ServerDatabase,
+	type ServerDb,
 	agentsTable,
 	initializeServerDatabase,
 	runMigrations,
@@ -36,5 +37,8 @@ describe("db boundary export", () => {
 		type CloseFn = ServerDatabase["close"];
 		const closeFn: CloseFn = async () => {};
 		expect(typeof closeFn).toBe("function");
+
+		const acceptDb = (_db: ServerDb) => undefined;
+		expect(typeof acceptDb).toBe("function");
 	});
 });

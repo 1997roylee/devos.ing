@@ -1,5 +1,4 @@
-import type { BoardTaskRow, NewBoardTaskRow } from "../db/board-tasks.types";
-import type { NewTaskCommentRow } from "../db/task-comments.types";
+import type { BoardTaskRow, NewBoardTaskRow, NewTaskCommentRow } from "../db";
 import type {
 	CreateTaskPayload,
 	UpdateTaskPayload,
@@ -9,18 +8,26 @@ import type {
 	TaskActivitySourceRows,
 } from "./task-activity.types";
 
+export type BoardTaskApiRecord = BoardTaskRow & {
+	assigneeId: string | null;
+};
+
 export interface TaskRepository {
-	listTasks(): Promise<BoardTaskRow[]>;
-	getTask(id: string): Promise<BoardTaskRow | null>;
+	listTasks(): Promise<BoardTaskApiRecord[]>;
+	getTask(id: string): Promise<BoardTaskApiRecord | null>;
 	getTaskActivity(id: string): Promise<TaskActivitySourceRows | null>;
 	projectExists(id: string): Promise<boolean>;
 	nextTaskKey(): Promise<string>;
-	createTask(input: NewBoardTaskRow): Promise<BoardTaskRow>;
+	createTask(
+		input: NewBoardTaskRow,
+		assigneeId?: string | null,
+	): Promise<BoardTaskApiRecord>;
 	updateTask(
 		id: string,
 		input: Partial<NewBoardTaskRow>,
-	): Promise<BoardTaskRow | null>;
-	deleteTask(id: string): Promise<BoardTaskRow | null>;
+		assigneeId?: string | null,
+	): Promise<BoardTaskApiRecord | null>;
+	deleteTask(id: string): Promise<BoardTaskApiRecord | null>;
 	addTaskComment(input: NewTaskCommentRow): Promise<void>;
 }
 
@@ -31,19 +38,19 @@ export type TaskServiceResult<T> =
 	| { status: "invalid_payload" };
 
 export interface TaskService {
-	listTasks(): Promise<TaskServiceResult<BoardTaskRow[]>>;
-	getTask(id: string): Promise<TaskServiceResult<BoardTaskRow>>;
+	listTasks(): Promise<TaskServiceResult<BoardTaskApiRecord[]>>;
+	getTask(id: string): Promise<TaskServiceResult<BoardTaskApiRecord>>;
 	getTaskActivity(id: string): Promise<TaskServiceResult<TaskActivityResponse>>;
 	createTask(
 		input: CreateTaskPayload,
-	): Promise<TaskServiceResult<BoardTaskRow>>;
+	): Promise<TaskServiceResult<BoardTaskApiRecord>>;
 	ensureChatCreatedTask(
 		input: { projectId?: string },
 		task: BoardTaskRow,
-	): Promise<TaskServiceResult<BoardTaskRow>>;
+	): Promise<TaskServiceResult<BoardTaskApiRecord>>;
 	updateTask(
 		id: string,
 		input: UpdateTaskPayload,
-	): Promise<TaskServiceResult<BoardTaskRow>>;
-	deleteTask(id: string): Promise<TaskServiceResult<BoardTaskRow>>;
+	): Promise<TaskServiceResult<BoardTaskApiRecord>>;
+	deleteTask(id: string): Promise<TaskServiceResult<BoardTaskApiRecord>>;
 }

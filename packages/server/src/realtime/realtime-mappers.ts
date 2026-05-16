@@ -1,4 +1,4 @@
-import type { BoardProjectRow } from "../db/board-projects.types";
+import type { BoardProjectRow } from "../db";
 import type { RealtimeProjectRecord } from "./realtime-events.types";
 
 export function toRealtimeProjectRecord(

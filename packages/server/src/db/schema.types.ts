@@ -1,43 +1,52 @@
-export type {
-	BoardProjectRow,
-	NewBoardProjectRow,
-} from "./board-projects.types";
-export type { BoardTaskRow, NewBoardTaskRow } from "./board-tasks.types";
-export type { AgentRow, NewAgentRow } from "./agents.types";
-export type {
-	CommandHistoryRow,
-	NewCommandHistoryRow,
-} from "./command-history.types";
-export type {
-	InboxMessageRow,
-	NewInboxMessageRow,
-} from "./inbox-messages.types";
-export type { JobRow, NewJobRow } from "./jobs.types";
-export type {
-	NewProjectCronJobRow,
-	ProjectCronJobRow,
-} from "./project-cron-jobs.types";
-export type {
-	NewProjectBoardRow,
-	ProjectBoardRow,
-} from "./project-boards.types";
-export type { NewSkillRow, SkillRow } from "./skills.types";
-export type {
-	NewTaskAssigneeRow,
-	TaskAssigneeRow,
-} from "./task-assignees.types";
-export type { NewTaskCommentRow, TaskCommentRow } from "./task-comments.types";
-export type {
-	NewTaskExecutionLogRow,
-	TaskExecutionLogRow,
-} from "./task-execution-logs.types";
-export type {
-	NewTaskExecutionStepRow,
-	TaskExecutionStepRow,
-} from "./task-execution-steps.types";
-export type {
-	NewTaskPullRequestRow,
-	TaskPullRequestRow,
-} from "./task-pull-requests.types";
-export type { NewTaskTagRow, TaskTagRow } from "./task-tags.types";
-export type { NewTokenUsageRow, TokenUsageRow } from "./token-usage.types";
+import type {
+	agentsTable,
+	boardProjectsTable,
+	boardTasksTable,
+	commandHistoryTable,
+	inboxMessagesTable,
+	jobsTable,
+	projectBoardsTable,
+	projectCronJobsTable,
+	skillsTable,
+	taskAssigneesTable,
+	taskCommentsTable,
+	taskExecutionLogsTable,
+	taskExecutionStepsTable,
+	taskPullRequestsTable,
+	taskTagsTable,
+	tokenUsageTable,
+} from "./schema";
+
+export type AgentRow = typeof agentsTable.$inferSelect;
+export type NewAgentRow = typeof agentsTable.$inferInsert;
+export type BoardProjectRow = typeof boardProjectsTable.$inferSelect;
+export type NewBoardProjectRow = typeof boardProjectsTable.$inferInsert;
+export type BoardTaskRow = typeof boardTasksTable.$inferSelect;
+export type NewBoardTaskRow = typeof boardTasksTable.$inferInsert;
+export type CommandHistoryRow = typeof commandHistoryTable.$inferSelect;
+export type NewCommandHistoryRow = typeof commandHistoryTable.$inferInsert;
+export type InboxMessageRow = typeof inboxMessagesTable.$inferSelect;
+export type NewInboxMessageRow = typeof inboxMessagesTable.$inferInsert;
+export type JobRow = typeof jobsTable.$inferSelect;
+export type NewJobRow = typeof jobsTable.$inferInsert;
+export type ProjectBoardRow = typeof projectBoardsTable.$inferSelect;
+export type NewProjectBoardRow = typeof projectBoardsTable.$inferInsert;
+export type ProjectCronJobRow = typeof projectCronJobsTable.$inferSelect;
+export type NewProjectCronJobRow = typeof projectCronJobsTable.$inferInsert;
+export type SkillRow = typeof skillsTable.$inferSelect;
+export type NewSkillRow = typeof skillsTable.$inferInsert;
+export type TaskAssigneeRow = typeof taskAssigneesTable.$inferSelect;
+export type NewTaskAssigneeRow = typeof taskAssigneesTable.$inferInsert;
+export type TaskCommentRow = typeof taskCommentsTable.$inferSelect;
+export type NewTaskCommentRow = typeof taskCommentsTable.$inferInsert;
+export type TaskExecutionLogRow = typeof taskExecutionLogsTable.$inferSelect;
+export type NewTaskExecutionLogRow = typeof taskExecutionLogsTable.$inferInsert;
+export type TaskExecutionStepRow = typeof taskExecutionStepsTable.$inferSelect;
+export type NewTaskExecutionStepRow =
+	typeof taskExecutionStepsTable.$inferInsert;
+export type TaskPullRequestRow = typeof taskPullRequestsTable.$inferSelect;
+export type NewTaskPullRequestRow = typeof taskPullRequestsTable.$inferInsert;
+export type TaskTagRow = typeof taskTagsTable.$inferSelect;
+export type NewTaskTagRow = typeof taskTagsTable.$inferInsert;
+export type TokenUsageRow = typeof tokenUsageTable.$inferSelect;
+export type NewTokenUsageRow = typeof tokenUsageTable.$inferInsert;

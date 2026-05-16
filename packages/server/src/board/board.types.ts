@@ -1,7 +1,7 @@
 export const REQUIRED_BOARD_STATUSES = [
 	"planning",
+	"todo",
 	"implementing",
-	"pr_created",
 	"reviewing",
 	"testing",
 	"done",
@@ -30,6 +30,7 @@ export interface BoardTaskSummary {
 	status: string;
 	dueDate: string | null;
 	creatorId: string;
+	assigneeId: string | null;
 	linkedPr: string | null;
 	linearIssueId: string | null;
 	linearIdentifier: string | null;
