@@ -302,7 +302,7 @@ describe("task routes", () => {
 			new Request(`http://localhost/api/tasks/${created.id}`, {
 				method: "PATCH",
 				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ status: "done" }),
+				body: JSON.stringify({ status: "todo" }),
 			}),
 		);
 		await app(
@@ -320,5 +320,80 @@ describe("task routes", () => {
 			type: "issue.created",
 			issue: { id: created.id },
 		});
+		expect(events[1]).toMatchObject({
+			type: "issue.updated",
+			issue: { id: created.id, status: "todo" },
+		});
+	});
+
+	it("publishes daemon task-changed events from reread DB state", async () => {
+		testDatabase = await createDrizzleServerTestDatabase();
+		const events: RealtimeEventPayload[] = [];
+		const app = createTaskRouteTestApp(testDatabase.db, {
+			publish: (event) => events.push(event),
+		});
+		await seedTaskRouteProject(testDatabase.db, "project-1");
+		await testDatabase.db.insert(boardTasksTable).values({
+			id: "task-1",
+			taskKey: "TASK-000001",
+			projectId: "project-1",
+			title: "Task 1",
+			content: "Body",
+			priority: 1,
+			status: "implementing",
+			creatorId: "owner-1",
+			dueDate: null,
+			linkedPr: null,
+			createdAt: "2026-05-13T00:00:00.000Z",
+			updatedAt: "2026-05-13T00:00:00.000Z",
+		});
+
+		const response = await app(
+			new Request("http://localhost/api/internal/daemon/task-changed", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({
+					taskId: "task-1",
+					issue: { id: "task-1", status: "untrusted" },
+				}),
+			}),
+		);
+
+		expect(response.status).toBe(200);
+		expect(await response.json()).toMatchObject({
+			id: "task-1",
+			status: "implementing",
+		});
+		expect(events).toEqual([
+			expect.objectContaining({
+				type: "issue.updated",
+				issue: expect.objectContaining({
+					id: "task-1",
+					status: "implementing",
+				}),
+			}),
+		]);
+	});
+
+	it("rejects malformed daemon task-changed notifications", async () => {
+		testDatabase = await createDrizzleServerTestDatabase();
+		const events: RealtimeEventPayload[] = [];
+		const app = createTaskRouteTestApp(testDatabase.db, {
+			publish: (event) => events.push(event),
+		});
+
+		const response = await app(
+			new Request("http://localhost/api/internal/daemon/task-changed", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ issue: { id: "task-1" } }),
+			}),
+		);
+
+		expect(response.status).toBe(400);
+		expect(await response.json()).toEqual({
+			error: "taskId must be a non-empty string",
+		});
+		expect(events).toEqual([]);
 	});
 });

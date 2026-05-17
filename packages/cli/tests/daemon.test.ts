@@ -34,6 +34,21 @@ describe("buildDaemonCommands", () => {
 					NEXT_PUBLIC_DEVOS_SERVER_WS_URL: "ws://127.0.0.1:3001/api/cli/stream",
 				},
 			},
+			{
+				name: "workflow-poller",
+				command: "bun",
+				args: [
+					"run",
+					"./packages/cli/src/index.ts",
+					"run",
+					"--all-projects",
+					"--poll-forever",
+				],
+				env: {
+					DEVOS_SERVER_BASE_URL: "http://127.0.0.1:3001",
+					NODE_ENV: "production",
+				},
+			},
 		]);
 	});
 
@@ -56,6 +71,21 @@ describe("buildDaemonCommands", () => {
 			PORT: "4102",
 			DEVOS_SERVER_BASE_URL: "https://api.example.test",
 			NEXT_PUBLIC_DEVOS_SERVER_WS_URL: "ws://127.0.0.1:4101/api/cli/stream",
+		});
+		expect(commands[2]).toMatchObject({
+			name: "workflow-poller",
+			command: "bun",
+			args: [
+				"run",
+				"./packages/cli/src/index.ts",
+				"run",
+				"--all-projects",
+				"--poll-forever",
+			],
+			env: {
+				DEVOS_SERVER_BASE_URL: "https://api.example.test",
+				NODE_ENV: "production",
+			},
 		});
 	});
 
@@ -102,6 +132,17 @@ describe("runProductionDaemon", () => {
 				args: ["run", "--filter", "web", "start"],
 				cwd: "/repo",
 			},
+			{
+				command: "bun",
+				args: [
+					"run",
+					"./packages/cli/src/index.ts",
+					"run",
+					"--all-projects",
+					"--poll-forever",
+				],
+				cwd: "/repo",
+			},
 		]);
 		harness.children[0]?.emit("close", 0, null);
 		await expect(done).resolves.toBe(0);
@@ -123,7 +164,9 @@ describe("runProductionDaemon", () => {
 		await expect(done).resolves.toBe(7);
 		expect(harness.children[0]?.killed).toBe(false);
 		expect(harness.children[1]?.killed).toBe(true);
+		expect(harness.children[2]?.killed).toBe(true);
 		expect(harness.children[1]?.signals).toEqual(["SIGTERM"]);
+		expect(harness.children[2]?.signals).toEqual(["SIGTERM"]);
 	});
 
 	it("stops all services with the received process signal", async () => {
@@ -140,6 +183,7 @@ describe("runProductionDaemon", () => {
 
 		await expect(done).resolves.toBe(0);
 		expect(harness.children.map((child) => child.signals)).toEqual([
+			["SIGINT"],
 			["SIGINT"],
 			["SIGINT"],
 		]);

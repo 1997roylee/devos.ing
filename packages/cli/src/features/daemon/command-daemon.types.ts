@@ -61,4 +61,11 @@ export interface CliCommandDaemonOptions {
 	cwd: string;
 	env?: NodeJS.ProcessEnv;
 	port?: number;
+	logger?: CliCommandDaemonLogger;
+}
+
+export interface CliCommandDaemonLogger {
+	info(context: Record<string, unknown>, message: string): void;
+	warn(context: Record<string, unknown>, message: string): void;
+	error(context: Record<string, unknown>, message: string): void;
 }

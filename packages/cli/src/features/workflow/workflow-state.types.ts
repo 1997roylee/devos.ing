@@ -177,6 +177,7 @@ export interface RunOptions {
 	concurrency?: number;
 	reviewOnly?: boolean;
 	poll?: boolean;
+	pollForever?: boolean;
 	pollIntervalMs?: number;
 	maxPollCycles?: number;
 	exitWhenIdle?: boolean;

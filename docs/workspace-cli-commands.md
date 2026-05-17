@@ -118,12 +118,14 @@ Examples:
 bun run packages/cli/src/index.ts run --project default --issue ENG-123
 bun run packages/cli/src/index.ts run --project default --poll
 bun run packages/cli/src/index.ts run --all-projects --poll
+bun run packages/cli/src/index.ts run --all-projects --poll-forever
 ```
 
 Expected behavior:
 
 - Starts workflow orchestration for one project or all projects.
 - `--poll` keeps polling for eligible issues.
+- `--poll-forever` is the daemon-owned continuous polling mode; it implies polling, ignores configured max cycles, disables idle exit, and cannot be combined with `--max-poll-cycles`.
 - `--no-exit-when-idle` keeps process alive when no eligible work is found.
 - Numeric flags (`--concurrency`, `--poll-interval-ms`, `--max-poll-cycles`) must be positive integers.
 - `--isolated-worktrees` enables isolated per-issue worktree mode when supported by config.

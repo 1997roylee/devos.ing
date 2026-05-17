@@ -994,11 +994,16 @@ export function resolvePollingSettings(
 	pollingConfig: PollingConfig,
 	options: RunOptions,
 ): PollingSettings {
+	const pollForever = options.pollForever === true;
 	return {
-		enabled: options.poll === true,
+		enabled: options.poll === true || pollForever,
 		intervalMs: options.pollIntervalMs ?? pollingConfig.intervalMs,
-		maxCycles: options.maxPollCycles ?? pollingConfig.maxCycles,
-		exitWhenIdle: options.exitWhenIdle ?? pollingConfig.exitWhenIdle,
+		maxCycles: pollForever
+			? undefined
+			: (options.maxPollCycles ?? pollingConfig.maxCycles),
+		exitWhenIdle: pollForever
+			? false
+			: (options.exitWhenIdle ?? pollingConfig.exitWhenIdle),
 		staleRunTimeoutMs: pollingConfig.staleRunTimeoutMs,
 	};
 }

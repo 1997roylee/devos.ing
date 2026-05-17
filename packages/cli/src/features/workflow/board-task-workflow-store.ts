@@ -9,6 +9,7 @@ import {
 } from "devos-server/db";
 import { eq } from "drizzle-orm";
 import type { ResolvedProjectConfig } from "../../features/types";
+import { notifyBoardTaskChanged } from "./board-task-notifier";
 import type {
 	BoardTaskPrSelection,
 	BoardTaskPullRequestLink,
@@ -57,6 +58,7 @@ export function createBoardTaskWorkflowStore(
 					}
 				}
 			});
+			await notifyBoardTaskChanged(taskId);
 		},
 		async createTask(input) {
 			return withDatabase(databasePath, async (db) => {
@@ -93,9 +95,11 @@ export function createBoardTaskWorkflowStore(
 					.set({ updatedAt: now })
 					.where(eq(boardTasksTable.id, taskId));
 			});
+			await notifyBoardTaskChanged(taskId);
 		},
 		async linkPullRequest(input) {
 			await linkPullRequest(databasePath, input);
+			await notifyBoardTaskChanged(input.taskId);
 		},
 	};
 }

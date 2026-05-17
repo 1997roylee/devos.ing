@@ -96,8 +96,8 @@ Purpose: run workflow orchestration for one issue or project scope.
 Syntax:
 
 ```bash
-bun run src/index.ts run [--project <PROJECT_ID>] [--issue <LINEAR_KEY_OR_URL>] [--poll] [--no-exit-when-idle] [--concurrency <N>] [--poll-interval-ms <MS>] [--max-poll-cycles <N>] [--isolated-worktrees]
-bun run src/index.ts run --all-projects [--issue <LINEAR_KEY_OR_URL>] [--poll] [--no-exit-when-idle] [--concurrency <N>] [--poll-interval-ms <MS>] [--max-poll-cycles <N>] [--isolated-worktrees]
+bun run src/index.ts run [--project <PROJECT_ID>] [--issue <LINEAR_KEY_OR_URL>] [--poll|--poll-forever] [--no-exit-when-idle] [--concurrency <N>] [--poll-interval-ms <MS>] [--max-poll-cycles <N>] [--isolated-worktrees]
+bun run src/index.ts run --all-projects [--issue <LINEAR_KEY_OR_URL>] [--poll|--poll-forever] [--no-exit-when-idle] [--concurrency <N>] [--poll-interval-ms <MS>] [--max-poll-cycles <N>] [--isolated-worktrees]
 ```
 
 Options:
@@ -106,6 +106,7 @@ Options:
 - `--all-projects`: run across all configured projects.
 - `--issue <LINEAR_KEY_OR_URL>`: scope run to a specific Linear issue.
 - `--poll`: continue polling for new work.
+- `--poll-forever`: daemon-friendly polling mode; implies `--poll`, ignores configured max cycles, disables idle exit, and cannot be combined with `--max-poll-cycles`.
 - `--no-exit-when-idle`: disable automatic exit while idle.
 - `--concurrency <N>`: positive integer worker concurrency.
 - `--poll-interval-ms <MS>`: positive integer poll interval.

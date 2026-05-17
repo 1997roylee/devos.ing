@@ -221,6 +221,14 @@ function resolveInvocation(
 		if (pollValidation.status !== "ok") {
 			return pollValidation;
 		}
+		const pollForeverValidation = validateOptionalBooleanField(
+			request.pollForever,
+			"run",
+			"pollForever",
+		);
+		if (pollForeverValidation.status !== "ok") {
+			return pollForeverValidation;
+		}
 		const noExitWhenIdleValidation = validateOptionalBooleanField(
 			request.noExitWhenIdle,
 			"run",
@@ -261,6 +269,16 @@ function resolveInvocation(
 		if (maxPollCyclesValidation.status !== "ok") {
 			return maxPollCyclesValidation;
 		}
+		if (
+			pollForeverValidation.value === true &&
+			maxPollCyclesValidation.value !== undefined
+		) {
+			return {
+				status: "error",
+				error:
+					"Malformed run request: pollForever cannot be combined with maxPollCycles",
+			};
+		}
 		const runRequest = request as Extract<
 			SupportedCliCommandRequest,
 			{ action: "run" }
@@ -277,6 +295,7 @@ function resolveInvocation(
 						issueKey: issueKeyValidation.value,
 						allProjects: allProjectsValidation.value,
 						poll: pollValidation.value,
+						pollForever: pollForeverValidation.value,
 						noExitWhenIdle: noExitWhenIdleValidation.value,
 						isolatedWorktrees: isolatedWorktreesValidation.value,
 						concurrency: concurrencyValidation.value,
@@ -390,6 +409,7 @@ function buildRunArgs(
 	appendFlag(args, "--issue", request.issueKey);
 	appendBooleanFlag(args, "--all-projects", request.allProjects);
 	appendBooleanFlag(args, "--poll", request.poll);
+	appendBooleanFlag(args, "--poll-forever", request.pollForever);
 	if (request.noExitWhenIdle) {
 		args.push("--no-exit-when-idle");
 	}

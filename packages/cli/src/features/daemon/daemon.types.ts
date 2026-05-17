@@ -1,6 +1,6 @@
 import type { CliCommandDaemon } from "./command-daemon.types";
 
-export type DaemonServiceName = "server" | "web";
+export type DaemonServiceName = "server" | "web" | "workflow-poller";
 
 export interface DaemonServiceCommand {
 	name: DaemonServiceName;

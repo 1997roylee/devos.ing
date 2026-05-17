@@ -5,7 +5,6 @@ import { createCliDaemonClient } from "./daemon/daemon-client";
 import { initializeServerDatabase } from "./db";
 import { createExpressApp, listenExpressApp } from "./express-server";
 import type { ServerInstance } from "./express-server.types";
-import { startInternalTaskPollingScheduler } from "./features/polling";
 import {
 	logger,
 	normalizeError,
@@ -69,13 +68,6 @@ export async function startServer(
 		}),
 		{ logger },
 	);
-	const taskPolling = startInternalTaskPollingScheduler({
-		config,
-		db: serverDatabase.db,
-		cliExecutor,
-		logger,
-		realtimeEvents,
-	});
 	const server = await listenExpressApp(app, port);
 	const cliStreamProxy = attachCliStreamProxy({
 		server,
@@ -88,7 +80,6 @@ export async function startServer(
 		eventBus: realtimeEvents,
 	});
 	server.once("close", () => {
-		taskPolling.stop();
 		void cliStreamProxy.close();
 		void realtimeEventsSocket.close();
 	});

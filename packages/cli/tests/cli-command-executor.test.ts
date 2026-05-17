@@ -256,6 +256,11 @@ describe("CliCommandExecutor", () => {
 			action: "run",
 			concurrency: 0,
 		} as unknown as { action: string });
+		const malformedPollForever = await executor.execute({
+			action: "run",
+			pollForever: true,
+			maxPollCycles: 2,
+		} as unknown as { action: string });
 
 		expect(unsupportedAction.status).toBe("rejected");
 		expect(unsupportedAction.error).toContain("Unsupported CLI action");
@@ -273,6 +278,10 @@ describe("CliCommandExecutor", () => {
 		expect(malformedTaskCreate.status).toBe("rejected");
 		expect(malformedTaskUnsafeField.status).toBe("rejected");
 		expect(malformedRunField.status).toBe("rejected");
+		expect(malformedPollForever.status).toBe("rejected");
+		expect(malformedPollForever.error).toContain(
+			"pollForever cannot be combined",
+		);
 		expect(callCount).toBe(0);
 	});
 });

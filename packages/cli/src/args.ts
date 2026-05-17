@@ -23,7 +23,8 @@ export function parseArgs(argv: string[]): CliCommand {
 		const issueArg = readFlagValue(args, "--issue");
 		const projectId = readFlagValue(args, "--project");
 		const allProjects = args.includes("--all-projects");
-		const poll = args.includes("--poll");
+		const pollForever = args.includes("--poll-forever");
+		const poll = args.includes("--poll") || pollForever;
 		const exitWhenIdle = args.includes("--no-exit-when-idle")
 			? false
 			: undefined;
@@ -36,6 +37,11 @@ export function parseArgs(argv: string[]): CliCommand {
 		if (projectId && allProjects) {
 			throw new Error("run command cannot use --project with --all-projects");
 		}
+		if (pollForever && maxPollCycles !== undefined) {
+			throw new Error(
+				"run command cannot use --poll-forever with --max-poll-cycles",
+			);
+		}
 		return {
 			kind: "run",
 			options: {
@@ -43,6 +49,7 @@ export function parseArgs(argv: string[]): CliCommand {
 				projectId,
 				allProjects,
 				poll,
+				pollForever: pollForever ? true : undefined,
 				concurrency,
 				exitWhenIdle,
 				pollIntervalMs,

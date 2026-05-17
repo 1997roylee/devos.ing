@@ -15,6 +15,7 @@ export interface RunActionRequest {
 	issueKey?: string;
 	allProjects?: boolean;
 	poll?: boolean;
+	pollForever?: boolean;
 	noExitWhenIdle?: boolean;
 	concurrency?: number;
 	pollIntervalMs?: number;

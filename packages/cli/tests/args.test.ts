@@ -11,6 +11,7 @@ describe("parseArgs", () => {
 				projectId: undefined,
 				allProjects: false,
 				poll: false,
+				pollForever: undefined,
 				concurrency: undefined,
 				exitWhenIdle: undefined,
 				pollIntervalMs: undefined,
@@ -27,6 +28,7 @@ describe("parseArgs", () => {
 				projectId: "api",
 				allProjects: false,
 				poll: false,
+				pollForever: undefined,
 				concurrency: undefined,
 				exitWhenIdle: undefined,
 				pollIntervalMs: undefined,
@@ -53,6 +55,7 @@ describe("parseArgs", () => {
 				projectId: undefined,
 				allProjects: false,
 				poll: true,
+				pollForever: undefined,
 				concurrency: undefined,
 				exitWhenIdle: undefined,
 				pollIntervalMs: 15000,
@@ -76,6 +79,7 @@ describe("parseArgs", () => {
 				projectId: undefined,
 				allProjects: false,
 				poll: true,
+				pollForever: undefined,
 				concurrency: undefined,
 				exitWhenIdle: false,
 				pollIntervalMs: undefined,
@@ -93,6 +97,7 @@ describe("parseArgs", () => {
 				projectId: undefined,
 				allProjects: false,
 				poll: false,
+				pollForever: undefined,
 				concurrency: 2,
 				exitWhenIdle: undefined,
 				pollIntervalMs: undefined,
@@ -110,11 +115,30 @@ describe("parseArgs", () => {
 				projectId: undefined,
 				allProjects: false,
 				poll: false,
+				pollForever: undefined,
 				concurrency: undefined,
 				exitWhenIdle: undefined,
 				pollIntervalMs: undefined,
 				maxPollCycles: undefined,
 				isolatedWorktrees: true,
+			},
+		});
+	});
+
+	it("parses poll-forever as polling with no idle exit", () => {
+		const parsed = parseArgs(["bun", "devos", "run", "--poll-forever"]);
+		expect(parsed).toEqual({
+			kind: "run",
+			options: {
+				issueArg: undefined,
+				projectId: undefined,
+				allProjects: false,
+				poll: true,
+				pollForever: true,
+				concurrency: undefined,
+				exitWhenIdle: undefined,
+				pollIntervalMs: undefined,
+				maxPollCycles: undefined,
 			},
 		});
 	});
@@ -129,6 +153,19 @@ describe("parseArgs", () => {
 		expect(() =>
 			parseArgs(["bun", "devos", "run", "--max-poll-cycles", "-1"]),
 		).toThrow("--max-poll-cycles must be a positive integer");
+	});
+
+	it("rejects poll-forever with max-poll-cycles", () => {
+		expect(() =>
+			parseArgs([
+				"bun",
+				"devos",
+				"run",
+				"--poll-forever",
+				"--max-poll-cycles",
+				"2",
+			]),
+		).toThrow("run command cannot use --poll-forever with --max-poll-cycles");
 	});
 
 	it("rejects invalid concurrency when zero", () => {

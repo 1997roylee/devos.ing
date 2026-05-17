@@ -107,6 +107,19 @@ describe("resolvePollingSettings", () => {
 			staleRunTimeoutMs: 3600000,
 		});
 	});
+
+	it("treats poll-forever as polling with no max cycle or idle exit", () => {
+		const settings = resolvePollingSettings(polling, {
+			pollForever: true,
+		});
+		expect(settings).toEqual({
+			enabled: true,
+			intervalMs: 30000,
+			maxCycles: undefined,
+			exitWhenIdle: false,
+			staleRunTimeoutMs: 3600000,
+		});
+	});
 });
 
 describe("processIssueQueueBounded", () => {

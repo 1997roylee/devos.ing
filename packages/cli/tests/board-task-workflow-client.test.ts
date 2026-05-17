@@ -169,6 +169,58 @@ describe("BoardTaskWorkflowClient", () => {
 		expect(task?.state.id).toBe("reviewing");
 		expect(task?.state.name).toBe("reviewing");
 	});
+
+	it("notifies the server after daemon-owned task mutations", async () => {
+		const { database, config } = await setupDatabase();
+		await seedTask(database, { id: "task-1", taskKey: "TASK-000001" });
+		const calls: Array<{ url: string; body: unknown }> = [];
+		const restore = installTaskNotificationMock(calls);
+		const client = createBoardTaskWorkflowClient(config);
+
+		try {
+			await client.markStage("task-1", "implementing");
+			await client.comment("task-1", "Implementation started.");
+			await client.linkPullRequest?.("task-1", {
+				number: 42,
+				url: "https://github.com/acme/project/pull/42",
+				branch: "codex/task-000001",
+				title: "Task PR",
+			});
+		} finally {
+			restore();
+		}
+
+		expect(calls).toEqual([
+			{
+				url: "http://server.test/api/internal/daemon/task-changed",
+				body: { taskId: "task-1" },
+			},
+			{
+				url: "http://server.test/api/internal/daemon/task-changed",
+				body: { taskId: "task-1" },
+			},
+			{
+				url: "http://server.test/api/internal/daemon/task-changed",
+				body: { taskId: "task-1" },
+			},
+		]);
+	});
+
+	it("keeps workflow mutations successful when server notification fails", async () => {
+		const { database, config, databasePath } = await setupDatabase();
+		await seedTask(database, { id: "task-1", taskKey: "TASK-000001" });
+		const restore = installTaskNotificationMock([], 500);
+		const client = createBoardTaskWorkflowClient(config);
+
+		try {
+			await client.markStage("task-1", "implementing");
+		} finally {
+			restore();
+		}
+
+		const task = await readTask(databasePath, "task-1");
+		expect(task?.status).toBe("implementing");
+	});
 });
 
 async function setupDatabase() {
@@ -267,4 +319,28 @@ async function withFreshDatabase<T>(
 	} finally {
 		await database.close();
 	}
+}
+
+function installTaskNotificationMock(
+	calls: Array<{ url: string; body: unknown }>,
+	status = 204,
+): () => void {
+	const previousBaseUrl = process.env.DEVOS_SERVER_BASE_URL;
+	const previousFetch = globalThis.fetch;
+	process.env.DEVOS_SERVER_BASE_URL = "http://server.test";
+	globalThis.fetch = (async (input, init) => {
+		calls.push({
+			url: String(input),
+			body: JSON.parse(String(init?.body)),
+		});
+		return new Response(null, { status });
+	}) as typeof fetch;
+	return () => {
+		if (previousBaseUrl === undefined) {
+			Reflect.deleteProperty(process.env, "DEVOS_SERVER_BASE_URL");
+		} else {
+			process.env.DEVOS_SERVER_BASE_URL = previousBaseUrl;
+		}
+		globalThis.fetch = previousFetch;
+	};
 }

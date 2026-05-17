@@ -1,11 +1,13 @@
+import { logger as defaultLogger } from "../../utils/logger";
 import { CliCommandExecutor } from "../server";
-import type { CliCommandStreamEvent } from "../server";
+import type { CliCommandRequest, CliCommandStreamEvent } from "../server";
 import {
 	parseCliDaemonInboundFrame,
 	serializeCliDaemonFrame,
 } from "./command-daemon-protocol";
 import type {
 	CliCommandDaemon,
+	CliCommandDaemonLogger,
 	CliCommandDaemonOptions,
 	CliDaemonOutboundFrame,
 } from "./command-daemon.types";
@@ -32,6 +34,7 @@ export function startCliCommandDaemon(
 	options: CliCommandDaemonOptions,
 ): CliCommandDaemon {
 	const port = options.port ?? resolveCliDaemonPort(options.env ?? process.env);
+	const daemonLogger = options.logger ?? defaultLogger;
 	const executor = new CliCommandExecutor({
 		cwd: options.cwd,
 		command: "bun",
@@ -57,6 +60,7 @@ export function startCliCommandDaemon(
 			message(socket, message) {
 				const parsed = parseCliDaemonInboundFrame(String(message));
 				if (parsed.status === "error") {
+					logMalformedDaemonFrame(daemonLogger, parsed.error);
 					sendFrame(socket, {
 						type: "error",
 						requestId: "unknown",
@@ -64,15 +68,23 @@ export function startCliCommandDaemon(
 					});
 					return;
 				}
-				if (parsed.frame.type === "ping") {
+				const frame = parsed.frame;
+				if (frame.type === "ping") {
 					sendFrame(socket, {
 						type: "pong",
-						requestId: parsed.frame.requestId,
+						requestId: frame.requestId,
 					});
 					return;
 				}
-				void executor.executeStream(parsed.frame.request, (event) => {
-					sendFrame(socket, toOutboundFrame(parsed.frame.requestId, event));
+				logDaemonActionReceived(daemonLogger, frame.requestId, frame.request);
+				void executor.executeStream(frame.request, (event) => {
+					logDaemonStreamEvent(
+						daemonLogger,
+						frame.requestId,
+						frame.request,
+						event,
+					);
+					sendFrame(socket, toOutboundFrame(frame.requestId, event));
 				});
 			},
 		},
@@ -81,6 +93,101 @@ export function startCliCommandDaemon(
 		port,
 		stop: () => Promise.resolve(server.stop(true)),
 	};
+}
+
+export function logMalformedDaemonFrame(
+	daemonLogger: CliCommandDaemonLogger,
+	error: string,
+): void {
+	daemonLogger.warn({ error }, "Malformed CLI daemon frame");
+}
+
+export function logDaemonActionReceived(
+	daemonLogger: CliCommandDaemonLogger,
+	requestId: string,
+	request: CliCommandRequest,
+): void {
+	daemonLogger.info(
+		buildDaemonActionLogContext(requestId, request),
+		"CLI daemon action received",
+	);
+}
+
+export function buildDaemonActionLogContext(
+	requestId: string,
+	request: CliCommandRequest,
+): Record<string, unknown> {
+	const fields = request as Record<string, unknown>;
+	return pickDefined({
+		requestId,
+		action: request.action,
+		projectId: stringField(fields.projectId),
+		issueKey: stringField(fields.issueKey),
+		allProjects: booleanField(fields.allProjects),
+		poll: booleanField(fields.poll),
+		pollForever: booleanField(fields.pollForever),
+		skillsAction: stringField(fields.skillsAction),
+		taskAction: stringField(fields.taskAction),
+	});
+}
+
+export function logDaemonStreamEvent(
+	daemonLogger: CliCommandDaemonLogger,
+	requestId: string,
+	request: CliCommandRequest,
+	event: CliCommandStreamEvent,
+): void {
+	if (event.type === "progress" && event.event.kind === "action") {
+		daemonLogger.info(
+			pickDefined({
+				requestId,
+				requestAction: request.action,
+				projectId: event.event.projectId,
+				issueKey: event.event.issueKey,
+				stage: event.event.stage,
+				action: event.event.action,
+				status: event.event.status,
+			}),
+			"CLI daemon workflow action progress",
+		);
+		return;
+	}
+	if (event.type === "error") {
+		daemonLogger.error(
+			{
+				...buildDaemonActionLogContext(requestId, request),
+				error: event.error,
+			},
+			"CLI daemon action error",
+		);
+		return;
+	}
+	if (event.type === "complete") {
+		daemonLogger.info(
+			pickDefined({
+				...buildDaemonActionLogContext(requestId, request),
+				status: event.result.status,
+				exitCode: event.result.commandResult?.code,
+			}),
+			"CLI daemon action completed",
+		);
+	}
+}
+
+function pickDefined(
+	input: Record<string, unknown | undefined>,
+): Record<string, unknown> {
+	return Object.fromEntries(
+		Object.entries(input).filter(([, value]) => value !== undefined),
+	);
+}
+
+function stringField(value: unknown): string | undefined {
+	return typeof value === "string" ? value : undefined;
+}
+
+function booleanField(value: unknown): boolean | undefined {
+	return typeof value === "boolean" ? value : undefined;
 }
 
 function sendFrame(

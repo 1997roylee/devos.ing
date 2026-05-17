@@ -5,7 +5,11 @@ export {
 } from "./daemon";
 export {
 	DEFAULT_CLI_DAEMON_PORT,
+	buildDaemonActionLogContext,
 	formatCliDaemonWsUrl,
+	logDaemonActionReceived,
+	logDaemonStreamEvent,
+	logMalformedDaemonFrame,
 	resolveCliDaemonPort,
 	startCliCommandDaemon,
 } from "./command-daemon";
@@ -25,6 +29,7 @@ export type {
 } from "./daemon.types";
 export type {
 	CliCommandDaemon,
+	CliCommandDaemonLogger,
 	CliCommandDaemonOptions,
 	CliDaemonInboundFrame,
 	CliDaemonOutboundFrame,

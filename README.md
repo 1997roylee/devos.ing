@@ -58,6 +58,9 @@ bun run packages/cli/src/index.ts run --project <PROJECT_ID> --issue ENG-123
 # local polling mode
 bun run packages/cli/src/index.ts run --project <PROJECT_ID> --poll
 
+# daemon-owned continuous workflow polling
+bun run packages/cli/src/index.ts run --all-projects --poll-forever
+
 # unattended scheduled mode (server-owned cron runner)
 bun run --filter devos-server cron
 
@@ -99,7 +102,9 @@ Use `bun run dev:server` or `bun run dev:web` when you only need one side of the
 
 Use `bun run dev:cli-daemon` to start only the CLI daemon websocket on `ws://127.0.0.1:3002` for local command streaming. This is the companion process the API server connects to when browser command streams go through `/api/cli/stream`.
 
-Use `devos daemon` to run the production API server and web UI together in the foreground after production artifacts already exist. The command starts the server on `PIV_SERVER_PORT=3001` and the web UI on `PORT=3000` by default, with the web UI proxying to `DEVOS_SERVER_BASE_URL=http://127.0.0.1:3001`. Override those environment variables before starting when needed.
+Use `devos daemon` to run the production API server, web UI, CLI command daemon, and workflow poller together in the foreground after production artifacts already exist. The command starts the server on `PIV_SERVER_PORT=3001`, the web UI on `PORT=3000`, and a supervised `run --all-projects --poll-forever` worker by default, with the web UI proxying to `DEVOS_SERVER_BASE_URL=http://127.0.0.1:3001`. Override those environment variables before starting when needed.
+
+Server cron remains a separate scheduled automation runner. Start it with `bun run --filter devos-server cron` when you want server-owned cron jobs.
 
 To run the full local development stack in Docker, use:
 

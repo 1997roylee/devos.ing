@@ -25,8 +25,7 @@ export function buildDaemonCommands(
 	const cliDaemonPort = resolveCliDaemonPort(env);
 	const cliDaemonWsUrl =
 		env.DEVOS_CLI_DAEMON_WS_URL ?? formatCliDaemonWsUrl(cliDaemonPort);
-	const serverBaseUrl =
-		env.DEVOS_SERVER_BASE_URL ?? `http://127.0.0.1:${serverPort}`;
+	const serverBaseUrl = resolveServerBaseUrl(env);
 	const serverWsUrl =
 		env.NEXT_PUBLIC_DEVOS_SERVER_WS_URL ??
 		`ws://127.0.0.1:${serverPort}/api/cli/stream`;
@@ -54,6 +53,21 @@ export function buildDaemonCommands(
 				NEXT_PUBLIC_DEVOS_SERVER_WS_URL: serverWsUrl,
 			},
 		},
+		{
+			name: "workflow-poller",
+			command: "bun",
+			args: [
+				"run",
+				"./packages/cli/src/index.ts",
+				"run",
+				"--all-projects",
+				"--poll-forever",
+			],
+			env: {
+				...baseEnv,
+				DEVOS_SERVER_BASE_URL: serverBaseUrl,
+			},
+		},
 	];
 }
 
@@ -63,9 +77,13 @@ export async function runProductionDaemon(
 	const cwd = options.cwd ?? process.cwd();
 	const spawnChild = options.spawnChild ?? spawnDaemonChild;
 	const signalTarget = options.signalTarget ?? process;
+	const env = options.env ?? process.env;
 	const commandDaemon = (options.startCommandDaemon ?? startCliCommandDaemon)({
 		cwd,
-		env: options.env,
+		env: {
+			...env,
+			DEVOS_SERVER_BASE_URL: resolveServerBaseUrl(env),
+		},
 	});
 	const children = buildDaemonCommands(options.env).map((service) =>
 		spawnChild(service.command, service.args, {
@@ -193,3 +211,8 @@ function superviseDaemonChildren(
 
 const spawnDaemonChild: DaemonSpawn = (command, args, options) =>
 	spawn(command, args, options);
+
+function resolveServerBaseUrl(env: NodeJS.ProcessEnv): string {
+	const serverPort = env.PIV_SERVER_PORT ?? DEFAULT_SERVER_PORT;
+	return env.DEVOS_SERVER_BASE_URL ?? `http://127.0.0.1:${serverPort}`;
+}

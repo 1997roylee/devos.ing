@@ -8,6 +8,7 @@ import {
 	notFound,
 	parseObjectJsonBody,
 	readPathId,
+	requireString,
 } from "./http-utils";
 import {
 	parseCreateTaskPayload,
@@ -28,6 +29,23 @@ export async function handleTasksRoute(
 	}
 
 	const service = createTaskService(createTaskRepository(db));
+	if (pathname === "/api/internal/daemon/task-changed") {
+		if (request.method !== "POST") {
+			return methodNotAllowed();
+		}
+		const parsedBody = await parseObjectJsonBody(request);
+		if (!parsedBody.ok) {
+			return badRequest(parsedBody.error);
+		}
+		const taskId = requireString(parsedBody.value.taskId, "taskId");
+		if (!taskId.ok) {
+			return badRequest(taskId.error);
+		}
+		const result = await service.getTask(taskId.value);
+		publishTaskEvent(realtimeEvents, "issue.updated", result);
+		return mapTaskResult(result, "Invalid daemon task notification payload");
+	}
+
 	if (pathname === "/api/tasks") {
 		if (request.method === "GET") {
 			return mapTaskResult(await service.listTasks(), "Invalid task list");
