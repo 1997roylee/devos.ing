@@ -57,14 +57,8 @@ export function buildDaemonCommands(
 		},
 		{
 			name: "workflow-poller",
-			command: "bun",
-			args: [
-				"run",
-				"./packages/cli/src/index.ts",
-				"run",
-				"--all-projects",
-				"--poll-forever",
-			],
+			command: "npx",
+			args: ["devos", "run", "--all-projects", "--poll-forever"],
 			env: {
 				...baseEnv,
 				DEVOS_SERVER_BASE_URL: serverBaseUrl,

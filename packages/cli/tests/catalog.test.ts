@@ -9,6 +9,7 @@ import {
 	loadFolderSkillCandidates,
 	rankSkillCandidates,
 } from "../src/skills/catalog";
+import { repoSkillsRoot } from "./test-paths";
 
 const issue: IssueRef = {
 	id: "lin_roy_43",
@@ -56,7 +57,7 @@ describe("loadFolderSkillCandidates", () => {
 	});
 
 	it("discovers bundled backend/frontend/typescript standards skills", async () => {
-		const skillsRoot = path.join(process.cwd(), "skills");
+		const skillsRoot = repoSkillsRoot;
 		const basePlanPath = path.join(skillsRoot, "piv-plan", "SKILL.md");
 
 		const candidates = await loadFolderSkillCandidates(
@@ -167,7 +168,7 @@ describe("rankSkillCandidates", () => {
 	});
 
 	it("ranks coding standards skills for backend/frontend/typescript biome issues", async () => {
-		const skillsRoot = path.join(process.cwd(), "skills");
+		const skillsRoot = repoSkillsRoot;
 		const basePlanPath = path.join(skillsRoot, "piv-plan", "SKILL.md");
 		const candidates = await loadFolderSkillCandidates(
 			skillsRoot,
@@ -192,7 +193,7 @@ describe("rankSkillCandidates", () => {
 	});
 
 	it("ranks daily maintenance skill for recurring codebase cleanup issues", async () => {
-		const skillsRoot = path.join(process.cwd(), "skills");
+		const skillsRoot = repoSkillsRoot;
 		const basePlanPath = path.join(skillsRoot, "piv-plan", "SKILL.md");
 		const candidates = await loadFolderSkillCandidates(
 			skillsRoot,

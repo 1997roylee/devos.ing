@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+	buildCliCommandDaemonExecutorOptions,
 	buildDaemonActionLogContext,
 	logDaemonActionReceived,
 	logDaemonStreamEvent,
@@ -10,6 +11,23 @@ import {
 import type { CliCommandDaemonLogger } from "../src/features/daemon";
 
 describe("CLI daemon action logging", () => {
+	it("uses npx devos for daemon-owned command execution", () => {
+		expect(
+			buildCliCommandDaemonExecutorOptions({
+				cwd: "/repo",
+				env: { DEVOS_SERVER_BASE_URL: "http://127.0.0.1:3001" },
+			}),
+		).toEqual({
+			cwd: "/repo",
+			command: "npx",
+			baseArgs: ["devos"],
+			env: {
+				DEVOS_SERVER_BASE_URL: "http://127.0.0.1:3001",
+				DEVOS_WORKFLOW_PROGRESS_STREAM: "1",
+			},
+		});
+	});
+
 	it("logs valid command actions with only safe routing fields", () => {
 		const entries: LogEntry[] = [];
 		const logger = createLogger(entries);

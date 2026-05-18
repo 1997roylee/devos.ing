@@ -36,14 +36,8 @@ describe("buildDaemonCommands", () => {
 			},
 			{
 				name: "workflow-poller",
-				command: "bun",
-				args: [
-					"run",
-					"./packages/cli/src/index.ts",
-					"run",
-					"--all-projects",
-					"--poll-forever",
-				],
+				command: "npx",
+				args: ["devos", "run", "--all-projects", "--poll-forever"],
 				env: {
 					DEVOS_SERVER_BASE_URL: "http://127.0.0.1:3001",
 					DEVOS_SERVER_EVENTS_WS_URL: "ws://127.0.0.1:3001/daemon/events",
@@ -75,14 +69,8 @@ describe("buildDaemonCommands", () => {
 		});
 		expect(commands[2]).toMatchObject({
 			name: "workflow-poller",
-			command: "bun",
-			args: [
-				"run",
-				"./packages/cli/src/index.ts",
-				"run",
-				"--all-projects",
-				"--poll-forever",
-			],
+			command: "npx",
+			args: ["devos", "run", "--all-projects", "--poll-forever"],
 			env: {
 				DEVOS_SERVER_BASE_URL: "https://api.example.test",
 				DEVOS_SERVER_EVENTS_WS_URL: "wss://api.example.test/daemon/events",
@@ -145,14 +133,8 @@ describe("runProductionDaemon", () => {
 				cwd: "/repo",
 			},
 			{
-				command: "bun",
-				args: [
-					"run",
-					"./packages/cli/src/index.ts",
-					"run",
-					"--all-projects",
-					"--poll-forever",
-				],
+				command: "npx",
+				args: ["devos", "run", "--all-projects", "--poll-forever"],
 				cwd: "/repo",
 			},
 		]);

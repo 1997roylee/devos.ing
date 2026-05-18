@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import path from "node:path";
 import type { IssueRef, PullRequestRef } from "../src/features/types";
 import { buildFixPrompt, buildReviewPrompt } from "../src/skills/prompts";
+import { repoSkillPath } from "./test-paths";
 
 const issue: IssueRef = {
 	id: "lin_123",
@@ -103,7 +103,7 @@ describe("buildReviewPrompt", () => {
 
 	it("includes review guidelines from the repo review skill", async () => {
 		const prompt = await buildReviewPrompt(
-			path.resolve(process.cwd(), "skills/piv-review-test/SKILL.md"),
+			repoSkillPath("piv-review-test", "SKILL.md"),
 			issue,
 			pr,
 		);

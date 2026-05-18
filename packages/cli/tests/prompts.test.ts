@@ -8,6 +8,7 @@ import {
 	buildImplementPrompt,
 	buildPlanPrompt,
 } from "../src/skills/prompts";
+import { repoSkillPath } from "./test-paths";
 
 const issue: IssueRef = {
 	id: "lin_123",
@@ -37,7 +38,7 @@ describe("buildImplementPrompt", () => {
 
 	it("includes implementation process guidance from the repo implementation skill", async () => {
 		const prompt = await buildImplementPrompt(
-			path.resolve(process.cwd(), "skills/piv-implement/SKILL.md"),
+			repoSkillPath("piv-implement", "SKILL.md"),
 			issue,
 			"Update workflow stage transitions.",
 		);
@@ -131,7 +132,7 @@ describe("buildPlanPrompt", () => {
 
 	it("includes planning process guidance from the repo plan skill", async () => {
 		const prompt = await buildPlanPrompt(
-			path.resolve(process.cwd(), "skills/piv-plan/SKILL.md"),
+			repoSkillPath("piv-plan", "SKILL.md"),
 			issue,
 		);
 

@@ -1,6 +1,10 @@
 import { logger as defaultLogger } from "../../utils/logger";
 import { CliCommandExecutor } from "../server";
-import type { CliCommandRequest, CliCommandStreamEvent } from "../server";
+import type {
+	CliCommandExecutorOptions,
+	CliCommandRequest,
+	CliCommandStreamEvent,
+} from "../server";
 import {
 	parseCliDaemonInboundFrame,
 	serializeCliDaemonFrame,
@@ -35,12 +39,9 @@ export function startCliCommandDaemon(
 ): CliCommandDaemon {
 	const port = options.port ?? resolveCliDaemonPort(options.env ?? process.env);
 	const daemonLogger = options.logger ?? defaultLogger;
-	const executor = new CliCommandExecutor({
-		cwd: options.cwd,
-		command: "bun",
-		baseArgs: ["run", "./packages/cli/src/index.ts"],
-		env: { ...options.env, DEVOS_WORKFLOW_PROGRESS_STREAM: "1" },
-	});
+	const executor = new CliCommandExecutor(
+		buildCliCommandDaemonExecutorOptions(options),
+	);
 	const server = Bun.serve<{ connectedAt: string }>({
 		port,
 		fetch(request, bunServer) {
@@ -92,6 +93,17 @@ export function startCliCommandDaemon(
 	return {
 		port,
 		stop: () => Promise.resolve(server.stop(true)),
+	};
+}
+
+export function buildCliCommandDaemonExecutorOptions(
+	options: Pick<CliCommandDaemonOptions, "cwd" | "env">,
+): CliCommandExecutorOptions {
+	return {
+		cwd: options.cwd,
+		command: "npx",
+		baseArgs: ["devos"],
+		env: { ...options.env, DEVOS_WORKFLOW_PROGRESS_STREAM: "1" },
 	};
 }
 

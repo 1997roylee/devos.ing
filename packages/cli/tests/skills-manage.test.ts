@@ -8,6 +8,7 @@ import {
 	removeSkill,
 	updateSkill,
 } from "../src/skills/manage";
+import { repoSkillPath } from "./test-paths";
 
 describe("skills manage", () => {
 	it("adds and lists a skill using the SKILL.md template", async () => {
@@ -123,7 +124,7 @@ describe("skills manage", () => {
 		try {
 			await mkdir(skillDir, { recursive: true });
 			const sourceSkill = await readFile(
-				path.join(process.cwd(), "skills", "piv-plan", "SKILL.md"),
+				repoSkillPath("piv-plan", "SKILL.md"),
 				"utf8",
 			);
 			await writeFile(skillPath, sourceSkill, "utf8");

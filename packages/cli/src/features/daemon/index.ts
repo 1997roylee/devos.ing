@@ -5,6 +5,7 @@ export {
 } from "./daemon";
 export {
 	DEFAULT_CLI_DAEMON_PORT,
+	buildCliCommandDaemonExecutorOptions,
 	buildDaemonActionLogContext,
 	formatCliDaemonWsUrl,
 	logDaemonActionReceived,
