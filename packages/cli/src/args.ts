@@ -60,8 +60,25 @@ export function parseArgs(argv: string[]): CliCommand {
 	}
 
 	if (command === "daemon") {
-		if (rest.slice(1).includes("--cli-only")) {
-			return { kind: "daemon", cliOnly: true };
+		const args = rest.slice(1);
+		const cliOnly = args.includes("--cli-only");
+		const pollForever = args.includes("--poll-forever");
+		const allProjects = args.includes("--all-projects");
+		if ((pollForever || allProjects) && !cliOnly) {
+			throw new Error(
+				"daemon polling flags require --cli-only; use devos daemon for the full production daemon",
+			);
+		}
+		if (allProjects && !pollForever) {
+			throw new Error("daemon --all-projects requires --poll-forever");
+		}
+		if (cliOnly) {
+			return {
+				kind: "daemon",
+				cliOnly: true,
+				pollForever: pollForever ? true : undefined,
+				allProjects: allProjects ? true : undefined,
+			};
 		}
 		return { kind: "daemon" };
 	}

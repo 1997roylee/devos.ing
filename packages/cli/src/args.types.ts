@@ -35,7 +35,12 @@ export type TaskCommand = {
 
 export type CliCommand =
 	| { kind: "run"; options: RunOptions }
-	| { kind: "daemon"; cliOnly?: boolean }
+	| {
+			kind: "daemon";
+			cliOnly?: boolean;
+			pollForever?: boolean;
+			allProjects?: boolean;
+	  }
 	| { kind: "status"; issueKey: string; projectId: string }
 	| { kind: "projects" }
 	| { kind: "skills"; command: SkillsCommand }

@@ -149,7 +149,7 @@ export function printHelp(): void {
 			"",
 			"Commands:",
 			"  devos daemon",
-			"  devos daemon --cli-only",
+			"  devos daemon --cli-only [--poll-forever --all-projects]",
 			"  devos run [--project <PROJECT_ID>] [--issue <LINEAR_KEY_OR_URL>] [--poll|--poll-forever] [--no-exit-when-idle] [--poll-interval-ms <MS>] [--max-poll-cycles <N>] [--isolated-worktrees]",
 			"  devos run --all-projects [--issue <LINEAR_KEY_OR_URL>] [--poll|--poll-forever] [--no-exit-when-idle]",
 			"  devos status --project <PROJECT_ID> --issue <LINEAR_KEY>",

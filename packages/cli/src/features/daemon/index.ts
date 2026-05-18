@@ -18,6 +18,15 @@ export {
 	parseCliDaemonInboundFrame,
 	serializeCliDaemonFrame,
 } from "./command-daemon-protocol";
+export {
+	buildAttachedPollerEnv,
+	startAttachedWorkflowPoller,
+	superviseCliCommandDaemonWithPoller,
+} from "./daemon-poller";
+export {
+	createDaemonProgressPrinter,
+	formatWorkflowProgressForDaemon,
+} from "./daemon-progress-printer";
 export type {
 	DaemonChild,
 	DaemonServiceCommand,
@@ -28,6 +37,11 @@ export type {
 	RunCliCommandDaemonOnlyOptions,
 	RunProductionDaemonOptions,
 } from "./daemon.types";
+export type {
+	AttachedPoller,
+	AttachedPollerSpawn,
+	AttachedPollerSpawnOptions,
+} from "./daemon-poller";
 export type {
 	CliCommandDaemon,
 	CliCommandDaemonLogger,

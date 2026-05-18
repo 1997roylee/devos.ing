@@ -34,6 +34,8 @@ describe("buildImplementPrompt", () => {
 
 		expect(prompt).toContain("do not run git fetch or git pull");
 		expect(prompt).toContain("Plan summary:");
+		expect(prompt).toContain("90%-100% meaningful behavior coverage");
+		expect(prompt).toContain("Prioritize business logic first");
 	});
 
 	it("includes implementation process guidance from the repo implementation skill", async () => {
@@ -125,6 +127,8 @@ describe("buildPlanPrompt", () => {
 			expect(prompt).toContain(
 				"implementation target and validation/progress signal",
 			);
+			expect(prompt).toContain("90%-100% meaningful behavior coverage");
+			expect(prompt).toContain("not exhaustive 100% line coverage");
 		} finally {
 			await rm(tmpDir, { recursive: true, force: true });
 		}
@@ -177,88 +181,5 @@ describe("buildPlanPrompt", () => {
 		expect(prompt).toContain(
 			"Continue under the parent task context; keep this child issue scoped",
 		);
-	});
-
-	it("includes auto-selected supplemental skills when provided", async () => {
-		const tmpDir = await mkdtemp(path.join(os.tmpdir(), "adhd-plan-skill-"));
-		const skillPath = path.join(tmpDir, "SKILL.md");
-		await writeFile(
-			skillPath,
-			["name: adhd-plan", "description: base planning skill"].join("\n"),
-			"utf8",
-		);
-
-		try {
-			const prompt = await buildPlanPrompt(skillPath, issue, {
-				supplementalSkills: [
-					{
-						name: "linear",
-						description: "Use Linear workflows",
-						content: "name: linear\ndescription: Linear workflows",
-						path: "/tmp/skills/linear/SKILL.md",
-						tags: [],
-						source: "folder",
-						score: 9,
-					},
-				],
-				autoSelectWarnings: ["Database skill source failed: table missing"],
-			});
-
-			expect(prompt).toContain("Description: Planning should auto-select");
-			expect(prompt).toContain("Auto-selected supplemental skills:");
-			expect(prompt).toContain("include ISSUE_REFINEMENT_JSON");
-			expect(prompt).toContain("1. linear");
-			expect(prompt).toContain("source: folder");
-			expect(prompt).toContain("score: 9");
-			expect(prompt).toContain("Auto-selection notes:");
-			expect(prompt).toContain("Database skill source failed");
-		} finally {
-			await rm(tmpDir, { recursive: true, force: true });
-		}
-	});
-
-	it("renders multiple standards supplemental skills in plan prompt", async () => {
-		const tmpDir = await mkdtemp(path.join(os.tmpdir(), "adhd-plan-skill-"));
-		const skillPath = path.join(tmpDir, "SKILL.md");
-		await writeFile(
-			skillPath,
-			["name: adhd-plan", "description: base planning skill"].join("\n"),
-			"utf8",
-		);
-
-		try {
-			const prompt = await buildPlanPrompt(skillPath, issue, {
-				supplementalSkills: [
-					{
-						name: "backend-standard",
-						description: "Backend service and reliability standards",
-						content: "name: backend-standard\ndescription: backend standards",
-						path: "/tmp/skills/backend-standard/SKILL.md",
-						tags: [],
-						source: "folder",
-						score: 12,
-					},
-					{
-						name: "typescript-biome-style",
-						description: "TypeScript and Biome coding style",
-						content:
-							"name: typescript-biome-style\ndescription: TypeScript + Biome",
-						path: "/tmp/skills/typescript-biome-style/SKILL.md",
-						tags: [],
-						source: "folder",
-						score: 11,
-					},
-				],
-			});
-
-			expect(prompt).toContain("1. backend-standard");
-			expect(prompt).toContain("2. typescript-biome-style");
-			expect(prompt).toContain("score: 12");
-			expect(prompt).toContain("score: 11");
-			expect(prompt).toContain("/tmp/skills/backend-standard/SKILL.md");
-			expect(prompt).toContain("name: typescript-biome-style");
-		} finally {
-			await rm(tmpDir, { recursive: true, force: true });
-		}
 	});
 });

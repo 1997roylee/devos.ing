@@ -1,4 +1,5 @@
 import type { CliCommandDaemon } from "./command-daemon.types";
+import type { AttachedPollerSpawn } from "./daemon-poller";
 
 export type DaemonServiceName = "server" | "web" | "workflow-poller";
 
@@ -54,10 +55,13 @@ export interface RunProductionDaemonOptions {
 export interface RunCliCommandDaemonOnlyOptions {
 	cwd?: string;
 	env?: NodeJS.ProcessEnv;
+	pollForever?: boolean;
+	allProjects?: boolean;
 	signalTarget?: DaemonSignalTarget;
 	startCommandDaemon?: (options: {
 		cwd: string;
 		env?: NodeJS.ProcessEnv;
 	}) => CliCommandDaemon;
+	spawnPoller?: AttachedPollerSpawn;
 	write?: (message: string) => void;
 }

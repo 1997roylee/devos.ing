@@ -31,7 +31,11 @@ async function main(): Promise<void> {
 	}
 	if (command.kind === "daemon") {
 		if (command.cliOnly) {
-			process.exitCode = await runCliCommandDaemonOnly({ cwd });
+			process.exitCode = await runCliCommandDaemonOnly({
+				cwd,
+				pollForever: command.pollForever,
+				allProjects: command.allProjects,
+			});
 			return;
 		}
 		process.exitCode = await runProductionDaemon({ cwd });

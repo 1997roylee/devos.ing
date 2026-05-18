@@ -74,6 +74,7 @@ import type {
 import type { AgentAdapter } from "../../integrations/agent-adapters";
 import { issueBranchName } from "../../integrations/github";
 import { sortIssuesByPriority } from "../../integrations/linear";
+import { emitWorkflowProgress } from "../server";
 export type {
 	IssueJobLogFields,
 	PollingSettings,
@@ -147,6 +148,10 @@ export async function runWorkflow(
 					errorAt: new Date().toISOString(),
 					finishedAt: new Date().toISOString(),
 					metadata: { error: message },
+				});
+				emitPollingProgress(context.config.id, "cycle_failed", "failed", {
+					detail: `cycle ${cycle} failed`,
+					error: message,
 				});
 				const errorLogPath = projectErrorLogPath(
 					context.config.workspacePath,
@@ -304,6 +309,23 @@ export function shouldStopPolling(
 	return false;
 }
 
+function emitPollingProgress(
+	projectId: string,
+	action: string,
+	status: "started" | "succeeded" | "failed",
+	input: { detail: string; error?: string },
+): void {
+	emitWorkflowProgress({
+		kind: "action",
+		projectId,
+		stage: "polling",
+		action,
+		status,
+		detail: input.detail,
+		...(input.error ? { error: input.error } : {}),
+	});
+}
+
 async function runProjectCycle(
 	config: ResolvedProjectConfig,
 	notifications: ResolvedNotificationConfig,
@@ -323,6 +345,9 @@ async function runProjectCycle(
 		cycle,
 		startedAt,
 	});
+	emitPollingProgress(config.id, "cycle_started", "started", {
+		detail: `cycle ${cycle} started`,
+	});
 	const { issueQueue, staleRetryCount } = await buildIssueQueueForProjectCycle(
 		config,
 		options,
@@ -339,9 +364,15 @@ async function runProjectCycle(
 		},
 		"Fetched eligible Linear issues",
 	);
+	emitPollingProgress(config.id, "cycle_fetched", "succeeded", {
+		detail: `fetched ${issueQueue.length} issue(s)`,
+	});
 
 	if (issueQueue.length === 0) {
 		projectLogger.info({ cycle }, "No eligible Linear issues found.");
+		emitPollingProgress(config.id, "cycle_no_work", "succeeded", {
+			detail: `cycle ${cycle} no eligible issues`,
+		});
 	}
 
 	const effectiveConcurrency = resolveEffectiveIssueConcurrency(
@@ -377,6 +408,9 @@ async function runProjectCycle(
 		finishedAt: new Date().toISOString(),
 		successAt: new Date().toISOString(),
 		lastError: null,
+	});
+	emitPollingProgress(config.id, "cycle_completed", "succeeded", {
+		detail: `cycle ${cycle} completed`,
 	});
 
 	return issueQueue.length;
@@ -849,6 +883,7 @@ async function processIssue(
 		}),
 		"Taking issue job",
 	);
+	emitActionProgress(runState, runState.stage, "issue", "started");
 
 	let leaseAcquired = false;
 	const isolatedWorktreesEnabled = shouldUseIsolatedWorktree(
@@ -868,6 +903,9 @@ async function processIssue(
 				{ leaseOwnerId, currentLeaseOwnerId: runState.lease?.ownerId },
 				"Skipping issue because it is already leased by another worker",
 			);
+			emitActionProgress(runState, runState.stage, "issue", "blocked", {
+				detail: "already leased by another worker",
+			});
 			return;
 		}
 		issueLogger.info({ leaseOwnerId }, "Issue lease acquired");
@@ -924,6 +962,7 @@ async function processIssue(
 			return;
 		}
 		issueLogger.info({ stage: runState.stage }, "Issue workflow finished");
+		emitActionProgress(runState, runState.stage, "workflow", "succeeded");
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		const failedStage = runState.stage;

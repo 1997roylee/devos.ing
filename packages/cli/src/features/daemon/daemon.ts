@@ -1,9 +1,10 @@
 import { spawn } from "node:child_process";
+import { formatCliDaemonWsUrl, startCliCommandDaemon } from "./command-daemon";
 import {
-	formatCliDaemonWsUrl,
-	resolveCliDaemonPort,
-	startCliCommandDaemon,
-} from "./command-daemon";
+	startAttachedWorkflowPoller,
+	superviseCliCommandDaemonWithPoller,
+} from "./daemon-poller";
+import { resolveDaemonPorts } from "./daemon-ports";
 import type {
 	DaemonChild,
 	DaemonServiceCommand,
@@ -13,16 +14,12 @@ import type {
 	RunProductionDaemonOptions,
 } from "./daemon.types";
 
-const DEFAULT_SERVER_PORT = "3001";
-const DEFAULT_WEB_PORT = "3000";
 const SIGNALS = ["SIGINT", "SIGTERM"] as const;
 
 export function buildDaemonCommands(
 	env: NodeJS.ProcessEnv = process.env,
 ): DaemonServiceCommand[] {
-	const serverPort = env.PIV_SERVER_PORT ?? DEFAULT_SERVER_PORT;
-	const webPort = env.PORT ?? DEFAULT_WEB_PORT;
-	const cliDaemonPort = resolveCliDaemonPort(env);
+	const { serverPort, webPort, cliDaemonPort } = resolveDaemonPorts(env);
 	const cliDaemonWsUrl =
 		env.DEVOS_CLI_DAEMON_WS_URL ?? formatCliDaemonWsUrl(cliDaemonPort);
 	const serverBaseUrl = resolveServerBaseUrl(env);
@@ -76,6 +73,7 @@ export async function runProductionDaemon(
 	const signalTarget = options.signalTarget ?? process;
 	const env = options.env ?? process.env;
 	const serverBaseUrl = resolveServerBaseUrl(env);
+	const services = buildDaemonCommands(env);
 	const commandDaemon = (options.startCommandDaemon ?? startCliCommandDaemon)({
 		cwd,
 		env: {
@@ -86,7 +84,7 @@ export async function runProductionDaemon(
 				resolveServerEventsWsUrl(serverBaseUrl),
 		},
 	});
-	const children = buildDaemonCommands(options.env).map((service) =>
+	const children = services.map((service) =>
 		spawnChild(service.command, service.args, {
 			cwd,
 			env: service.env,
@@ -110,37 +108,26 @@ export function runCliCommandDaemonOnly(
 	write(
 		`CLI daemon websocket listening on ${formatCliDaemonWsUrl(commandDaemon.port)}\n`,
 	);
+	const poller =
+		options.pollForever && options.allProjects
+			? startAttachedWorkflowPoller({
+					cwd,
+					env: options.env,
+					write,
+					spawnPoller: options.spawnPoller,
+				})
+			: undefined;
+	if (poller) {
+		write(
+			"CLI daemon workflow poller attached with --all-projects --poll-forever\n",
+		);
+	}
 
-	return superviseCliCommandDaemon(commandDaemon, signalTarget);
-}
-
-function superviseCliCommandDaemon(
-	commandDaemon: { stop(): Promise<void> },
-	signalTarget: DaemonSignalTarget,
-): Promise<number> {
-	return new Promise((resolve) => {
-		let resolved = false;
-
-		const finish = (code: number) => {
-			if (resolved) {
-				return;
-			}
-			resolved = true;
-			for (const signal of SIGNALS) {
-				signalTarget.off(signal, signalHandlers[signal]);
-			}
-			void commandDaemon.stop().finally(() => resolve(code));
-		};
-
-		const signalHandlers = {
-			SIGINT: () => finish(0),
-			SIGTERM: () => finish(0),
-		};
-
-		for (const signal of SIGNALS) {
-			signalTarget.on(signal, signalHandlers[signal]);
-		}
-	});
+	return superviseCliCommandDaemonWithPoller(
+		commandDaemon,
+		signalTarget,
+		poller,
+	);
 }
 
 function superviseDaemonChildren(
@@ -214,7 +201,7 @@ const spawnDaemonChild: DaemonSpawn = (command, args, options) =>
 	spawn(command, args, options);
 
 function resolveServerBaseUrl(env: NodeJS.ProcessEnv): string {
-	const serverPort = env.PIV_SERVER_PORT ?? DEFAULT_SERVER_PORT;
+	const { serverPort } = resolveDaemonPorts(env);
 	return env.DEVOS_SERVER_BASE_URL ?? `http://127.0.0.1:${serverPort}`;
 }
 

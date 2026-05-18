@@ -5,6 +5,7 @@ import type {
 } from "../../features/types";
 import type { AgentResult } from "../../integrations/agent-adapters";
 import { logger, normalizeError } from "../../utils/logger";
+import { emitWorkflowProgress } from "../server";
 import { appendAgentChatLog } from "./state";
 
 interface RunAgentWithChatLogOptions {
@@ -30,6 +31,7 @@ export async function runAgentWithChatLog(
 	options: RunAgentWithChatLogOptions,
 ): Promise<AgentResult> {
 	try {
+		emitAgentProgress(options, "started");
 		const result = await options.invoke();
 		await persistAgentChatLog(options, {
 			finalMessage: result.finalMessage,
@@ -38,6 +40,7 @@ export async function runAgentWithChatLog(
 			usage: result.usage,
 			success: true,
 		});
+		emitAgentProgress(options, "succeeded");
 		return result;
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -47,8 +50,26 @@ export async function runAgentWithChatLog(
 			success: false,
 			error: message,
 		});
+		emitAgentProgress(options, "failed", message);
 		throw error;
 	}
+}
+
+function emitAgentProgress(
+	options: RunAgentWithChatLogOptions,
+	status: "started" | "succeeded" | "failed",
+	error?: string,
+): void {
+	emitWorkflowProgress({
+		kind: "action",
+		projectId: options.projectId,
+		issueKey: options.issue.key,
+		stage: options.agentRole,
+		action: "agent",
+		agentRole: options.agentRole,
+		status,
+		...(error ? { error } : {}),
+	});
 }
 
 async function persistAgentChatLog(

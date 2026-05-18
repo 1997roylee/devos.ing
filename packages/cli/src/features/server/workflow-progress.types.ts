@@ -1,4 +1,4 @@
-import type { PlannedSplitTask } from "../types";
+import type { AgentChatLogRole, PlannedSplitTask } from "../types";
 
 export const WORKFLOW_PROGRESS_SCHEMA = "devos.workflow.stream.v1";
 
@@ -41,6 +41,7 @@ export interface WorkflowActionProgressEvent extends WorkflowProgressBase {
 	kind: "action";
 	action: string;
 	status: WorkflowProgressStatus;
+	agentRole?: AgentChatLogRole;
 	detail?: string;
 	error?: string;
 }

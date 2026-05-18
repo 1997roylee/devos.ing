@@ -1,5 +1,5 @@
 import { emitWorkflowProgress } from "../server/workflow-progress";
-import type { PlannedSplitTask, RunState } from "../types";
+import type { AgentChatLogRole, PlannedSplitTask, RunState } from "../types";
 
 const PLAN_HEADINGS = [
 	"Title",
@@ -31,7 +31,7 @@ export function emitActionProgress(
 	stage: string,
 	action: string,
 	status: "started" | "succeeded" | "failed" | "blocked",
-	input?: { detail?: string; error?: string },
+	input?: { agentRole?: AgentChatLogRole; detail?: string; error?: string },
 ): void {
 	emitWorkflowProgress({
 		kind: "action",
@@ -40,6 +40,7 @@ export function emitActionProgress(
 		stage,
 		action,
 		status,
+		...(input?.agentRole ? { agentRole: input.agentRole } : {}),
 		...(input?.detail ? { detail: input.detail } : {}),
 		...(input?.error ? { error: input.error } : {}),
 	});

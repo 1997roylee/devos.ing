@@ -10,6 +10,12 @@ async function loadSkillText(filePath: string): Promise<string> {
 	}
 }
 
+const COVERAGE_GUIDANCE = [
+	"Use 90%-100% meaningful behavior coverage as the testing target, not exhaustive 100% line coverage.",
+	"Prioritize business logic first: workflow transitions, parsing contracts, config/state behavior, integrations, API route behavior, and user-visible data-flow decisions.",
+	"Flag missing coverage only when it creates real product or workflow risk, not because non-critical lines are uncovered.",
+].join(" ");
+
 export async function buildPlanPrompt(
 	skillPath: string,
 	issue: IssueRef,
@@ -72,6 +78,7 @@ export async function buildPlanPrompt(
 		"Do not invent a success goal when acceptance criteria are unclear; use NEEDS_INFO instead.",
 		"When including SPLIT_TASKS_JSON, write action-oriented task titles and clear descriptions that include expected behavior, implementation scope, and tests.",
 		"Create a concrete implementation plan and format the READY narrative with these headings in order: Title, Summary, Key Changes, Checkpoints (Steps), Test plan, Assumptions.",
+		`In Test plan, ${COVERAGE_GUIDANCE}`,
 		"In Checkpoints (Steps), break meaningful requirements into ordered progress checkpoints; each checkpoint must name the implementation target and validation/progress signal.",
 		"Use Assumptions for explicit assumptions only; write None when there are no assumptions.",
 	].join("\n");
@@ -98,6 +105,7 @@ export async function buildImplementPrompt(
 		"",
 		"Before editing, restate the scoped plan and the ordered Checkpoints (Steps) list as your progress plan.",
 		"Implement the task checkpoint-by-checkpoint in the current workspace and run relevant tests.",
+		`When adding or updating tests, ${COVERAGE_GUIDANCE}`,
 		"End with a concise summary that lists completed checkpoints, blocked checkpoints if any, checks run, and remaining risk.",
 	].join("\n");
 }
@@ -133,6 +141,7 @@ export async function buildReviewPrompt(
 		...successScope,
 		"",
 		"Use the success scope above as the acceptance boundary. Verify the implementation satisfies it, and do not widen requirements beyond it.",
+		COVERAGE_GUIDANCE,
 		"",
 		"Review code changes and run `bun test` to verify the workspace is workable. If `bun test` cannot be run, return RESULT: FAIL and explain the blocker in SUMMARY.",
 		"When returning RESULT: FAIL, each BUGS_JSON item body must be a structured repair checklist with: failing command or reproduction step, observed behavior, expected behavior, likely files or code path, concrete fix expectation, and verification command/check.",
@@ -184,6 +193,7 @@ export async function buildFixPrompt(
 		"- Break the repair work into checkpointed fixes, then report each bug-fix checkpoint as completed or blocked.",
 		"- Preserve unrelated user changes and avoid broad refactors outside the failing behavior.",
 		"- Add or update regression tests when the fix changes behavior or guards a reported failure.",
+		`- ${COVERAGE_GUIDANCE}`,
 		"- Run each listed verification command/check plus relevant repository checks for the touched code.",
 		"- End with a concise summary that names the bugs fixed, completed and blocked checkpoints, checks that passed, and remaining risk.",
 	].join("\n");

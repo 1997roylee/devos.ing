@@ -9,7 +9,7 @@
 		"devos": "dist/index.js"
 	},
 	"scripts": {
-		"build": "bun build ./src/index.ts --target bun --outdir dist",
+		"build": "bun run ./scripts/build.ts",
 		"start": "bun run ./src/index.ts",
 		"smoke": "bun test tests/smoke-flow.test.ts",
 		"publish:version": "bun run ./scripts/publish-version.ts",

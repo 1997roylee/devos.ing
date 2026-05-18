@@ -24,8 +24,8 @@ export function resolveCliDaemonPort(env: NodeJS.ProcessEnv): number {
 		return DEFAULT_CLI_DAEMON_PORT;
 	}
 	const port = Number(rawPort);
-	if (!Number.isInteger(port) || port <= 0) {
-		throw new Error("CLI daemon port must be a positive integer");
+	if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+		throw new Error("CLI daemon port must be a valid TCP port");
 	}
 	return port;
 }
