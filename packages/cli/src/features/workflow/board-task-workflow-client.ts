@@ -11,7 +11,11 @@ import type {
 	BoardTaskWorkflowRecord,
 	BoardTaskWorkflowStore,
 } from "./board-task-workflow-store.types";
-import type { WorkflowIssue, WorkflowLinearClient } from "./workflow.types";
+import type {
+	WorkflowFetchWorkOptions,
+	WorkflowIssue,
+	WorkflowLinearClient,
+} from "./workflow.types";
 
 const BACKLOG_STATUS = "planning";
 const READY_STATUS = "todo";
@@ -33,10 +37,13 @@ class BoardTaskWorkflowClient implements WorkflowLinearClient {
 		this.store = createBoardTaskWorkflowStore(config);
 	}
 
-	async fetchWork(taskKey?: string): Promise<WorkflowIssue[]> {
+	async fetchWork(
+		taskKey?: string,
+		options: WorkflowFetchWorkOptions = {},
+	): Promise<WorkflowIssue[]> {
 		const tasks = await this.store.listTasks();
 		return tasks
-			.filter(({ task }) => task.projectId === this.config.id)
+			.filter(({ task }) => this.matchesProjectScope(task.projectId, options))
 			.filter(({ task }) => (taskKey ? task.taskKey === taskKey : true))
 			.filter(({ task }) => (taskKey ? true : task.status === READY_STATUS))
 			.map(mapTaskToWorkflowIssue);
@@ -139,6 +146,16 @@ class BoardTaskWorkflowClient implements WorkflowLinearClient {
 			linearUrl: null,
 		});
 		return toCreatedRef(created.id, created.taskKey, created.title);
+	}
+
+	private matchesProjectScope(
+		projectId: string | null,
+		options: WorkflowFetchWorkOptions,
+	): boolean {
+		return (
+			projectId === this.config.id ||
+			(options.includeUnprojected === true && projectId === null)
+		);
 	}
 }
 

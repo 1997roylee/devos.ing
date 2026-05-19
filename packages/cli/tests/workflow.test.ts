@@ -676,6 +676,55 @@ describe("processIssueQueueBounded", () => {
 });
 
 describe("runWorkflow parallel issue regression", () => {
+	it("requests unprojected tasks during all-project polling", async () => {
+		const { restore } = installWorkflowPollingSocket();
+		const fetchCalls: Array<{
+			projectId: string;
+			issueArg: string | undefined;
+			options: unknown;
+		}> = [];
+		const projects = [createProject("api"), createProject("web")];
+		const runtime = {
+			createLinearClient: (config: ResolvedProjectConfig) =>
+				({
+					fetchWork: mock(async (issueArg, options) => {
+						fetchCalls.push({
+							projectId: config.id,
+							issueArg,
+							options,
+						});
+						return [];
+					}),
+				}) as unknown,
+		} as unknown as WorkflowRuntime;
+
+		try {
+			await runWorkflow(
+				{
+					...createLoadedConfig(projects[0] as ResolvedProjectConfig),
+					projects,
+				},
+				{ allProjects: true, poll: true },
+				runtime,
+			);
+
+			expect(fetchCalls).toEqual([
+				{
+					projectId: "api",
+					issueArg: undefined,
+					options: { includeUnprojected: true },
+				},
+				{
+					projectId: "web",
+					issueArg: undefined,
+					options: { includeUnprojected: true },
+				},
+			]);
+		} finally {
+			restore();
+		}
+	});
+
 	it("records CLI polling cycle status and events", async () => {
 		const { calls, restore } = installWorkflowPollingSocket();
 		const workspacePath = await mkdtemp(

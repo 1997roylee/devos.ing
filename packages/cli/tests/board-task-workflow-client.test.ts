@@ -27,11 +27,17 @@ describe("BoardTaskWorkflowClient", () => {
 			"TASK-000001",
 		]);
 		expect(
+			(await client.fetchWork(undefined, { includeUnprojected: true })).map(
+				(task) => task.identifier,
+			),
+		).toEqual(["TASK-000001", "TASK-000005"]);
+		expect(
 			(await client.fetchWork("TASK-000002")).map((task) => task.identifier),
 		).toEqual(["TASK-000002"]);
 		expect(await client.isAssignedState("todo")).toBe(true);
 		expect(await client.isAssignedState("planning")).toBe(false);
 		expect(calls.map((call) => call.body.action)).toEqual([
+			"tasks.list",
 			"tasks.list",
 			"tasks.list",
 		]);
@@ -142,6 +148,12 @@ function payloadForAction(action: string, payload: unknown): unknown {
 				},
 			}),
 			task({ id: "task-4", taskKey: "TASK-000004", projectId: "other" }),
+			task({
+				id: "task-5",
+				taskKey: "TASK-000005",
+				projectId: null,
+				status: "todo",
+			}),
 		];
 	}
 	if (action === "tasks.update" && isRecord(payload)) {

@@ -437,7 +437,9 @@ async function buildIssueQueueForProjectCycle(
 		};
 	}
 
-	const assignedIssues = await linear.fetchWork(options.issueArg);
+	const assignedIssues = await linear.fetchWork(options.issueArg, {
+		includeUnprojected: options.allProjects === true && !options.issueArg,
+	});
 	if (options.issueArg !== undefined) {
 		return {
 			issueQueue: selectIssueQueueForCycle(

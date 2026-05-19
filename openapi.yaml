@@ -153,6 +153,16 @@ paths:
           description: Deleted task.
         '404':
           $ref: '#/components/responses/TypedError'
+  /api/tasks/{id}/activity:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Board]
+      responses:
+        '200':
+          description: Task activity timeline.
+        '404':
+          $ref: '#/components/responses/TypedError'
   /api/agents:
     get:
       tags: [Read Models]
@@ -543,6 +553,9 @@ components:
         priority: { type: integer }
         status: { type: string, minLength: 1 }
         creatorId: { type: string, minLength: 1 }
+        assigneeId:
+          type: string
+          nullable: true
         dueDate:
           type: string
           nullable: true
@@ -627,6 +640,9 @@ components:
         priority: { type: integer }
         status: { type: string, minLength: 1 }
         creatorId: { type: string, minLength: 1 }
+        assigneeId:
+          type: string
+          nullable: true
         dueDate:
           type: string
           nullable: true

@@ -67,8 +67,15 @@ export interface IssueJobLogFields {
 	resumed?: true;
 }
 
+export interface WorkflowFetchWorkOptions {
+	includeUnprojected?: boolean;
+}
+
 export interface WorkflowLinearClient {
-	fetchWork(issueArg?: string): Promise<WorkflowIssue[]>;
+	fetchWork(
+		issueArg?: string,
+		options?: WorkflowFetchWorkOptions,
+	): Promise<WorkflowIssue[]>;
 	fetchIssueByIdentifier(issueArg: string): Promise<WorkflowIssue | null>;
 	fetchReviewOnlyWork(): Promise<WorkflowIssue[]>;
 	isAssignedState(stateId: string): Promise<boolean>;

@@ -65,6 +65,25 @@ describe("CLI stream proxy", () => {
 			},
 		]);
 	});
+
+	it("rejects malformed browser frames before forwarding to the daemon", () => {
+		const client = new FakeSocket(WebSocket.OPEN);
+		const DaemonWebSocket = createFakeDaemonConstructor();
+		proxyClientToDaemon(client, "ws://daemon.test", DaemonWebSocket);
+		const daemon = DaemonWebSocket.instances[0];
+
+		client.emitMessage(JSON.stringify({ action: "projects" }));
+		daemon?.open();
+
+		expect(daemon?.sent).toEqual([]);
+		expect(client.sent.map((message) => JSON.parse(String(message)))).toEqual([
+			{
+				type: "error",
+				requestId: "unknown",
+				error: "Malformed daemon frame: type is required",
+			},
+		]);
+	});
 });
 
 class FakeSocket extends EventEmitter implements CliStreamSocket {

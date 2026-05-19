@@ -1,5 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
+import { parseCliDaemonInboundFrame } from "devos/features/daemon";
 import { WebSocket, WebSocketServer } from "ws";
 import type {
 	CliStreamDaemonSocketConstructor,
@@ -67,11 +68,7 @@ export function proxyClientToDaemon(
 		}
 	});
 	client.on("message", (message: WebSocket.RawData) => {
-		if (daemon.readyState === WebSocket.OPEN) {
-			daemon.send(message);
-			return;
-		}
-		queuedMessages.push(message);
+		forwardClientMessage(client, daemon, queuedMessages, message);
 	});
 	client.on("close", () => {
 		if (
@@ -81,6 +78,24 @@ export function proxyClientToDaemon(
 			daemon.close();
 		}
 	});
+}
+
+function forwardClientMessage(
+	client: CliStreamSocket,
+	daemon: CliStreamSocket,
+	queuedMessages: WebSocket.RawData[],
+	message: WebSocket.RawData,
+): void {
+	const parsed = parseCliDaemonInboundFrame(String(message));
+	if (parsed.status === "error") {
+		sendProxyError(client, parsed.error);
+		return;
+	}
+	if (daemon.readyState === WebSocket.OPEN) {
+		daemon.send(message);
+		return;
+	}
+	queuedMessages.push(message);
 }
 
 function sendProxyError(client: CliStreamSocket, error: string): void {
